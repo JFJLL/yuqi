@@ -1,5 +1,8 @@
 # Logs
 logs
+# 源码里的 logs/Logs 目录(巡检日志页面/组件)是正常源码, 不是日志输出
+!src/pages/Logs/
+!src/components/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
