@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* shadcn 基础层兜底: 没写显式 text-x / bg-x 的文字和表面 (textarea 输入文字、
+     placeholder、气泡正文) 从这里继承主题色, 不依赖 UA 默认色.
+     烧主题前 token 未定义时这两行按无效值优雅回退, 无副作用. */
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* 中英混排对齐:一行里英文(尤其 ds 的 display/像素字体如 Press Start 2P)和中文(系统黑体)
+   混在一起时,英文会偏小、偏上,跟中文对不齐。把纯英文/数字那一截用 <span className="cjk-latin">
+   包起来即可统一对齐:font-size-adjust 拉平字号,vertical-align 把英文下移到与中文同基线。
+   --cjk-latin-shift 由 design_picker 按 ds 烧进 :root(默认 -0.15em);极个别字体偏差大改这一个值。 */
+.cjk-latin {
+  font-size-adjust: 0.56;
+  vertical-align: var(--cjk-latin-shift, -0.15em);
+}

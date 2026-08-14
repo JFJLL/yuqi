@@ -1,0 +1,23 @@
+{
+  "app_id": "app-2384c9a6dbe348a39055854b7b5d3e18",
+  "name": "我要基于这些原型开发管理后台请先分析admin.html",
+  "exported_at": "2026-08-14T02:47:54.204284+00:00",
+  "source": "dev-container",
+  "includes_pb_data": false,
+  "removed_sensitive_files": [
+    "templates/pb_hooks",
+    "src/_rh_inspect.ts",
+    "templates/scaffold/src/_rh_inspect.ts"
+  ],
+  "entrypoints": {
+    "macos": "vibex-local/start-macos.sh",
+    "linux": "vibex-local/start-linux.sh",
+    "windows": "vibex-local/start-windows.bat"
+  },
+  "coding_agent_guidance": {
+    "skill": ".vibex/skills/vibex-app-source-roundtrip/SKILL.md",
+    "codex": "AGENTS.md",
+    "claude_code": "CLAUDE.md",
+    "cursor": ".cursor/rules/vibex-source-roundtrip.mdc"
+  }
+}

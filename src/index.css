@@ -1,0 +1,175 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100%;
+  /* 管理后台固定浅色主题，首帧直接按目标底色渲染。 */
+  background-color: #f4f7fa;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* shadcn 基础层兜底: 没写显式 text-x / bg-x 的文字和表面 (textarea 输入文字、
+     placeholder、气泡正文) 从这里继承主题色, 不依赖 UA 默认色.
+     烧主题前 token 未定义时这两行按无效值优雅回退, 无副作用. */
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* 中英混排对齐:一行里英文(尤其 ds 的 display/像素字体如 Press Start 2P)和中文(系统黑体)
+   混在一起时,英文会偏小、偏上,跟中文对不齐。把纯英文/数字那一截用 <span className="cjk-latin">
+   包起来即可统一对齐:font-size-adjust 拉平字号,vertical-align 把英文下移到与中文同基线。
+   --cjk-latin-shift 由 design_picker 按 ds 烧进 :root(默认 -0.15em);极个别字体偏差大改这一个值。 */
+.cjk-latin {
+  font-size-adjust: 0.56;
+  vertical-align: var(--cjk-latin-shift, -0.15em);
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+    /* 管理后台浅色主题: 浅灰底 + 白卡片 + 商务蓝主色 (照原型风格) */
+    --background: 210 33% 97%;
+    --foreground: 219 37% 15%;
+    --card-foreground: 219 37% 15%;
+    --popover-foreground: 219 37% 15%;
+    --card: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --secondary: 212 31% 95%;
+    --secondary-foreground: 219 37% 25%;
+    --accent: 205 75% 95%;
+    --accent-foreground: 207 76% 30%;
+    --muted: 212 31% 95%;
+    --muted-foreground: 214 15% 47%;
+    --border: 212 31% 90%;
+    --input: 212 31% 90%;
+    --primary: 207 76% 38%;
+    --ring: 207 76% 38%;
+    --primary-foreground: 0 0% 100%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive: 355 61% 46%;
+    --radius: var(--radius-md);
+
+    /* 状态语义色: 合规/风险/告警徽标用 */
+    --success: 161 75% 29%;
+    --warning: 34 100% 32%;
+    --info: 207 76% 38%;
+    --violet: 256 53% 53%;
+
+    /* 深藏蓝侧边栏 */
+    --sidebar-background: 211 52% 13%;
+    --sidebar-foreground: 210 55% 89%;
+    --sidebar-primary: 205 69% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 211 45% 20%;
+    --sidebar-accent-foreground: 210 55% 93%;
+    --sidebar-border: 211 40% 24%;
+    --sidebar-ring: 207 76% 38%;
+
+    --space-1: 4px;
+    --space-12: 48px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --radius-lg: 12px;
+    --radius-md: 8px;
+    --radius-pill: 9999px;
+    --radius-sm: 6px;
+    --elev-flat: none;
+    --elev-ring: 0 0 0 1px var(--border);
+    --text-2xl: 32px;
+    --text-3xl: 48px;
+    --text-4xl: 72px;
+    --text-base: 16px;
+    --text-lg: 18px;
+    --text-sm: 14px;
+    --text-xl: 24px;
+    --text-xs: 12px;
+    --leading-body: 1.5;
+    --leading-tight: 1.00;
+    --font-display: "Inter Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Inter", "SF Pro Display", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+    --font-body: "Inter Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Inter", "SF Pro Display", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "Berkeley Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+    --cjk-latin-shift: -0.15em;
+  }
+
+  .dark {
+    /* 管理后台固定浅色主题: 即使外层强制 dark, 也保持浅色观感 */
+    color-scheme: light;
+    --background: 210 33% 97%;
+    --foreground: 219 37% 15%;
+    --card-foreground: 219 37% 15%;
+    --popover-foreground: 219 37% 15%;
+    --card: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --secondary: 212 31% 95%;
+    --secondary-foreground: 219 37% 25%;
+    --accent: 205 75% 95%;
+    --accent-foreground: 207 76% 30%;
+    --muted: 212 31% 95%;
+    --muted-foreground: 214 15% 47%;
+    --border: 212 31% 90%;
+    --input: 212 31% 90%;
+    --primary: 207 76% 38%;
+    --ring: 207 76% 38%;
+    --primary-foreground: 0 0% 100%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive: 355 61% 46%;
+    --radius: var(--radius-md);
+
+    --success: 161 75% 29%;
+    --warning: 34 100% 32%;
+    --info: 207 76% 38%;
+    --violet: 256 53% 53%;
+
+    --sidebar-background: 211 52% 13%;
+    --sidebar-foreground: 210 55% 89%;
+    --sidebar-primary: 205 69% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 211 45% 20%;
+    --sidebar-accent-foreground: 210 55% 93%;
+    --sidebar-border: 211 40% 24%;
+    --sidebar-ring: 207 76% 38%;
+
+    --space-1: 4px;
+    --space-12: 48px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --radius-lg: 12px;
+    --radius-md: 8px;
+    --radius-pill: 9999px;
+    --radius-sm: 6px;
+    --elev-flat: none;
+    --elev-ring: 0 0 0 1px var(--border);
+    --text-2xl: 32px;
+    --text-3xl: 48px;
+    --text-4xl: 72px;
+    --text-base: 16px;
+    --text-lg: 18px;
+    --text-sm: 14px;
+    --text-xl: 24px;
+    --text-xs: 12px;
+    --leading-body: 1.5;
+    --leading-tight: 1.00;
+    --font-display: "Inter Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Inter", "SF Pro Display", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+    --font-body: "Inter Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Inter", "SF Pro Display", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "Berkeley Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+    --cjk-latin-shift: -0.15em;
+  }
+
+  body { font-family: var(--font-body); }
+
+  /* 中英混排: 把英文/数字那一截用 <span class="cjk-latin"> 包起来, 字号 + 基线对齐中文 (font-size-adjust 0.56 实测最贴中文字高) */
+  .cjk-latin { font-size-adjust: 0.56; vertical-align: var(--cjk-latin-shift, -0.15em); }
+}
