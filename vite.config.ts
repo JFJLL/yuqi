@@ -80,7 +80,7 @@ export default defineConfig({
     },
   },
   server: {
-    allowedHosts: ['.runninghub.cn', '.vibex.cn'],
+    allowedHosts: ['.runninghub.cn', '.vibex.cn', '.red-magic.cn'],
     host: '0.0.0.0',
     port: 8040,
     strictPort: true,
@@ -88,5 +88,6 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 8040,
+    allowedHosts: ['.red-magic.cn'],
   },
 })
