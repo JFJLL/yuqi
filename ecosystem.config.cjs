@@ -3,7 +3,7 @@
 // 两个进程:
 //   - yuqi-pb   : PocketBase, 127.0.0.1:7040, cwd=pocketbase/ 让它按 cwd 解析
 //                 pb_data / pb_migrations / pb_hooks
-//   - yuqi-web  : vite preview 托管 dist/, 127.0.0.1:8040 (需先 pnpm build)
+//   - yuqi      : vite preview 托管 dist/, 127.0.0.1:8040 (需先 pnpm build)
 //
 // 用法:
 //   pnpm install && pnpm build
@@ -29,7 +29,7 @@ module.exports = {
       // },
     },
     {
-      name: 'yuqi-web',
+      name: 'yuqi',
       script: path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'),
       cwd: ROOT,
       args: 'preview --host 127.0.0.1 --port 8040 --strictPort',
