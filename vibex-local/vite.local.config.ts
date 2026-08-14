@@ -11,18 +11,18 @@ export default defineConfig({
   },
   server: {
     host: '127.0.0.1',
-    port: 8000,
+    port: 8040,
     strictPort: true,
     proxy: {
       '/__pb': {
-        target: 'http://127.0.0.1:7000',
+        target: 'http://127.0.0.1:7040',
         changeOrigin: true,
       },
     },
   },
   preview: {
     host: '127.0.0.1',
-    port: 8000,
+    port: 8040,
     strictPort: true,
   },
 })

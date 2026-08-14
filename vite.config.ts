@@ -82,11 +82,11 @@ export default defineConfig({
   server: {
     allowedHosts: ['.runninghub.cn', '.vibex.cn'],
     host: '0.0.0.0',
-    port: 8000,
+    port: 8040,
     strictPort: true,
   },
   preview: {
     host: '0.0.0.0',
-    port: 8000,
+    port: 8040,
   },
 })

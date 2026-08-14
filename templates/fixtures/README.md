@@ -25,6 +25,6 @@ bash .claude/scripts/init-fixtures.sh
 3. 下载产物 URL 落盘到 `templates/fixtures/`
 4. 写一个 `test-prompt.txt` 包含已知过审的 prompt
 
-**前置**: PocketBase 在 :7000 已经跑, `pb_hooks` 已有 `/api/aigc/image/generate` 路由 (rh-aigc-integration skill 的标准路由), `RH_API_KEY` 已注入。
+**前置**: PocketBase 在 :7040 已经跑, `pb_hooks` 已有 `/api/aigc/image/generate` 路由 (rh-aigc-integration skill 的标准路由), `RH_API_KEY` 已注入。
 
 如果初始化失败也不要紧 — Claude 直接调用 `/api/aigc/image/generate` 现场生成临时 fixture 即可。

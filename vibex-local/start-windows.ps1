@@ -86,7 +86,7 @@ function Show-PocketBaseLogTail {
 
 function Test-PocketBaseHealth {
   try {
-    $health = Invoke-RestMethod "http://127.0.0.1:7000/api/health" -TimeoutSec 1
+    $health = Invoke-RestMethod "http://127.0.0.1:7040/api/health" -TimeoutSec 1
     return ($health.message -eq "API is healthy." -or $health.code -eq 200)
   } catch {
     return $false
@@ -97,27 +97,27 @@ function Wait-PocketBase($Process) {
   for ($i = 0; $i -lt 30; $i++) {
     if ($Process.HasExited) {
       Show-PocketBaseLogTail
-      throw "PocketBase failed to start. Check that port 7000 is free, then retry."
+      throw "PocketBase failed to start. Check that port 7040 is free, then retry."
     }
     if (Test-PocketBaseHealth) { return }
     Start-Sleep -Seconds 1
   }
   Show-PocketBaseLogTail
-  throw "PocketBase did not become healthy at http://127.0.0.1:7000/api/health."
+  throw "PocketBase did not become healthy at http://127.0.0.1:7040/api/health."
 }
 
 Ensure-PocketBase
-$pb = Start-Process -FilePath $PbBin -ArgumentList @("serve", "--http=127.0.0.1:7000") -WorkingDirectory $PbDir -RedirectStandardOutput (Join-Path $PbLogDir "stdout.log") -RedirectStandardError (Join-Path $PbLogDir "stderr.log") -PassThru
+$pb = Start-Process -FilePath $PbBin -ArgumentList @("serve", "--http=127.0.0.1:7040") -WorkingDirectory $PbDir -RedirectStandardOutput (Join-Path $PbLogDir "stdout.log") -RedirectStandardError (Join-Path $PbLogDir "stderr.log") -PassThru
 try {
   Wait-PocketBase $pb
   $vite = Ensure-NodePm
-  Start-Job -ScriptBlock { Start-Sleep -Seconds 3; Start-Process "http://127.0.0.1:8000" } | Out-Null
-  Write-Host "VibeX local app: http://127.0.0.1:8000"
-  Write-Host "PocketBase:      http://127.0.0.1:7000"
+  Start-Job -ScriptBlock { Start-Sleep -Seconds 3; Start-Process "http://127.0.0.1:8040" } | Out-Null
+  Write-Host "VibeX local app: http://127.0.0.1:8040"
+  Write-Host "PocketBase:      http://127.0.0.1:7040"
   $cmd = $vite[0]
   $args = @()
   if ($vite.Length -gt 1) { $args += $vite[1..($vite.Length - 1)] }
-  $args += @("--config", "vibex-local/vite.local.config.ts", "--host", "127.0.0.1", "--port", "8000")
+  $args += @("--config", "vibex-local/vite.local.config.ts", "--host", "127.0.0.1", "--port", "8040")
   & $cmd @args
 } finally {
   if ($pb -and !$pb.HasExited) { Stop-Process -Id $pb.Id -Force }

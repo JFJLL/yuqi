@@ -109,7 +109,7 @@ wait_for_pocketbase() {
       exit 1
     fi
     if command -v curl >/dev/null 2>&1; then
-      if curl -fsS http://127.0.0.1:7000/api/health 2>/dev/null | grep -q "API is healthy"; then
+      if curl -fsS http://127.0.0.1:7040/api/health 2>/dev/null | grep -q "API is healthy"; then
         return
       fi
     elif [ "$i" -ge 3 ]; then
@@ -117,23 +117,23 @@ wait_for_pocketbase() {
     fi
     sleep 1
   done
-  echo "PocketBase did not become healthy at http://127.0.0.1:7000/api/health." >&2
-  echo "Check that port 7000 is free, then retry. Recent stderr:" >&2
+  echo "PocketBase did not become healthy at http://127.0.0.1:7040/api/health." >&2
+  echo "Check that port 7040 is free, then retry. Recent stderr:" >&2
   tail -n 80 "$PB_LOG_DIR/stderr.log" >&2 2>/dev/null || true
   exit 1
 }
 
 open_local_app() {
   if [ "$ACTUAL_OS" = "Darwin" ] && command -v open >/dev/null 2>&1; then
-    open http://127.0.0.1:8000 >/dev/null 2>&1 || true
+    open http://127.0.0.1:8040 >/dev/null 2>&1 || true
   elif command -v xdg-open >/dev/null 2>&1; then
-    xdg-open http://127.0.0.1:8000 >/dev/null 2>&1 || true
+    xdg-open http://127.0.0.1:8040 >/dev/null 2>&1 || true
   fi
 }
 
 ensure_pocketbase
 
-"$PB_BIN" serve --http=127.0.0.1:7000 > "$PB_LOG_DIR/stdout.log" 2> "$PB_LOG_DIR/stderr.log" &
+"$PB_BIN" serve --http=127.0.0.1:7040 > "$PB_LOG_DIR/stdout.log" 2> "$PB_LOG_DIR/stderr.log" &
 PB_PID=$!
 cleanup() {
   kill "$PB_PID" >/dev/null 2>&1 || true
@@ -144,6 +144,6 @@ wait_for_pocketbase
 ensure_node_pm
 
 (sleep 3; open_local_app) &
-echo "VibeX local app: http://127.0.0.1:8000"
-echo "PocketBase:      http://127.0.0.1:7000"
-exec "${VITE_CMD[@]}" --config vibex-local/vite.local.config.ts --host 127.0.0.1 --port 8000
+echo "VibeX local app: http://127.0.0.1:8040"
+echo "PocketBase:      http://127.0.0.1:7040"
+exec "${VITE_CMD[@]}" --config vibex-local/vite.local.config.ts --host 127.0.0.1 --port 8040

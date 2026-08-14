@@ -25,7 +25,7 @@ Double-click `vibex-local/start-windows.bat`, or run:
 powershell -ExecutionPolicy Bypass -File .\vibex-local\start-windows.ps1
 ```
 
-The app opens at `http://127.0.0.1:8000` and PocketBase runs at `http://127.0.0.1:7000`; both ports must be free before starting.
+The app opens at `http://127.0.0.1:8040` and PocketBase runs at `http://127.0.0.1:7040`; both ports must be free before starting.
 The local Vite config proxies `/__pb` to PocketBase, matching the VibeX online runtime path.
 
 ## Requirements
