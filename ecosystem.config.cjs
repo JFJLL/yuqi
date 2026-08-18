@@ -1,9 +1,8 @@
 // PM2 ecosystem for yuqi (https://yuqi.red-magic.cn)
 //
-// 两个进程:
-//   - yuqi-pb   : PocketBase, 127.0.0.1:7040, cwd=pocketbase/ 让它按 cwd 解析
-//                 pb_data / pb_migrations / pb_hooks
-//   - yuqi      : vite preview 托管 dist/, 127.0.0.1:8040 (需先 pnpm build)
+// 进程配置:
+//   - yuqi-pb : PocketBase 数据库与 API, 127.0.0.1:7040
+//   (前端网页已改为 Nginx 直接托管 dist/ 静态目录，无需再启动 Node 进程)
 //
 // 用法:
 //   pnpm install && pnpm build
@@ -27,14 +26,6 @@ module.exports = {
       // env: {
       //   RH_API_KEY: '',
       // },
-    },
-    {
-      name: 'yuqi',
-      script: path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'),
-      cwd: ROOT,
-      args: 'preview --host 127.0.0.1 --port 8040 --strictPort',
-      max_memory_restart: '300M',
-      autorestart: true,
     },
   ],
 }
