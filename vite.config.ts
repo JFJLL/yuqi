@@ -84,6 +84,14 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 8040,
     strictPort: true,
+    // 本地运行网关时，浏览器仍只访问 /__asr；网关再以服务端 Token 调用 127.0.0.1:18083 的 ASR。
+    // 不在 Vite 中注入 Token，也不让浏览器直连 ASR 服务。
+    proxy: {
+      '/__asr': {
+        target: process.env.YUQI_ASR_DEV_GATEWAY_URL || 'http://127.0.0.1:18084',
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     host: '0.0.0.0',

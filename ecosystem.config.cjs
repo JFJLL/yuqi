@@ -1,8 +1,9 @@
 // PM2 ecosystem for yuqi (https://yuqi.red-magic.cn)
 //
 // 进程配置:
-//   - yuqi-pb : PocketBase 数据库与 API, 127.0.0.1:7040
-//   (前端网页已改为 Nginx 直接托管 dist/ 静态目录，无需再启动 Node 进程)
+//   - yuqi-pb          : PocketBase 数据库与 API, 127.0.0.1:7040
+//   - yuqi-asr-gateway : ASR 上传转发与后台轮询, 127.0.0.1:18084
+//   (前端网页已改为 Nginx 直接托管 dist/ 静态目录)
 //
 // 用法:
 //   pnpm install && pnpm build
@@ -22,10 +23,19 @@ module.exports = {
       args: 'serve --http=127.0.0.1:7040',
       max_memory_restart: '300M',
       autorestart: true,
-      // AI 功能需要时取消注释, 填入你自己的 key (来自 .env.local)
-      // env: {
-      //   RH_API_KEY: '',
-      // },
+    },
+    {
+      name: 'yuqi-asr-gateway',
+      script: path.join(ROOT, 'server', 'asr-gateway.mjs'),
+      interpreter: 'node',
+      cwd: ROOT,
+      max_memory_restart: '250M',
+      autorestart: true,
+      // 请在云服务器的 PM2 环境或 systemd EnvironmentFile 中设置，勿提交真实值：
+      // ASR_BASE_URL=http://127.0.0.1:<frp-visitor-port>
+      // ASR_SERVICE_TOKEN=<long-random-token>
+      // POCKETBASE_URL=http://127.0.0.1:7040
+      // YUQI_ASR_GATEWAY_PORT=18084
     },
   ],
 }

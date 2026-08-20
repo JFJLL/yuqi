@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { Pill, stateTone } from "@/components/dashboard/Pill"
+import { Pill, stateTone, type PillTone } from "@/components/dashboard/Pill"
 import type { TranscriptRecord } from "@/lib/admin"
 
 export interface RecordRow extends TranscriptRecord {
@@ -11,11 +11,23 @@ interface RecordTableProps {
   rows: RecordRow[]
   loading: boolean
   onView: (row: RecordRow) => void
+  onRetry?: (asrJobId: string) => void
 }
 
-const HEADS = ["时间", "员工", "门店", "设备码", "文本摘要", "质检", "操作"]
+const HEADS = ["时间", "员工", "门店", "设备码", "文本摘要", "ASR 状态", "质检", "操作"]
 
-export function RecordTable({ rows, loading, onView }: RecordTableProps) {
+const ASR_STATUS: Record<string, { label: string; tone: PillTone }> = {
+  queued: { label: "排队中", tone: "gray" },
+  running: { label: "转写中", tone: "blue" },
+  succeeded: { label: "已完成", tone: "green" },
+  failed: { label: "失败", tone: "red" },
+}
+
+function asrStatusInfo(status?: string) {
+  return ASR_STATUS[status || ""] ?? { label: status ? "未知" : "-", tone: "gray" as PillTone }
+}
+
+export function RecordTable({ rows, loading, onView, onRetry }: RecordTableProps) {
   return (
     <div className="overflow-auto">
       <table className="w-full border-collapse text-[13px]">
@@ -39,27 +51,40 @@ export function RecordTable({ rows, loading, onView }: RecordTableProps) {
               </td>
             </tr>
           )}
-          {rows.map((row) => (
-            <tr key={row.id} className="hover:bg-accent/40">
-              <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">
-                {row.occurred_at ? row.occurred_at.slice(11, 16) : "-"}
-              </td>
-              <td className="px-2.5 py-3 border-b border-border">{row.employeeName || "-"}</td>
-              <td className="px-2.5 py-3 border-b border-border">{row.storeName || "-"}</td>
-              <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">{row.device || "-"}</td>
-              <td className="px-2.5 py-3 border-b border-border max-w-[360px]">
-                <span className="line-clamp-2">{row.summary}</span>
-              </td>
-              <td className="px-2.5 py-3 border-b border-border">
-                <Pill tone={stateTone(row.qc_result)}>{row.qc_result || "-"}</Pill>
-              </td>
-              <td className="px-2.5 py-3 border-b border-border">
-                <Button variant="link" className="h-auto p-0 text-primary font-semibold" onClick={() => onView(row)}>
-                  查看文本
-                </Button>
-              </td>
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const asr = asrStatusInfo(row.asr_status)
+            return (
+              <tr key={row.id} className="hover:bg-accent/40">
+                <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">
+                  {row.occurred_at ? row.occurred_at.slice(11, 16) : "-"}
+                </td>
+                <td className="px-2.5 py-3 border-b border-border">{row.employeeName || "-"}</td>
+                <td className="px-2.5 py-3 border-b border-border">{row.storeName || "-"}</td>
+                <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">{row.device || "-"}</td>
+                <td className="px-2.5 py-3 border-b border-border max-w-[360px]">
+                  <span className="line-clamp-2">{row.summary || row.audio_name || "-"}</span>
+                </td>
+                <td className="px-2.5 py-3 border-b border-border">
+                  <Pill tone={asr.tone}>{asr.label}</Pill>
+                </td>
+                <td className="px-2.5 py-3 border-b border-border">
+                  <Pill tone={stateTone(row.qc_result)}>{row.qc_result || "-"}</Pill>
+                </td>
+                <td className="px-2.5 py-3 border-b border-border">
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    <Button variant="link" className="h-auto p-0 text-primary font-semibold" onClick={() => onView(row)}>
+                      查看文本
+                    </Button>
+                    {row.asr_status === "failed" && row.asr_job && onRetry && (
+                      <Button variant="link" className="h-auto p-0 text-destructive font-semibold" onClick={() => onRetry(row.asr_job!)}>
+                        重试
+                      </Button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

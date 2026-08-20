@@ -2,7 +2,7 @@
 // pb_hooks/transcripts.pb.js — 业务 collection + REST CRUD 路由 (self-contained)
 //
 // 由 mcp__rh-pb-hooks__install_business_collection 装. 不要直接 Read+Write 这个文件.
-// 业务字段: device:text, employee:relation, store:relation, summary:text, full_text:text, qc_result:text, occurred_at:date
+// 业务字段: device:text, employee:relation, store:relation, summary:text, full_text:text, segments_json:json, asr_job:text, asr_status:text, model:text, audio_name:text, qc_result:text, occurred_at:date
 // 路由: list,get,create,update,delete
 // list filter 字段: store,employee,qc_result
 // list 默认排序: -occurred_at
@@ -31,7 +31,16 @@ onBootstrap(function (e) {
       addField({ name: 'employee', type: 'relation', max: 1, collectionId: 'employees' })
       addField({ name: 'store', type: 'relation', max: 1, collectionId: 'stores' })
       addField({ name: 'summary', type: 'text', max: 500 })
-      addField({ name: 'full_text', type: 'text', max: 8000 })
+      addField({ name: 'full_text', type: 'text', max: 100000 })
+      addField({ name: 'segments_json', type: 'json' })
+      addField({ name: 'asr_job', type: 'text', max: 20 })
+      addField({ name: 'asr_status', type: 'text', max: 20 })
+      addField({ name: 'model', type: 'text', max: 80 })
+      addField({ name: 'audio_name', type: 'text', max: 180 })
+      try {
+        var fullTextField = existing.fields.getByName('full_text')
+        if (fullTextField && Number(fullTextField.max || 0) < 100000) { fullTextField.max = 100000; changed = true }
+      } catch (_) {}
       addField({ name: 'qc_result', type: 'text', max: 20 })
       addField({ name: 'occurred_at', type: 'date' })
       addField({ name: "created", type: "autodate", onCreate: true })
@@ -50,7 +59,12 @@ onBootstrap(function (e) {
           { name: 'employee', type: 'relation', max: 1, collectionId: 'employees' },
           { name: 'store', type: 'relation', max: 1, collectionId: 'stores' },
           { name: 'summary', type: 'text', max: 500 },
-          { name: 'full_text', type: 'text', max: 8000 },
+          { name: 'full_text', type: 'text', max: 100000 },
+          { name: 'segments_json', type: 'json' },
+          { name: 'asr_job', type: 'text', max: 20 },
+          { name: 'asr_status', type: 'text', max: 20 },
+          { name: 'model', type: 'text', max: 80 },
+          { name: 'audio_name', type: 'text', max: 180 },
           { name: 'qc_result', type: 'text', max: 20 },
           { name: 'occurred_at', type: 'date' },
           { name: "created", type: "autodate", onCreate: true },
@@ -78,7 +92,12 @@ routerAdd("GET", "/api/transcripts", function (e) {
           { name: 'employee', type: 'relation', max: 1, collectionId: 'employees' },
           { name: 'store', type: 'relation', max: 1, collectionId: 'stores' },
           { name: 'summary', type: 'text', max: 500 },
-          { name: 'full_text', type: 'text', max: 8000 },
+          { name: 'full_text', type: 'text', max: 100000 },
+          { name: 'segments_json', type: 'json' },
+          { name: 'asr_job', type: 'text', max: 20 },
+          { name: 'asr_status', type: 'text', max: 20 },
+          { name: 'model', type: 'text', max: 80 },
+          { name: 'audio_name', type: 'text', max: 180 },
           { name: 'qc_result', type: 'text', max: 20 },
           { name: 'occurred_at', type: 'date' },
         { name: "created", type: "autodate", onCreate: true },
@@ -152,7 +171,12 @@ routerAdd("POST", "/api/transcripts", function (e) {
           { name: 'employee', type: 'relation', max: 1, collectionId: 'employees' },
           { name: 'store', type: 'relation', max: 1, collectionId: 'stores' },
           { name: 'summary', type: 'text', max: 500 },
-          { name: 'full_text', type: 'text', max: 8000 },
+          { name: 'full_text', type: 'text', max: 100000 },
+          { name: 'segments_json', type: 'json' },
+          { name: 'asr_job', type: 'text', max: 20 },
+          { name: 'asr_status', type: 'text', max: 20 },
+          { name: 'model', type: 'text', max: 80 },
+          { name: 'audio_name', type: 'text', max: 180 },
           { name: 'qc_result', type: 'text', max: 20 },
           { name: 'occurred_at', type: 'date' },
         { name: "created", type: "autodate", onCreate: true },
@@ -171,6 +195,11 @@ routerAdd("POST", "/api/transcripts", function (e) {
     rec.set("store", body.store === undefined || body.store === null ? "" : String(body.store))
     rec.set("summary", body.summary === undefined || body.summary === null ? "" : String(body.summary))
     rec.set("full_text", body.full_text === undefined || body.full_text === null ? "" : String(body.full_text))
+    rec.set("segments_json", body.segments_json === undefined || body.segments_json === null ? [] : body.segments_json)
+    rec.set("asr_job", body.asr_job === undefined || body.asr_job === null ? "" : String(body.asr_job))
+    rec.set("asr_status", body.asr_status === undefined || body.asr_status === null ? "" : String(body.asr_status))
+    rec.set("model", body.model === undefined || body.model === null ? "" : String(body.model))
+    rec.set("audio_name", body.audio_name === undefined || body.audio_name === null ? "" : String(body.audio_name))
     rec.set("qc_result", body.qc_result === undefined || body.qc_result === null ? "" : String(body.qc_result))
     rec.set("occurred_at", body.occurred_at === undefined || body.occurred_at === null ? "" : String(body.occurred_at))
     $app.save(rec)
@@ -195,6 +224,11 @@ routerAdd("PATCH", "/api/transcripts/{id}", function (e) {
     if ("store" in body) rec.set("store", body.store === undefined || body.store === null ? "" : String(body.store))
     if ("summary" in body) rec.set("summary", body.summary === undefined || body.summary === null ? "" : String(body.summary))
     if ("full_text" in body) rec.set("full_text", body.full_text === undefined || body.full_text === null ? "" : String(body.full_text))
+    if ("segments_json" in body) rec.set("segments_json", body.segments_json === undefined || body.segments_json === null ? [] : body.segments_json)
+    if ("asr_job" in body) rec.set("asr_job", body.asr_job === undefined || body.asr_job === null ? "" : String(body.asr_job))
+    if ("asr_status" in body) rec.set("asr_status", body.asr_status === undefined || body.asr_status === null ? "" : String(body.asr_status))
+    if ("model" in body) rec.set("model", body.model === undefined || body.model === null ? "" : String(body.model))
+    if ("audio_name" in body) rec.set("audio_name", body.audio_name === undefined || body.audio_name === null ? "" : String(body.audio_name))
     if ("qc_result" in body) rec.set("qc_result", body.qc_result === undefined || body.qc_result === null ? "" : String(body.qc_result))
     if ("occurred_at" in body) rec.set("occurred_at", body.occurred_at === undefined || body.occurred_at === null ? "" : String(body.occurred_at))
     $app.save(rec)

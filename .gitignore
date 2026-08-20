@@ -25,3 +25,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+yuqi_asr_service/
+
+# 云端 ASR 网关运行时密钥；仅提交 deploy/asr-gateway.env.example 模板。
+/deploy/asr-gateway.env

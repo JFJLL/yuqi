@@ -136,6 +136,16 @@ export interface TranscriptRecord {
   store: string
   summary: string
   full_text: string
+  segments_json?: Array<{
+    text: string
+    start_ms: number | null
+    end_ms: number | null
+    speaker: string
+  }>
+  asr_job?: string
+  asr_status?: "queued" | "running" | "succeeded" | "failed" | ""
+  model?: string
+  audio_name?: string
   qc_result: string
   occurred_at: string
 }
