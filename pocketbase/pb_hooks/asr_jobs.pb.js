@@ -1,107 +1,47 @@
 /// <reference path="../pb_data/types.d.ts" />
 // pb_hooks/asr_jobs.pb.js — ASR 任务元数据与轻量 CRUD 路由。
 // 不在 PocketBase hook 内执行上传转发、远程轮询或 ASR 推理；这些工作由云端 asr-gateway 完成。
-
-var ASR_JOB_STATUS = ["queued", "running", "succeeded", "failed"]
-
-function asrJobFields() {
-  return [
-    { name: "remote_job_id", type: "text", max: 40 },
-    { name: "transcript", type: "text", max: 20 },
-    { name: "status", type: "text", max: 20 },
-    { name: "device", type: "text", max: 60 },
-    { name: "employee", type: "relation", max: 1, collectionId: "employees" },
-    { name: "store", type: "relation", max: 1, collectionId: "stores" },
-    { name: "audio_name", type: "text", max: 180 },
-    { name: "audio_size", type: "number" },
-    { name: "audio_sha256", type: "text", max: 64 },
-    { name: "metadata_json", type: "json" },
-    { name: "submitted_at", type: "date" },
-    { name: "started_at", type: "date" },
-    { name: "finished_at", type: "date" },
-    { name: "last_polled_at", type: "date" },
-    { name: "result_imported_at", type: "date" },
-    { name: "occurred_at", type: "date" },
-    { name: "attempts", type: "number" },
-    { name: "error_code", type: "text", max: 80 },
-    { name: "error_message", type: "text", max: 1000 },
-    { name: "created", type: "autodate", onCreate: true },
-    { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
-  ]
-}
-
-function ensureAsrJobsCollection() {
-  var existing = null
-  try { existing = $app.findCollectionByNameOrId("asr_jobs") } catch (_) { existing = null }
-  if (!existing) {
-    var created = new Collection({
-      type: "base",
-      name: "asr_jobs",
-      listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
-      fields: asrJobFields(),
-    })
-    $app.save(created)
-    return $app.findCollectionByNameOrId("asr_jobs")
-  }
-  var changed = false
-  function hasField(name) {
-    try { return !!existing.fields.getByName(name) } catch (_) {}
-    try {
-      for (var i = 0; i < existing.fields.length; i++) {
-        if (String(existing.fields[i].name) === String(name)) return true
-      }
-    } catch (_) {}
-    return false
-  }
-  var fields = asrJobFields()
-  for (var i = 0; i < fields.length; i++) {
-    if (hasField(fields[i].name)) continue
-    try { existing.fields.add(new Field(fields[i])); changed = true } catch (_) {}
-  }
-  if (changed) $app.save(existing)
-  return $app.findCollectionByNameOrId("asr_jobs")
-}
-
-function asrJobStatus(value) {
-  var normalized = String(value || "queued").toLowerCase()
-  if (ASR_JOB_STATUS.indexOf(normalized) < 0) throw new Error("invalid ASR job status")
-  return normalized
-}
-
-function asrJobString(value, max) {
-  return value === undefined || value === null ? "" : String(value).slice(0, max)
-}
-
-function asrJobNumber(value, fallback) {
-  var number = Number(value)
-  return isFinite(number) && number >= 0 ? number : fallback
-}
-
-function asrJobSet(record, body, partial) {
-  if (!partial || "remote_job_id" in body) record.set("remote_job_id", asrJobString(body.remote_job_id, 40))
-  if (!partial || "transcript" in body) record.set("transcript", asrJobString(body.transcript, 20))
-  if (!partial || "status" in body) record.set("status", asrJobStatus(body.status))
-  if (!partial || "device" in body) record.set("device", asrJobString(body.device, 60))
-  if (!partial || "employee" in body) record.set("employee", asrJobString(body.employee, 20))
-  if (!partial || "store" in body) record.set("store", asrJobString(body.store, 20))
-  if (!partial || "audio_name" in body) record.set("audio_name", asrJobString(body.audio_name, 180))
-  if (!partial || "audio_size" in body) record.set("audio_size", asrJobNumber(body.audio_size, 0))
-  if (!partial || "audio_sha256" in body) record.set("audio_sha256", asrJobString(body.audio_sha256, 64))
-  if (!partial || "metadata_json" in body) record.set("metadata_json", body.metadata_json === undefined || body.metadata_json === null ? {} : body.metadata_json)
-  if (!partial || "submitted_at" in body) record.set("submitted_at", asrJobString(body.submitted_at, 40))
-  if (!partial || "started_at" in body) record.set("started_at", asrJobString(body.started_at, 40))
-  if (!partial || "finished_at" in body) record.set("finished_at", asrJobString(body.finished_at, 40))
-  if (!partial || "last_polled_at" in body) record.set("last_polled_at", asrJobString(body.last_polled_at, 40))
-  if (!partial || "result_imported_at" in body) record.set("result_imported_at", asrJobString(body.result_imported_at, 40))
-  if (!partial || "occurred_at" in body) record.set("occurred_at", asrJobString(body.occurred_at, 40))
-  if (!partial || "attempts" in body) record.set("attempts", asrJobNumber(body.attempts, 0))
-  if (!partial || "error_code" in body) record.set("error_code", asrJobString(body.error_code, 80))
-  if (!partial || "error_message" in body) record.set("error_message", asrJobString(body.error_message, 1000))
-}
+//
+// PocketBase 会把 routerAdd 的回调隔离执行，因此路由回调不能依赖本文件
+// 顶层声明的函数或变量。每个回调都保留自己的最小 schema/校验逻辑。
 
 onBootstrap(function (e) {
   e.next()
-  try { ensureAsrJobsCollection() } catch (err) {
+  try {
+    var existing = null
+    try { existing = $app.findCollectionByNameOrId("asr_jobs") } catch (_) { existing = null }
+    if (!existing) {
+      var collection = new Collection({
+        type: "base",
+        name: "asr_jobs",
+        listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
+        fields: [
+          { name: "remote_job_id", type: "text", max: 40 },
+          { name: "transcript", type: "text", max: 20 },
+          { name: "status", type: "text", max: 20 },
+          { name: "device", type: "text", max: 60 },
+          { name: "employee", type: "relation", max: 1, collectionId: "pbc_3735627160" },
+          { name: "store", type: "relation", max: 1, collectionId: "pbc_3800236418" },
+          { name: "audio_name", type: "text", max: 180 },
+          { name: "audio_size", type: "number" },
+          { name: "audio_sha256", type: "text", max: 64 },
+          { name: "metadata_json", type: "json" },
+          { name: "submitted_at", type: "date" },
+          { name: "started_at", type: "date" },
+          { name: "finished_at", type: "date" },
+          { name: "last_polled_at", type: "date" },
+          { name: "result_imported_at", type: "date" },
+          { name: "occurred_at", type: "date" },
+          { name: "attempts", type: "number" },
+          { name: "error_code", type: "text", max: 80 },
+          { name: "error_message", type: "text", max: 1000 },
+          { name: "created", type: "autodate", onCreate: true },
+          { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
+        ],
+      })
+      $app.save(collection)
+    }
+  } catch (err) {
     try { $app.logger().error("asr_jobs bootstrap: " + String(err && err.message || err)) } catch (_) {}
   }
 })
@@ -109,7 +49,7 @@ onBootstrap(function (e) {
 // GET /api/asr_jobs?page=1&perPage=50&status=queued&active=1&transcript=...
 routerAdd("GET", "/api/asr_jobs", function (e) {
   try {
-    ensureAsrJobsCollection()
+    $app.findCollectionByNameOrId("asr_jobs")
     var query = e.requestInfo().query || {}
     var page = parseInt(String(query.page || "1"), 10) || 1
     var perPage = parseInt(String(query.perPage || "50"), 10) || 50
@@ -118,12 +58,14 @@ routerAdd("GET", "/api/asr_jobs", function (e) {
     var filterParts = []
     var params = {}
     if (query.status !== undefined && query.status !== "") {
+      var status = String(query.status || "queued").toLowerCase()
+      if (["queued", "running", "succeeded", "failed"].indexOf(status) < 0) {
+        return e.json(400, { error: "invalid_status" })
+      }
       filterParts.push("status = {:status}")
-      params.status = asrJobStatus(query.status)
+      params.status = status
     }
-    if (String(query.active || "") === "1") {
-      filterParts.push("(status = 'queued' || status = 'running')")
-    }
+    if (String(query.active || "") === "1") filterParts.push("(status = 'queued' || status = 'running')")
     if (query.transcript !== undefined && query.transcript !== "") {
       filterParts.push("transcript = {:transcript}")
       params.transcript = String(query.transcript)
@@ -142,7 +84,6 @@ routerAdd("GET", "/api/asr_jobs", function (e) {
 
 routerAdd("GET", "/api/asr_jobs/{id}", function (e) {
   try {
-    ensureAsrJobsCollection()
     var rec = $app.findRecordById("asr_jobs", e.request.pathValue("id"))
     return e.json(200, rec.publicExport())
   } catch (err) {
@@ -152,12 +93,34 @@ routerAdd("GET", "/api/asr_jobs/{id}", function (e) {
 
 routerAdd("POST", "/api/asr_jobs", function (e) {
   try {
-    var collection = ensureAsrJobsCollection()
+    var collection = $app.findCollectionByNameOrId("asr_jobs")
     var body = e.requestInfo().body || {}
     if (!/^[0-9a-f]{32}$/i.test(String(body.remote_job_id || ""))) return e.json(400, { error: "remote_job_id_required" })
     if (!String(body.transcript || "")) return e.json(400, { error: "transcript_required" })
+    var status = String(body.status || "queued").toLowerCase()
+    if (["queued", "running", "succeeded", "failed"].indexOf(status) < 0) return e.json(400, { error: "invalid_status" })
     var rec = new Record(collection)
-    asrJobSet(rec, body, false)
+    rec.set("remote_job_id", String(body.remote_job_id || "").slice(0, 40))
+    rec.set("transcript", String(body.transcript || "").slice(0, 20))
+    rec.set("status", status)
+    rec.set("device", body.device === undefined || body.device === null ? "" : String(body.device).slice(0, 60))
+    rec.set("employee", body.employee === undefined || body.employee === null ? "" : String(body.employee).slice(0, 20))
+    rec.set("store", body.store === undefined || body.store === null ? "" : String(body.store).slice(0, 20))
+    rec.set("audio_name", body.audio_name === undefined || body.audio_name === null ? "" : String(body.audio_name).slice(0, 180))
+    var audioSize = Number(body.audio_size)
+    rec.set("audio_size", audioSize >= 0 && isFinite(audioSize) ? audioSize : 0)
+    rec.set("audio_sha256", body.audio_sha256 === undefined || body.audio_sha256 === null ? "" : String(body.audio_sha256).slice(0, 64))
+    rec.set("metadata_json", body.metadata_json === undefined || body.metadata_json === null ? {} : body.metadata_json)
+    rec.set("submitted_at", body.submitted_at === undefined || body.submitted_at === null ? "" : String(body.submitted_at).slice(0, 40))
+    rec.set("started_at", body.started_at === undefined || body.started_at === null ? "" : String(body.started_at).slice(0, 40))
+    rec.set("finished_at", body.finished_at === undefined || body.finished_at === null ? "" : String(body.finished_at).slice(0, 40))
+    rec.set("last_polled_at", body.last_polled_at === undefined || body.last_polled_at === null ? "" : String(body.last_polled_at).slice(0, 40))
+    rec.set("result_imported_at", body.result_imported_at === undefined || body.result_imported_at === null ? "" : String(body.result_imported_at).slice(0, 40))
+    rec.set("occurred_at", body.occurred_at === undefined || body.occurred_at === null ? "" : String(body.occurred_at).slice(0, 40))
+    var attempts = Number(body.attempts)
+    rec.set("attempts", attempts >= 0 && isFinite(attempts) ? attempts : 0)
+    rec.set("error_code", body.error_code === undefined || body.error_code === null ? "" : String(body.error_code).slice(0, 80))
+    rec.set("error_message", body.error_message === undefined || body.error_message === null ? "" : String(body.error_message).slice(0, 1000))
     $app.save(rec)
     return e.json(200, rec.publicExport())
   } catch (err) {
@@ -167,9 +130,37 @@ routerAdd("POST", "/api/asr_jobs", function (e) {
 
 routerAdd("PATCH", "/api/asr_jobs/{id}", function (e) {
   try {
-    ensureAsrJobsCollection()
     var rec = $app.findRecordById("asr_jobs", e.request.pathValue("id"))
-    asrJobSet(rec, e.requestInfo().body || {}, true)
+    var body = e.requestInfo().body || {}
+    if ("status" in body) {
+      var status = String(body.status || "queued").toLowerCase()
+      if (["queued", "running", "succeeded", "failed"].indexOf(status) < 0) return e.json(400, { error: "invalid_status" })
+      rec.set("status", status)
+    }
+    if ("remote_job_id" in body) rec.set("remote_job_id", String(body.remote_job_id || "").slice(0, 40))
+    if ("transcript" in body) rec.set("transcript", String(body.transcript || "").slice(0, 20))
+    if ("device" in body) rec.set("device", body.device === undefined || body.device === null ? "" : String(body.device).slice(0, 60))
+    if ("employee" in body) rec.set("employee", body.employee === undefined || body.employee === null ? "" : String(body.employee).slice(0, 20))
+    if ("store" in body) rec.set("store", body.store === undefined || body.store === null ? "" : String(body.store).slice(0, 20))
+    if ("audio_name" in body) rec.set("audio_name", body.audio_name === undefined || body.audio_name === null ? "" : String(body.audio_name).slice(0, 180))
+    if ("audio_size" in body) {
+      var audioSize = Number(body.audio_size)
+      rec.set("audio_size", audioSize >= 0 && isFinite(audioSize) ? audioSize : 0)
+    }
+    if ("audio_sha256" in body) rec.set("audio_sha256", body.audio_sha256 === undefined || body.audio_sha256 === null ? "" : String(body.audio_sha256).slice(0, 64))
+    if ("metadata_json" in body) rec.set("metadata_json", body.metadata_json === undefined || body.metadata_json === null ? {} : body.metadata_json)
+    if ("submitted_at" in body) rec.set("submitted_at", body.submitted_at === undefined || body.submitted_at === null ? "" : String(body.submitted_at).slice(0, 40))
+    if ("started_at" in body) rec.set("started_at", body.started_at === undefined || body.started_at === null ? "" : String(body.started_at).slice(0, 40))
+    if ("finished_at" in body) rec.set("finished_at", body.finished_at === undefined || body.finished_at === null ? "" : String(body.finished_at).slice(0, 40))
+    if ("last_polled_at" in body) rec.set("last_polled_at", body.last_polled_at === undefined || body.last_polled_at === null ? "" : String(body.last_polled_at).slice(0, 40))
+    if ("result_imported_at" in body) rec.set("result_imported_at", body.result_imported_at === undefined || body.result_imported_at === null ? "" : String(body.result_imported_at).slice(0, 40))
+    if ("occurred_at" in body) rec.set("occurred_at", body.occurred_at === undefined || body.occurred_at === null ? "" : String(body.occurred_at).slice(0, 40))
+    if ("attempts" in body) {
+      var attempts = Number(body.attempts)
+      rec.set("attempts", attempts >= 0 && isFinite(attempts) ? attempts : 0)
+    }
+    if ("error_code" in body) rec.set("error_code", body.error_code === undefined || body.error_code === null ? "" : String(body.error_code).slice(0, 80))
+    if ("error_message" in body) rec.set("error_message", body.error_message === undefined || body.error_message === null ? "" : String(body.error_message).slice(0, 1000))
     $app.save(rec)
     return e.json(200, rec.publicExport())
   } catch (err) {

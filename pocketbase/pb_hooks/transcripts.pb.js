@@ -7,6 +7,9 @@
 // list filter 字段: store,employee,qc_result
 // list 默认排序: -occurred_at
 
+// PocketBase relation fields require collection IDs, not collection names.
+// These IDs are declared by pocketbase/pb_migrations/*_created_{employees,stores}.js.
+
 onBootstrap(function (e) {
   e.next()
   try {
@@ -28,8 +31,8 @@ onBootstrap(function (e) {
         try { existing.fields.add(new Field(def)); changed = true } catch (_) {}
       }
       addField({ name: 'device', type: 'text', max: 60 })
-      addField({ name: 'employee', type: 'relation', max: 1, collectionId: 'employees' })
-      addField({ name: 'store', type: 'relation', max: 1, collectionId: 'stores' })
+      addField({ name: 'employee', type: 'relation', max: 1, collectionId: 'pbc_3735627160' })
+      addField({ name: 'store', type: 'relation', max: 1, collectionId: 'pbc_3800236418' })
       addField({ name: 'summary', type: 'text', max: 500 })
       addField({ name: 'full_text', type: 'text', max: 100000 })
       addField({ name: 'segments_json', type: 'json' })
@@ -56,8 +59,8 @@ onBootstrap(function (e) {
         listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
         fields: [
           { name: 'device', type: 'text', max: 60 },
-          { name: 'employee', type: 'relation', max: 1, collectionId: 'employees' },
-          { name: 'store', type: 'relation', max: 1, collectionId: 'stores' },
+          { name: 'employee', type: 'relation', max: 1, collectionId: 'pbc_3735627160' },
+          { name: 'store', type: 'relation', max: 1, collectionId: 'pbc_3800236418' },
           { name: 'summary', type: 'text', max: 500 },
           { name: 'full_text', type: 'text', max: 100000 },
           { name: 'segments_json', type: 'json' },
@@ -89,8 +92,8 @@ routerAdd("GET", "/api/transcripts", function (e) {
       listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
       fields: [
           { name: 'device', type: 'text', max: 60 },
-          { name: 'employee', type: 'relation', max: 1, collectionId: 'employees' },
-          { name: 'store', type: 'relation', max: 1, collectionId: 'stores' },
+          { name: 'employee', type: 'relation', max: 1, collectionId: 'pbc_3735627160' },
+          { name: 'store', type: 'relation', max: 1, collectionId: 'pbc_3800236418' },
           { name: 'summary', type: 'text', max: 500 },
           { name: 'full_text', type: 'text', max: 100000 },
           { name: 'segments_json', type: 'json' },
@@ -168,8 +171,8 @@ routerAdd("POST", "/api/transcripts", function (e) {
       listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
       fields: [
           { name: 'device', type: 'text', max: 60 },
-          { name: 'employee', type: 'relation', max: 1, collectionId: 'employees' },
-          { name: 'store', type: 'relation', max: 1, collectionId: 'stores' },
+          { name: 'employee', type: 'relation', max: 1, collectionId: 'pbc_3735627160' },
+          { name: 'store', type: 'relation', max: 1, collectionId: 'pbc_3800236418' },
           { name: 'summary', type: 'text', max: 500 },
           { name: 'full_text', type: 'text', max: 100000 },
           { name: 'segments_json', type: 'json' },

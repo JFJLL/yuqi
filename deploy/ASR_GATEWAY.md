@@ -2,18 +2,23 @@
 
 本说明只涉及 **Yuqi 云服务器**。独立的 `yuqi_asr_service` 保持不变；FunASR 推理继续运行在 ASR 电脑。Yuqi 新增的网关负责接收浏览器上传、通过已建立的 frp 回环入口调用 ASR、轮询任务，并将结果写入 PocketBase。
 
-## 1. 配置 frp 的云端回环入口
+## 1. 配置已有 frp TCP 回环入口
 
-确认 frp 在 **Yuqi 云服务器本机**提供到 ASR 服务的回环 URL，例如：
+本机 ASR 服务监听 `127.0.0.1:18083`。现有 frp 代理保持云端端口不变，只把本机目标改为：
 
-```text
-http://127.0.0.1:<frp-visitor-port>
+```toml
+[[proxies]]
+name = "asr-web"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 18083
+remotePort = 18082
 ```
 
-该端口应由云服务器上的 frp visitor/client 监听，并转发到 ASR 电脑的 `127.0.0.1:18083`。不要在 Nginx 中暴露此端口，也不要为它配置公网 `remotePort`。在填写 Yuqi 配置前，可在云服务器上验证：
+这样 Yuqi 云服务器上的 frps 会把 `127.0.0.1:18082` 转发到 ASR 电脑的 `127.0.0.1:18083`。云端 `18082` 不应通过 Nginx 或安全组向公网开放；如 frps 配置支持，优先将代理端口绑定到云服务器回环地址。填写 Yuqi 配置前，在云服务器上验证：
 
 ```bash
-curl -fsS http://127.0.0.1:<frp-visitor-port>/health
+curl -fsS http://127.0.0.1:18082/health
 ```
 
 ## 2. 创建仅在服务器保存的运行环境文件
@@ -28,7 +33,7 @@ chmod 600 deploy/asr-gateway.env
 填写以下两个值，其他默认项可先保留：
 
 ```dotenv
-ASR_BASE_URL=http://127.0.0.1:<frp-visitor-port>
+ASR_BASE_URL=http://127.0.0.1:18082
 ASR_SERVICE_TOKEN=<与 ASR 服务相同的随机长 Token>
 ```
 

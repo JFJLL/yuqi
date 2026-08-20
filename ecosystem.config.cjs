@@ -20,7 +20,15 @@ module.exports = {
       script: path.join(ROOT, 'vibex-local', 'bin', 'linux', 'pocketbase'),
       interpreter: 'none',
       cwd: path.join(ROOT, 'pocketbase'),
-      args: 'serve --http=127.0.0.1:7040',
+      // PocketBase resolves these directories relative to the executable by
+      // default. Keep the project-owned hooks and migrations explicit so the
+      // runtime path does not depend on where the binary is stored.
+      args: [
+        'serve',
+        '--http=127.0.0.1:7040',
+        `--hooksDir=${path.join(ROOT, 'pocketbase', 'pb_hooks')}`,
+        `--migrationsDir=${path.join(ROOT, 'pocketbase', 'pb_migrations')}`,
+      ].join(' '),
       max_memory_restart: '300M',
       autorestart: true,
     },
@@ -32,7 +40,7 @@ module.exports = {
       max_memory_restart: '250M',
       autorestart: true,
       // 请在云服务器的 PM2 环境或 systemd EnvironmentFile 中设置，勿提交真实值：
-      // ASR_BASE_URL=http://127.0.0.1:<frp-visitor-port>
+      // ASR_BASE_URL=http://127.0.0.1:18082
       // ASR_SERVICE_TOKEN=<long-random-token>
       // POCKETBASE_URL=http://127.0.0.1:7040
       // YUQI_ASR_GATEWAY_PORT=18084
