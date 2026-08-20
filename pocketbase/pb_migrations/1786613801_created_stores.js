@@ -1,5 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((app) => {
+  const region = app.findCollectionByNameOrId("regions");
   const collection = new Collection({
     "createRule": null,
     "deleteRule": null,
@@ -36,7 +37,7 @@ migrate((app) => {
       },
       {
         "cascadeDelete": false,
-        "collectionId": "pbc_859047449",
+        "collectionId": region.id,
         "help": "",
         "hidden": false,
         "id": "relation258142582",

@@ -1,5 +1,9 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((app) => {
+  let existing = null
+  try { existing = app.findCollectionByNameOrId("regions") } catch (_) {}
+  if (existing) return
+
   const collection = new Collection({
     "createRule": null,
     "deleteRule": null,
@@ -82,7 +86,9 @@ migrate((app) => {
 
   return app.save(collection);
 }, (app) => {
-  const collection = app.findCollectionByNameOrId("pbc_859047449");
+  let collection = null
+  try { collection = app.findCollectionByNameOrId("pbc_859047449") } catch (_) {}
+  if (!collection) return
 
   return app.delete(collection);
 })
