@@ -129,6 +129,17 @@ export interface DeviceLog {
   created?: string
 }
 
+export type TranscriptMarkColor = "red" | "yellow" | "blue" | "gray"
+
+export interface TranscriptMark {
+  speaker: string
+  start_ms: number | null
+  end_ms: number | null
+  color: TranscriptMarkColor
+  note: string
+  created_at: string
+}
+
 export interface TranscriptRecord {
   id: string
   device: string
@@ -149,6 +160,8 @@ export interface TranscriptRecord {
   source?: string
   qc_result: string
   occurred_at: string
+  speaker_aliases?: Record<string, string>
+  marks_json?: TranscriptMark[]
 }
 
 export interface RectifyTaskRecord {

@@ -48,6 +48,8 @@ onBootstrap(function (e) {
       addField({ name: 'occurred_at', type: 'date' })
       // 记录来源：manual=后台上传, oss_auto=OSS 自动采集。空值视为 manual。
       addField({ name: 'source', type: 'text', max: 20 })
+      addField({ name: 'speaker_aliases', type: 'json' })
+      addField({ name: 'marks_json', type: 'json' })
       addField({ name: "created", type: "autodate", onCreate: true })
       addField({ name: "updated", type: "autodate", onCreate: true, onUpdate: true })
       if (changed) {
@@ -73,7 +75,9 @@ onBootstrap(function (e) {
           { name: 'qc_result', type: 'text', max: 20 },
           { name: 'occurred_at', type: 'date' },
           { name: 'source', type: 'text', max: 20 },
-          { name: "created", type: "autodate", onCreate: true },
+          { name: 'speaker_aliases', type: 'json' },
+          { name: 'marks_json', type: 'json' },
+         { name: "created", type: "autodate", onCreate: true },
           { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
         ],
       })
@@ -104,52 +108,54 @@ routerAdd("GET", "/api/transcripts", function (e) {
           { name: 'asr_status', type: 'text', max: 20 },
           { name: 'model', type: 'text', max: 80 },
           { name: 'audio_name', type: 'text', max: 180 },
-          { name: 'qc_result', type: 'text', max: 20 },
-          { name: 'occurred_at', type: 'date' },
-          { name: 'source', type: 'text', max: 20 },
-        { name: "created", type: "autodate", onCreate: true },
-        { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
-      ],
-    })
-    $app.save(col)
-    return $app.findCollectionByNameOrId("transcripts")
-  }
-  try {
-    ensureCollLocal()
-    var info = e.requestInfo()
-    var query = info.query || {}
-    var page = parseInt(String(query.page || "1"), 10) || 1
-    var perPage = parseInt(String(query.perPage || "50"), 10) || 50
-    if (perPage > 200) perPage = 200
-    var sort = String(query.sort || "-occurred_at")
-    var filterParts = []
-    var params = {}
-    if (query.store !== undefined && query.store !== "") {
-      filterParts.push("store = {:store}")
-      params.store = String(query.store)
-    }
-    if (query.employee !== undefined && query.employee !== "") {
-      filterParts.push("employee = {:employee}")
-      params.employee = String(query.employee)
-    }
-    if (query.qc_result !== undefined && query.qc_result !== "") {
-      filterParts.push("qc_result = {:qc_result}")
-      params.qc_result = String(query.qc_result)
-    }
-    var filter = filterParts.length > 0 ? filterParts.join(" && ") : ""
-    var records = filter
-      ? $app.findRecordsByFilter("transcripts", filter, sort, perPage, (page - 1) * perPage, params)
-      : $app.findRecordsByFilter("transcripts", "", sort, perPage, (page - 1) * perPage)
-    var items = []
-    for (var i = 0; i < records.length; i++) {
-      items.push(records[i].publicExport())
-    }
-    return e.json(200, { items: items, page: page, perPage: perPage, totalItems: items.length })
-  } catch (err) {
-    var msg = String(err && err.message || err)
-    try { $app.logger().error("transcripts list: " + msg) } catch (_) {}
-    return e.json(500, { error: "list_failed", message: msg, fingerprint: msg.substring(0, 80) })
-  }
+           { name: 'qc_result', type: 'text', max: 20 },
+           { name: 'occurred_at', type: 'date' },
+           { name: 'source', type: 'text', max: 20 },
+           { name: 'speaker_aliases', type: 'json' },
+           { name: 'marks_json', type: 'json' },
+         { name: "created", type: "autodate", onCreate: true },
+         { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
+       ],
+     })
+     $app.save(col)
+     return $app.findCollectionByNameOrId("transcripts")
+   }
+   try {
+     ensureCollLocal()
+     var info = e.requestInfo()
+     var query = info.query || {}
+     var page = parseInt(String(query.page || "1"), 10) || 1
+     var perPage = parseInt(String(query.perPage || "50"), 10) || 50
+     if (perPage > 200) perPage = 200
+     var sort = String(query.sort || "-occurred_at")
+     var filterParts = []
+     var params = {}
+     if (query.store !== undefined && query.store !== "") {
+       filterParts.push("store = {:store}")
+       params.store = String(query.store)
+     }
+     if (query.employee !== undefined && query.employee !== "") {
+       filterParts.push("employee = {:employee}")
+       params.employee = String(query.employee)
+     }
+     if (query.qc_result !== undefined && query.qc_result !== "") {
+       filterParts.push("qc_result = {:qc_result}")
+       params.qc_result = String(query.qc_result)
+     }
+     var filter = filterParts.length > 0 ? filterParts.join(" && ") : ""
+     var records = filter
+       ? $app.findRecordsByFilter("transcripts", filter, sort, perPage, (page - 1) * perPage, params)
+       : $app.findRecordsByFilter("transcripts", "", sort, perPage, (page - 1) * perPage)
+     var items = []
+     for (var i = 0; i < records.length; i++) {
+       items.push(records[i].publicExport())
+     }
+     return e.json(200, { items: items, page: page, perPage: perPage, totalItems: items.length })
+   } catch (err) {
+     var msg = String(err && err.message || err)
+     try { $app.logger().error("transcripts list: " + msg) } catch (_) {}
+     return e.json(500, { error: "list_failed", message: msg, fingerprint: msg.substring(0, 80) })
+   }
 })
 // GET /api/transcripts/{id}
 routerAdd("GET", "/api/transcripts/{id}", function (e) {
@@ -184,33 +190,37 @@ routerAdd("POST", "/api/transcripts", function (e) {
           { name: 'asr_status', type: 'text', max: 20 },
           { name: 'model', type: 'text', max: 80 },
           { name: 'audio_name', type: 'text', max: 180 },
-          { name: 'qc_result', type: 'text', max: 20 },
-          { name: 'occurred_at', type: 'date' },
-          { name: 'source', type: 'text', max: 20 },
-        { name: "created", type: "autodate", onCreate: true },
-        { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
-      ],
-    })
-    $app.save(col)
-    return $app.findCollectionByNameOrId("transcripts")
-  }
-  try {
-    var coll = ensureCollLocal()
-    var body = e.requestInfo().body || {}
-    var rec = new Record(coll)
-    rec.set("device", body.device === undefined || body.device === null ? "" : String(body.device))
-    rec.set("employee", body.employee === undefined || body.employee === null ? "" : String(body.employee))
-    rec.set("store", body.store === undefined || body.store === null ? "" : String(body.store))
-    rec.set("summary", body.summary === undefined || body.summary === null ? "" : String(body.summary))
-    rec.set("full_text", body.full_text === undefined || body.full_text === null ? "" : String(body.full_text))
-    rec.set("segments_json", body.segments_json === undefined || body.segments_json === null ? [] : body.segments_json)
-    rec.set("asr_job", body.asr_job === undefined || body.asr_job === null ? "" : String(body.asr_job))
-    rec.set("asr_status", body.asr_status === undefined || body.asr_status === null ? "" : String(body.asr_status))
-    rec.set("model", body.model === undefined || body.model === null ? "" : String(body.model))
-    rec.set("audio_name", body.audio_name === undefined || body.audio_name === null ? "" : String(body.audio_name))
-    rec.set("qc_result", body.qc_result === undefined || body.qc_result === null ? "" : String(body.qc_result))
-    rec.set("occurred_at", body.occurred_at === undefined || body.occurred_at === null ? "" : String(body.occurred_at))
-    rec.set("source", body.source === undefined || body.source === null ? "" : String(body.source).slice(0, 20))
+           { name: 'qc_result', type: 'text', max: 20 },
+           { name: 'occurred_at', type: 'date' },
+           { name: 'source', type: 'text', max: 20 },
+           { name: 'speaker_aliases', type: 'json' },
+           { name: 'marks_json', type: 'json' },
+         { name: "created", type: "autodate", onCreate: true },
+         { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
+       ],
+     })
+     $app.save(col)
+     return $app.findCollectionByNameOrId("transcripts")
+   }
+   try {
+     var coll = ensureCollLocal()
+     var body = e.requestInfo().body || {}
+     var rec = new Record(coll)
+     rec.set("device", body.device === undefined || body.device === null ? "" : String(body.device))
+     rec.set("employee", body.employee === undefined || body.employee === null ? "" : String(body.employee))
+     rec.set("store", body.store === undefined || body.store === null ? "" : String(body.store))
+     rec.set("summary", body.summary === undefined || body.summary === null ? "" : String(body.summary))
+     rec.set("full_text", body.full_text === undefined || body.full_text === null ? "" : String(body.full_text))
+     rec.set("segments_json", body.segments_json === undefined || body.segments_json === null ? [] : body.segments_json)
+     rec.set("asr_job", body.asr_job === undefined || body.asr_job === null ? "" : String(body.asr_job))
+     rec.set("asr_status", body.asr_status === undefined || body.asr_status === null ? "" : String(body.asr_status))
+     rec.set("model", body.model === undefined || body.model === null ? "" : String(body.model))
+     rec.set("audio_name", body.audio_name === undefined || body.audio_name === null ? "" : String(body.audio_name))
+     rec.set("qc_result", body.qc_result === undefined || body.qc_result === null ? "" : String(body.qc_result))
+     rec.set("occurred_at", body.occurred_at === undefined || body.occurred_at === null ? "" : String(body.occurred_at))
+     rec.set("source", body.source === undefined || body.source === null ? "" : String(body.source).slice(0, 20))
+     rec.set("speaker_aliases", body.speaker_aliases === undefined || body.speaker_aliases === null ? {} : body.speaker_aliases)
+     rec.set("marks_json", body.marks_json === undefined || body.marks_json === null ? [] : body.marks_json)
     $app.save(rec)
     return e.json(200, rec.publicExport())
   } catch (err) {
@@ -241,6 +251,8 @@ routerAdd("PATCH", "/api/transcripts/{id}", function (e) {
     if ("qc_result" in body) rec.set("qc_result", body.qc_result === undefined || body.qc_result === null ? "" : String(body.qc_result))
     if ("occurred_at" in body) rec.set("occurred_at", body.occurred_at === undefined || body.occurred_at === null ? "" : String(body.occurred_at))
     if ("source" in body) rec.set("source", body.source === undefined || body.source === null ? "" : String(body.source).slice(0, 20))
+    if ("speaker_aliases" in body) rec.set("speaker_aliases", body.speaker_aliases === undefined || body.speaker_aliases === null ? {} : body.speaker_aliases)
+    if ("marks_json" in body) rec.set("marks_json", body.marks_json === undefined || body.marks_json === null ? [] : body.marks_json)
     $app.save(rec)
     return e.json(200, rec.publicExport())
   } catch (err) {
