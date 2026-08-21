@@ -197,8 +197,14 @@ async function listOssAudioObjects() {
       if (key) objects.push({ key, size, lastModified })
     }
     const truncated = /<IsTruncated>true<\/IsTruncated>/i.test(xml)
+    const nextMarker = xml.match(/<NextMarker>([\s\S]*?)<\/NextMarker>/)?.[1] || ""
+    log(`OSS 列表页 ${page + 1}: 返回 ${contents.length} 条, IsTruncated=${truncated}${nextMarker ? `, NextMarker=${decodeXmlEntities(nextMarker).slice(0, 60)}` : ""}`)
+    if (contents.length > 0 && contents.length <= 5) {
+      const sampleKeys = objects.slice(-contents.length).map((o) => o.key)
+      log(`  样本: ${sampleKeys.join(" | ")}`)
+    }
     if (!truncated) break
-    marker = objects.length > 0 ? objects[objects.length - 1].key : ""
+    marker = nextMarker ? decodeXmlEntities(nextMarker) : objects.length > 0 ? objects[objects.length - 1].key : ""
     if (!marker) break
   }
   return objects
