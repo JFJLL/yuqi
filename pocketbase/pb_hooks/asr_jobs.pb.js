@@ -20,8 +20,11 @@ onBootstrap(function (e) {
           { name: "transcript", type: "text", max: 20 },
           { name: "status", type: "text", max: 20 },
           { name: "device", type: "text", max: 60 },
-          { name: "employee", type: "relation", max: 1, collectionId: "pbc_3735627160" },
-          { name: "store", type: "relation", max: 1, collectionId: "pbc_3800236418" },
+          // ASR job metadata stores the source IDs as text. It should not
+          // prevent the ASR queue from starting when business collections
+          // were provisioned with different IDs.
+          { name: "employee", type: "text", max: 40 },
+          { name: "store", type: "text", max: 40 },
           { name: "audio_name", type: "text", max: 180 },
           { name: "audio_size", type: "number" },
           { name: "audio_sha256", type: "text", max: 64 },
@@ -40,6 +43,7 @@ onBootstrap(function (e) {
         ],
       })
       $app.save(collection)
+      try { $app.logger().info("asr_jobs collection created") } catch (_) {}
     }
   } catch (err) {
     try { $app.logger().error("asr_jobs bootstrap: " + String(err && err.message || err)) } catch (_) {}
