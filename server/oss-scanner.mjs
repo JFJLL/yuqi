@@ -112,15 +112,36 @@ function requestBuffer(urlString, { method = "GET", headers = {}, body } = {}) {
           try {
             data = raw ? JSON.parse(raw) : null
           } catch {
-            data = { raw: raw.slice(0, 1000) }
+            data = { raw } // OSS XML 等非 JSON 响应需保留完整内容
           }
-          resolve({ status: response.statusCode || 500, data })
+          resolve({ status: response.statusCode || 500, data, raw })
         })
       },
     )
     request.on("timeout", () => request.destroy(new Error("请求超时")))
     request.on("error", reject)
     if (body) request.write(body)
+    request.end()
+  })
+}
+
+function requestRaw(urlString, { method = "GET", headers = {} } = {}) {
+  const url = new URL(urlString)
+  return new Promise((resolve, reject) => {
+    const request = transportFor(url).request(
+      url,
+      { method, headers, timeout: REQUEST_TIMEOUT_MS },
+      (response) => {
+        const chunks = []
+        response.on("data", (chunk) => chunks.push(chunk))
+        response.on("end", () => {
+          const raw = Buffer.concat(chunks).toString("utf8")
+          resolve({ status: response.statusCode || 500, raw })
+        })
+      },
+    )
+    request.on("timeout", () => request.destroy(new Error("请求超时")))
+    request.on("error", reject)
     request.end()
   })
 }
@@ -181,14 +202,14 @@ async function listOssAudioObjects() {
     const date = new Date().toUTCString()
     const resource = `/${OSS_BUCKET}/`
     const authorization = ossAuthorization("GET", "", "", date, resource)
-    const response = await requestBuffer(`https://${ossVirtualHost()}/?${query.toString()}`, {
+    const response = await requestRaw(`https://${ossVirtualHost()}/?${query.toString()}`, {
       method: "GET",
       headers: { Date: date, Authorization: authorization },
     })
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(`OSS ListObjects 失败：HTTP ${response.status} ${String(response.data?.raw || "").slice(0, 200)}`)
+      throw new Error(`OSS ListObjects 失败：HTTP ${response.status} ${String(response.raw || "").slice(0, 500)}`)
     }
-    const xml = response.data?.raw || ""
+    const xml = response.raw || ""
     const contents = xml.match(/<Contents>[\s\S]*?<\/Contents>/g) || []
     for (const block of contents) {
       const key = decodeXmlEntities(block.match(/<Key>([\s\S]*?)<\/Key>/)?.[1])
