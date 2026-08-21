@@ -257,7 +257,9 @@ export function updateRecord<T>(
   id: string,
   body: Record<string, unknown>,
 ): Promise<T> {
-  return pb.send(`/api/${collection}/${id}`, { method: "PATCH", body })
+  // 禁用自动取消：连续 PATCH 同一条记录（如标记/别名/替换）不应互相取消
+  // https://github.com/pocketbase/js-sdk#auto-cancellation
+  return pb.send(`/api/${collection}/${id}`, { method: "PATCH", body, requestKey: null } as never)
 }
 
 export function deleteRecord(
