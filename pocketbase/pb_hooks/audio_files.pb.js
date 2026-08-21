@@ -44,11 +44,6 @@ onBootstrap(function (e) {
   }
 })
 
-function audioFileExport(rec) {
-  var out = rec.publicExport()
-  return out
-}
-
 // GET /api/audio_files?page=1&perPage=200&status=submit_failed&device_sn=WF...
 routerAdd("GET", "/api/audio_files", function (e) {
   try {
@@ -73,7 +68,7 @@ routerAdd("GET", "/api/audio_files", function (e) {
       ? $app.findRecordsByFilter("audio_files", filter, sort, perPage, (page - 1) * perPage, params)
       : $app.findRecordsByFilter("audio_files", "", sort, perPage, (page - 1) * perPage)
     var items = []
-    for (var i = 0; i < records.length; i++) items.push(audioFileExport(records[i]))
+    for (var i = 0; i < records.length; i++) items.push(records[i].publicExport())
     return e.json(200, { items: items, page: page, perPage: perPage, totalItems: items.length })
   } catch (err) {
     return e.json(500, { error: "list_failed", message: String(err && err.message || err).slice(0, 300) })
@@ -84,7 +79,7 @@ routerAdd("GET", "/api/audio_files", function (e) {
 routerAdd("GET", "/api/audio_files/{id}", function (e) {
   try {
     var rec = $app.findRecordById("audio_files", e.request.pathValue("id"))
-    return e.json(200, audioFileExport(rec))
+    return e.json(200, rec.publicExport())
   } catch (err) {
     return e.json(404, { error: "not_found", message: String(err && err.message || err).slice(0, 300) })
   }
@@ -102,7 +97,7 @@ routerAdd("POST", "/api/audio_files", function (e) {
     var existingRecord = null
     try { existingRecord = $app.findFirstRecordByFilter("audio_files", "object_key = {:k}", { k: objectKey }) } catch (_) { existingRecord = null }
     if (existingRecord) {
-      return e.json(200, { duplicate: true, item: audioFileExport(existingRecord) })
+      return e.json(200, { duplicate: true, item: existingRecord.publicExport() })
     }
 
     var status = String(body.status || "discovered").toLowerCase()
@@ -127,7 +122,7 @@ routerAdd("POST", "/api/audio_files", function (e) {
     rec.set("asr_job", body.asr_job === undefined || body.asr_job === null ? "" : String(body.asr_job).slice(0, 20))
     rec.set("error_message", body.error_message === undefined || body.error_message === null ? "" : String(body.error_message).slice(0, 1000))
     $app.save(rec)
-    return e.json(200, { duplicate: false, item: audioFileExport(rec) })
+    return e.json(200, { duplicate: false, item: rec.publicExport() })
   } catch (err) {
     return e.json(500, { error: "create_failed", message: String(err && err.message || err).slice(0, 300) })
   }
@@ -164,7 +159,7 @@ routerAdd("PATCH", "/api/audio_files/{id}", function (e) {
     if ("asr_job" in body) rec.set("asr_job", body.asr_job === undefined || body.asr_job === null ? "" : String(body.asr_job).slice(0, 20))
     if ("error_message" in body) rec.set("error_message", body.error_message === undefined || body.error_message === null ? "" : String(body.error_message).slice(0, 1000))
     $app.save(rec)
-    return e.json(200, audioFileExport(rec))
+    return e.json(200, rec.publicExport())
   } catch (err) {
     return e.json(500, { error: "update_failed", message: String(err && err.message || err).slice(0, 300) })
   }
