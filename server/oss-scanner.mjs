@@ -21,7 +21,8 @@ import { Transform } from "node:stream"
 const POCKETBASE_URL = trimTrailingSlash(process.env.POCKETBASE_URL || "http://127.0.0.1:7040")
 const ASR_BASE_URL = trimTrailingSlash(process.env.ASR_BASE_URL || "")
 const ASR_SERVICE_TOKEN = process.env.ASR_SERVICE_TOKEN || ""
-const OSS_ENDPOINT = trimTrailingSlash(process.env.OSS_ENDPOINT || "")
+// Endpoint 兼容带/不带 https:// 前缀的写法，统一剥掉协议头再拼 Bucket 虚拟主机。
+const OSS_ENDPOINT = normalizeEndpoint(process.env.OSS_ENDPOINT || "")
 const OSS_BUCKET = process.env.OSS_BUCKET || ""
 const OSS_PREFIX = normalizePrefix(process.env.OSS_PREFIX || "")
 const OSS_ACCESS_KEY_ID = process.env.OSS_ACCESS_KEY_ID || ""
@@ -49,6 +50,10 @@ function numberEnv(name, fallback) {
 
 function trimTrailingSlash(value) {
   return value.replace(/\/+$/, "")
+}
+
+function normalizeEndpoint(value) {
+  return trimTrailingSlash(String(value || "").trim().replace(/^https?:\/\//i, ""))
 }
 
 function normalizePrefix(value) {
@@ -593,10 +598,11 @@ async function runCycle() {
 }
 
 assertConfigured()
-log(`启动：bucket=${OSS_BUCKET} prefix=${OSS_PREFIX || "(根)"} interval=${SCAN_INTERVAL_MS}ms`)
+log(`启动：bucket=${OSS_BUCKET} endpoint=${OSS_ENDPOINT} prefix=${OSS_PREFIX || "(根)"} interval=${SCAN_INTERVAL_MS}ms`)
 void runCycle()
+// 注意：这里不能 unref()。扫描器没有常驻 HTTP 服务，unref 后事件循环清空进程会退出，
+// 导致 PM2 反复拉起（表现为每几秒重启一次）。
 const timer = setInterval(() => void runCycle(), SCAN_INTERVAL_MS)
-timer.unref()
 
 function shutdown() {
   clearInterval(timer)
