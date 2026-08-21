@@ -36,7 +36,7 @@ const MAX_SUBMIT_RETRIES = numberEnv("SCANNER_MAX_SUBMIT_RETRIES", 2)
 const MAX_ASR_ATTEMPTS = numberEnv("SCANNER_MAX_ASR_ATTEMPTS", 3)
 const RETRY_BACKOFF_BASE_MS = numberEnv("SCANNER_RETRY_BACKOFF_BASE_MS", 600_000)
 const REQUEST_TIMEOUT_MS = numberEnv("SCANNER_REQUEST_TIMEOUT_MS", 120_000)
-const STALE_SUBMITTING_MS = numberEnv("SCANNER_STALE_SUBMITTING_MS", 1_800_000)
+const STALE_SUBMITTING_MS = numberEnv("SCANNER_STALE_SUBMITTING_MS", 300_000)
 const AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".m4a"])
 
 const BINDING_ACTIVE_STATUS = "已绑定"
@@ -268,6 +268,7 @@ async function refreshBindingCache() {
   const nextCache = new Map()
   for (const binding of bindings) {
     if (String(binding?.status || "") !== BINDING_ACTIVE_STATUS) continue
+    // 小数据量下线性查找可接受；bindingCache 规模通常 <500 条。
     const sn = [...deviceIdBySn.entries()].find(([, id]) => id === binding.device)?.[0]
     if (!sn || nextCache.has(sn)) continue
     nextCache.set(sn, { employee: String(binding.employee || ""), store: String(binding.store || "") })
@@ -419,9 +420,12 @@ function forwardOssObjectToAsr(objectKey, fileName, metadata) {
             },
           })
           limiter.on("error", fail)
-          ossResponse.pipe(limiter).pipe(remote, { end: true })
+          limiter.on("end", () => remote.end(tail))
+          ossResponse.pipe(limiter).pipe(remote, { end: false })
         },
       )
+      source.on("error", fail)
+      source.end()
     } catch (error) {
       fail(error)
       return
@@ -502,9 +506,15 @@ async function retryDueSubmissions() {
   const staleItems = Array.isArray(staleData?.items) ? staleData.items : []
   for (const item of staleItems) {
     if (budget <= 0) return
-    const updatedAt = new Date(String(item.updated || "").replace(" ", "T").replace("Z", "+00:00")).getTime()
-    if (Number.isFinite(updatedAt) && now - updatedAt < STALE_SUBMITTING_MS) continue
-    log(`回收超时 submitting 记录：${item.object_key}`)
+    // 已产生 transcript 的记录按冷却时间回收；从未成功提交过的（空 transcript）立即重试。
+    const hasTranscript = Boolean(item.transcript)
+    if (hasTranscript) {
+      const updatedAt = new Date(String(item.updated || "").replace(" ", "T").replace("Z", "+00:00")).getTime()
+      if (Number.isFinite(updatedAt) && now - updatedAt < STALE_SUBMITTING_MS) continue
+      log(`回收超时 submitting 记录：${item.object_key}`)
+    } else {
+      log(`回收未完成的 submitting 记录：${item.object_key}`)
+    }
     budget -= 1
     await submitAudioItem(item)
   }
