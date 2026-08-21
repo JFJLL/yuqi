@@ -176,7 +176,7 @@ async function listOssAudioObjects() {
   for (let page = 0; page < 100; page += 1) {
     const query = new URLSearchParams()
     query.set("prefix", OSS_PREFIX)
-    query.set("max-keys", String(OSS_MAX_LIST_KEYS))
+    query.set("max-keys", "1000")
     if (marker) query.set("marker", marker)
     const date = new Date().toUTCString()
     const resource = `/${OSS_BUCKET}/`

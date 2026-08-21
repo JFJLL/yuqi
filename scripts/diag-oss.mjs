@@ -36,7 +36,7 @@ async function list(prefix, maxKeys = 1000) {
   })
 }
 
-console.log(`BUCKET=${BUCKET} ENDPOINT=${ENDPOINT} PREFIX=${JSON.stringify(PREFIX)} ID=${ID.slice(0,6)}***`)
+console.log(`BUCKET=${BUCKET} ENDPOINT=${ENDPOINT} PREFIX=${JSON.stringify(PREFIX)} MAX_KEYS=${process.env.OSS_MAX_LIST_KEYS || "(default 1000)"} ID=${ID.slice(0,6)}***`)
 for (const p of [PREFIX, PREFIX + "WF2503Y001eecc4/", ""]) {
   console.log(`\n=== prefix=${JSON.stringify(p)} ===`)
   try {
