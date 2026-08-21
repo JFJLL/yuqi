@@ -1,5 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((app) => {
+  const device = app.findCollectionByNameOrId("devices");
   const collection = new Collection({
     "createRule": null,
     "deleteRule": null,
@@ -21,7 +22,7 @@ migrate((app) => {
       },
       {
         "cascadeDelete": false,
-        "collectionId": "pbc_2153001328",
+        "collectionId": device.id,
         "help": "",
         "hidden": false,
         "id": "relation154121870",
