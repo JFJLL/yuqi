@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { retryAsrJob, submitAsrAudio, type AsrJob, type AsrSubmission } from "@/lib/asr"
 import {
+  deleteRecord,
   exportCsv,
   fetchList,
   type Employee,
@@ -38,6 +39,8 @@ export function useRecords() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [viewing, setViewing] = useState<RecordRow | null>(null)
+  const [deleting, setDeleting] = useState<RecordRow | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
 
   const fetchData = useCallback(async (): Promise<RecordsData> => {
     const [transcriptData, employeeData, storeData, logData, jobData] = await Promise.all([
@@ -167,6 +170,31 @@ export function useRecords() {
     }
   }, [refreshRecords])
 
+  const requestDelete = useCallback((row: RecordRow) => setDeleting(row), [])
+  const cancelDelete = useCallback(() => {
+    if (!deleteBusy) setDeleting(null)
+  }, [deleteBusy])
+
+  const confirmDelete = useCallback(async () => {
+    const row = deleting
+    if (!row || deleteBusy) return
+    setDeleteBusy(true)
+    try {
+      // 先清理关联的 ASR 任务，再删转写记录；audio_files 登记保留，避免 OSS 自动采集把同一条重新拉回来。
+      if (row.asr_job) {
+        await deleteRecord("asr_jobs", row.asr_job).catch(() => undefined)
+      }
+      await deleteRecord("transcripts", row.id)
+      toast.success("已删除该条转写记录")
+      setDeleting(null)
+      await refreshRecords(true)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "删除失败，请稍后重试")
+    } finally {
+      setDeleteBusy(false)
+    }
+  }, [deleting, deleteBusy, refreshRecords])
+
   function handleExport() {
     if (rows.length === 0) {
       toast.error("当前没有可导出的记录")
@@ -200,12 +228,17 @@ export function useRecords() {
     viewing,
     uploadOpen,
     submitting,
+    deleting,
+    deleteBusy,
     setFilters,
     setUploadOpen,
     openDetail,
     closeDetail,
     handleSubmitAudio,
     handleRetry,
+    requestDelete,
+    cancelDelete,
+    confirmDelete,
     handleExport,
   }
 }

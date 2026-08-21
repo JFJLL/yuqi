@@ -171,3 +171,18 @@ routerAdd("PATCH", "/api/asr_jobs/{id}", function (e) {
     return e.json(500, { error: "update_failed", message: String(err && err.message || err).slice(0, 300) })
   }
 })
+
+// DELETE /api/asr_jobs/{id} — 测试阶段清理用；删除转写记录时由前端联动调用。
+routerAdd("DELETE", "/api/asr_jobs/{id}", function (e) {
+  try {
+    var id = e.request.pathValue("id")
+    if (!id) return e.json(400, { error: "id_required" })
+    var rec = null
+    try { rec = $app.findRecordById("asr_jobs", id) } catch (_) { rec = null }
+    if (!rec) return e.json(404, { error: "not_found" })
+    $app.delete(rec)
+    return e.json(200, { ok: true })
+  } catch (err) {
+    return e.json(500, { error: "delete_failed", message: String(err && err.message || err).slice(0, 300) })
+  }
+})

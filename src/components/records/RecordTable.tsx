@@ -12,6 +12,7 @@ interface RecordTableProps {
   loading: boolean
   onView: (row: RecordRow) => void
   onRetry?: (asrJobId: string) => void
+  onDelete?: (row: RecordRow) => void
 }
 
 const HEADS = ["时间", "员工", "门店", "设备码", "来源", "文本摘要", "ASR 状态", "质检", "操作"]
@@ -33,7 +34,7 @@ function sourceInfo(source?: string): { label: string; tone: PillTone } {
     : { label: "手动上传", tone: "gray" }
 }
 
-export function RecordTable({ rows, loading, onView, onRetry }: RecordTableProps) {
+export function RecordTable({ rows, loading, onView, onRetry, onDelete }: RecordTableProps) {
   return (
     <div className="overflow-auto">
       <table className="w-full border-collapse text-[13px]">
@@ -88,6 +89,11 @@ export function RecordTable({ rows, loading, onView, onRetry }: RecordTableProps
                     {row.asr_status === "failed" && row.asr_job && onRetry && (
                       <Button variant="link" className="h-auto p-0 text-destructive font-semibold" onClick={() => onRetry(row.asr_job!)}>
                         重试
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button variant="link" className="h-auto p-0 text-destructive font-semibold" onClick={() => onDelete(row)}>
+                        删除
                       </Button>
                     )}
                   </div>

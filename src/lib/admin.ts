@@ -247,6 +247,13 @@ export function updateRecord<T>(
   return pb.send(`/api/${collection}/${id}`, { method: "PATCH", body })
 }
 
+export function deleteRecord(
+  collection: string,
+  id: string,
+): Promise<{ ok: boolean }> {
+  return pb.send(`/api/${collection}/${id}`, { method: "DELETE" })
+}
+
 // 本月每个员工的问题数 (前端按 occurred_at 归属当月聚合)
 export async function fetchEmployeeIssueCounts(): Promise<Record<string, number>> {
   const data = await fetchList<InspectionIssueRecord>("inspection_issues", { perPage: 500 })
