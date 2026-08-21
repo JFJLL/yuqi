@@ -14,7 +14,7 @@ interface RecordTableProps {
   onRetry?: (asrJobId: string) => void
 }
 
-const HEADS = ["时间", "员工", "门店", "设备码", "文本摘要", "ASR 状态", "质检", "操作"]
+const HEADS = ["时间", "员工", "门店", "设备码", "来源", "文本摘要", "ASR 状态", "质检", "操作"]
 
 const ASR_STATUS: Record<string, { label: string; tone: PillTone }> = {
   queued: { label: "排队中", tone: "gray" },
@@ -25,6 +25,12 @@ const ASR_STATUS: Record<string, { label: string; tone: PillTone }> = {
 
 function asrStatusInfo(status?: string) {
   return ASR_STATUS[status || ""] ?? { label: status ? "未知" : "-", tone: "gray" as PillTone }
+}
+
+function sourceInfo(source?: string): { label: string; tone: PillTone } {
+  return source === "oss_auto"
+    ? { label: "自动采集", tone: "blue" }
+    : { label: "手动上传", tone: "gray" }
 }
 
 export function RecordTable({ rows, loading, onView, onRetry }: RecordTableProps) {
@@ -53,6 +59,7 @@ export function RecordTable({ rows, loading, onView, onRetry }: RecordTableProps
           )}
           {rows.map((row) => {
             const asr = asrStatusInfo(row.asr_status)
+            const source = sourceInfo(row.source)
             return (
               <tr key={row.id} className="hover:bg-accent/40">
                 <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">
@@ -61,6 +68,9 @@ export function RecordTable({ rows, loading, onView, onRetry }: RecordTableProps
                 <td className="px-2.5 py-3 border-b border-border">{row.employeeName || "-"}</td>
                 <td className="px-2.5 py-3 border-b border-border">{row.storeName || "-"}</td>
                 <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">{row.device || "-"}</td>
+                <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">
+                  <Pill tone={source.tone}>{source.label}</Pill>
+                </td>
                 <td className="px-2.5 py-3 border-b border-border max-w-[360px]">
                   <span className="line-clamp-2">{row.summary || row.audio_name || "-"}</span>
                 </td>

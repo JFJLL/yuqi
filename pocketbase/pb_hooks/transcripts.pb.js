@@ -46,6 +46,8 @@ onBootstrap(function (e) {
       } catch (_) {}
       addField({ name: 'qc_result', type: 'text', max: 20 })
       addField({ name: 'occurred_at', type: 'date' })
+      // 记录来源：manual=后台上传, oss_auto=OSS 自动采集。空值视为 manual。
+      addField({ name: 'source', type: 'text', max: 20 })
       addField({ name: "created", type: "autodate", onCreate: true })
       addField({ name: "updated", type: "autodate", onCreate: true, onUpdate: true })
       if (changed) {
@@ -70,6 +72,7 @@ onBootstrap(function (e) {
           { name: 'audio_name', type: 'text', max: 180 },
           { name: 'qc_result', type: 'text', max: 20 },
           { name: 'occurred_at', type: 'date' },
+          { name: 'source', type: 'text', max: 20 },
           { name: "created", type: "autodate", onCreate: true },
           { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
         ],
@@ -103,6 +106,7 @@ routerAdd("GET", "/api/transcripts", function (e) {
           { name: 'audio_name', type: 'text', max: 180 },
           { name: 'qc_result', type: 'text', max: 20 },
           { name: 'occurred_at', type: 'date' },
+          { name: 'source', type: 'text', max: 20 },
         { name: "created", type: "autodate", onCreate: true },
         { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
       ],
@@ -182,6 +186,7 @@ routerAdd("POST", "/api/transcripts", function (e) {
           { name: 'audio_name', type: 'text', max: 180 },
           { name: 'qc_result', type: 'text', max: 20 },
           { name: 'occurred_at', type: 'date' },
+          { name: 'source', type: 'text', max: 20 },
         { name: "created", type: "autodate", onCreate: true },
         { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
       ],
@@ -205,6 +210,7 @@ routerAdd("POST", "/api/transcripts", function (e) {
     rec.set("audio_name", body.audio_name === undefined || body.audio_name === null ? "" : String(body.audio_name))
     rec.set("qc_result", body.qc_result === undefined || body.qc_result === null ? "" : String(body.qc_result))
     rec.set("occurred_at", body.occurred_at === undefined || body.occurred_at === null ? "" : String(body.occurred_at))
+    rec.set("source", body.source === undefined || body.source === null ? "" : String(body.source).slice(0, 20))
     $app.save(rec)
     return e.json(200, rec.publicExport())
   } catch (err) {
@@ -234,6 +240,7 @@ routerAdd("PATCH", "/api/transcripts/{id}", function (e) {
     if ("audio_name" in body) rec.set("audio_name", body.audio_name === undefined || body.audio_name === null ? "" : String(body.audio_name))
     if ("qc_result" in body) rec.set("qc_result", body.qc_result === undefined || body.qc_result === null ? "" : String(body.qc_result))
     if ("occurred_at" in body) rec.set("occurred_at", body.occurred_at === undefined || body.occurred_at === null ? "" : String(body.occurred_at))
+    if ("source" in body) rec.set("source", body.source === undefined || body.source === null ? "" : String(body.source).slice(0, 20))
     $app.save(rec)
     return e.json(200, rec.publicExport())
   } catch (err) {

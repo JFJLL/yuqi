@@ -146,6 +146,7 @@ export interface TranscriptRecord {
   asr_status?: "queued" | "running" | "succeeded" | "failed" | ""
   model?: string
   audio_name?: string
+  source?: string
   qc_result: string
   occurred_at: string
 }

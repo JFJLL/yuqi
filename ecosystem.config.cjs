@@ -3,6 +3,7 @@
 // 进程配置:
 //   - yuqi-pb          : PocketBase 数据库与 API, 127.0.0.1:7040
 //   - yuqi-asr-gateway : ASR 上传转发与后台轮询, 127.0.0.1:18084
+//   - yuqi-oss-scanner : OSS 录音定时扫描与自动提交 ASR
 //   (前端网页已改为 Nginx 直接托管 dist/ 静态目录)
 //
 // 用法:
@@ -44,6 +45,20 @@ module.exports = {
       // ASR_SERVICE_TOKEN=<long-random-token>
       // POCKETBASE_URL=http://127.0.0.1:7040
       // YUQI_ASR_GATEWAY_PORT=18084
+    },
+    {
+      name: 'yuqi-oss-scanner',
+      script: path.join(ROOT, 'server', 'oss-scanner.mjs'),
+      interpreter: 'node',
+      cwd: ROOT,
+      max_memory_restart: '200M',
+      autorestart: true,
+      // 与 yuqi-asr-gateway 共用同一份环境文件，另需 OSS_* 与 SCAN_INTERVAL_MS：
+      // OSS_ENDPOINT=oss-cn-beijing.aliyuncs.com
+      // OSS_BUCKET=redmagic
+      // OSS_PREFIX=audio/
+      // OSS_ACCESS_KEY_ID=<...>
+      // OSS_ACCESS_KEY_SECRET=<...>
     },
   ],
 }

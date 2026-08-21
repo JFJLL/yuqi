@@ -392,6 +392,7 @@ async function handleSubmit(req, res) {
         occurred_at: occurredAt,
         asr_status: "queued",
         audio_name: filename,
+        source: "manual",
       },
     })
     const job = await pbRequest("/api/asr_jobs", {
