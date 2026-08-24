@@ -29,12 +29,12 @@
 ## 阶段进度
 
 - [x] 阶段 0: 基线审计 + 安全止血 (docs/审计表/check-secrets/seed 开关/lint 基线)
-- [ ] 阶段 1: PocketBase 原生登录、租户、权限
-- [ ] 阶段 2: 一期轻量数据模型
+- [x] 阶段 1: PocketBase 原生登录、租户、权限 (后端: migrations + guards + auth + 守卫 CRUD, 本机验证通过)
+- [x] 阶段 2: 一期轻量数据模型 (后端集合已建, 规则已锁死; 前端接入待阶段 6/7)
 - [ ] 阶段 3: 数据库任务表 + Node Worker
 - [ ] 阶段 4: 接通并加固 OSS/ASR
 - [ ] 阶段 5: RuleRiskAnalyzer
-- [ ] 阶段 6: 管理端复核/申诉/整改闭环
+- [ ] 阶段 6: 管理端复核/申诉/整改闭环 (后端路由已就绪, 待前端接入)
 - [ ] 阶段 7: 员工移动端
 - [ ] 阶段 8: 报表/审计/保留
 - [ ] 阶段 9: PM2/Nginx 部署脚本
@@ -42,6 +42,23 @@
 - [ ] 测试: 单测 + 集成 25 场景
 - [ ] 最终报告
 
+## 阶段 1-2 后端验证记录 (2026-08-24)
+
+- PocketBase v0.40.0 本地实测: routerAdd((e)=>e.json()) 兼容; auth collection + 原生 Token 可用;
+- JSVM 经验: 所有 hook 文件共享顶层作用域(同名顶层 const/function 会冲突); routerAdd handler 无法访问词法闭包
+  (顶层 const/var/function 在 handler 内全部 undefined), 唯一可靠模式 = handler 函数体内 require() 模块。
+  因此所有守卫/辅助逻辑已移入 pb_hooks/_lib/*.js 模块。
+- v0.40 API 规则语义: `null` = 锁定(403), `""` = 公开。全部业务集合规则已统一为 null, 直接访问
+  /api/collections/*/records 均 403; 前端业务数据一律走受保护自定义路由。
+- 浏览器自动弹出安装页问题: 根因 = serve 时无 superuser; 修复 = 先 `superuser upsert` 再 serve, 不再弹窗。
+- 本机验证通过: 管理员登录/错误密码/登出/改密/me/看板 401 与 200; 员工验证码发送(dev 固定码)、
+  验证码登录、验证码复用拒绝、生产环境固定码禁用(503 sms_not_configured);
+  未登录访问业务数据 401/403; 跨集合锁定 35 个集合。
+
 ## 提交历史 (按序)
 
-(随阶段推进追加)
+- chore: establish lightweight phase one baseline
+- fix: restrict legacy demo and sensitive routes
+- (阶段 1-2) feat: add pocketbase authentication, tenant context and guarded CRUD
+- (阶段 1-2) feat: add phase one workflow routes (review/appeal/rectification/device/employee)
+- (阶段 1-2) fix: lock collection api rules and harden legacy hooks
