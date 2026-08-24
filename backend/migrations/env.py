@@ -41,8 +41,24 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+MANUAL_INDEXES = {"uq_device_active_binding"}
+
+
+def include_object(object, name, type_, reflected, compare_to):  # noqa: A002
+    """跳过手工管理的索引 (如 PG 部分唯一索引), 避免 autogenerate 误删."""
+
+    if type_ == "index" and name in MANUAL_INDEXES:
+        return False
+    return True
+
+
 def do_run_migrations(connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        include_object=include_object,
+    )
     with context.begin_transaction():
         context.run_migrations()
 

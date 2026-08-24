@@ -1,36 +1,44 @@
-import { Button } from "@/components/ui/button"
 import { Pill, stateTone, type PillTone } from "@/components/dashboard/Pill"
-import type { DeviceLog } from "@/lib/admin"
+import { TablePagination } from "@/components/ui/table-pagination"
 
-export interface DeviceLogRow extends DeviceLog {
+export interface DeviceLogRow {
+  id: string
+  occurred_at: string | null
+  type: string
+  content: string | null
+  status: string
   deviceNo: string
   employeeName: string
   storeName: string
+  actorName: string | null
 }
 
 interface DeviceLogTableProps {
   rows: DeviceLogRow[]
   tab: string
+  page: number
+  total: number
+  totalPages: number
   loading: boolean
   onTabChange: (tab: string) => void
+  onPageChange: (page: number) => void
 }
 
-const TABS = ["全部", "心跳", "上传", "操控"]
-const HEADS = ["时间", "设备码", "员工", "门店", "类型", "内容", "状态", "操作"]
+const TABS = ["全部", "操控"]
+const HEADS = ["时间", "设备码", "员工", "类型", "内容", "操作人", "状态"]
 
 function logTypeTone(type: string): PillTone {
-  if (type === "心跳") return "blue"
-  if (type === "上传") return "green"
-  return "violet"
+  if (type === "操控") return "violet"
+  return "blue"
 }
 
-export function DeviceLogTable({ rows, tab, loading, onTabChange }: DeviceLogTableProps) {
+export function DeviceLogTable({ rows, tab, page, total, totalPages, loading, onTabChange, onPageChange }: DeviceLogTableProps) {
   return (
     <section className="bg-card border border-border rounded-lg mt-3.5">
       <div className="min-h-[54px] px-4 py-3.5 border-b border-border flex items-center justify-between gap-3">
         <div>
-          <h2 className="m-0 text-base font-semibold">设备运行监控</h2>
-          <p className="mt-0.5 mb-0 text-muted-foreground text-xs">查看设备在线、心跳、上传、登录和操控记录。</p>
+          <h2 className="m-0 text-base font-semibold">设备运行事件</h2>
+          <p className="mt-0.5 mb-0 text-muted-foreground text-xs">设备建档、绑定、解绑等操作记录（来自审计日志）。</p>
         </div>
         <div className="inline-grid grid-flow-col gap-1 p-1 border border-border rounded-lg bg-background">
           {TABS.map((item) => (
@@ -67,7 +75,7 @@ export function DeviceLogTable({ rows, tab, loading, onTabChange }: DeviceLogTab
             {rows.length === 0 && !loading && (
               <tr>
                 <td colSpan={HEADS.length} className="px-2.5 py-10 text-center text-muted-foreground">
-                  暂无该类型的设备日志
+                  暂无该类型的设备事件
                 </td>
               </tr>
             )}
@@ -77,24 +85,20 @@ export function DeviceLogTable({ rows, tab, loading, onTabChange }: DeviceLogTab
                   {row.occurred_at ? row.occurred_at.slice(11, 19) : "-"}
                 </td>
                 <td className="px-2.5 py-3 border-b border-border font-semibold whitespace-nowrap">{row.deviceNo}</td>
-                <td className="px-2.5 py-3 border-b border-border">{row.employeeName || "未绑定"}</td>
-                <td className="px-2.5 py-3 border-b border-border">{row.storeName || "未绑定"}</td>
+                <td className="px-2.5 py-3 border-b border-border">{row.employeeName || "-"}</td>
                 <td className="px-2.5 py-3 border-b border-border">
                   <Pill tone={logTypeTone(row.type)}>{row.type}</Pill>
                 </td>
                 <td className="px-2.5 py-3 border-b border-border">{row.content}</td>
+                <td className="px-2.5 py-3 border-b border-border">{row.actorName || "-"}</td>
                 <td className="px-2.5 py-3 border-b border-border">
                   <Pill tone={stateTone(row.status)}>{row.status}</Pill>
-                </td>
-                <td className="px-2.5 py-3 border-b border-border">
-                  <Button variant="link" className="h-auto p-0 text-primary font-semibold">
-                    查看
-                  </Button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        <TablePagination page={page} totalPages={totalPages} total={total} onChange={onPageChange} />
       </div>
     </section>
   )

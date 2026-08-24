@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button"
 import { Pill, stateTone } from "@/components/dashboard/Pill"
-import type { Employee } from "@/lib/admin"
+import type { EmployeeItem } from "@/lib/v1"
 
-export interface EmployeeRow extends Employee {
+export interface EmployeeRow extends EmployeeItem {
   storeName: string
   regionName: string
   issueCount: number
@@ -14,7 +14,13 @@ interface EmployeeTableProps {
   onEdit: (employee: EmployeeRow) => void
 }
 
-const HEADS = ["员工", "手机号", "岗位", "门店", "绑定设备", "本月问题", "状态", "操作"]
+const HEADS = ["员工号", "员工", "手机号", "岗位", "门店", "状态", "操作"]
+
+function employmentLabel(status: string): string {
+  if (status === "LEAVING") return "离职中"
+  if (status === "LEFT") return "已离职"
+  return "在职"
+}
 
 export function EmployeeTable({ rows, loading, onEdit }: EmployeeTableProps) {
   return (
@@ -42,20 +48,13 @@ export function EmployeeTable({ rows, loading, onEdit }: EmployeeTableProps) {
           )}
           {rows.map((row) => (
             <tr key={row.id} className="hover:bg-accent/40">
+              <td className="px-2.5 py-3 border-b border-border font-mono text-xs">{row.employee_no}</td>
               <td className="px-2.5 py-3 border-b border-border font-semibold">{row.name}</td>
-              <td className="px-2.5 py-3 border-b border-border">{row.phone || "-"}</td>
-              <td className="px-2.5 py-3 border-b border-border">{row.role || "-"}</td>
+              <td className="px-2.5 py-3 border-b border-border">{row.mobile_masked || "-"}</td>
+              <td className="px-2.5 py-3 border-b border-border">{row.job_title || "-"}</td>
+              <td className="px-2.5 py-3 border-b border-border">{row.storeName || "-"}</td>
               <td className="px-2.5 py-3 border-b border-border">
-                {row.storeName || "-"}
-                {row.regionName ? (
-                  <span className="text-muted-foreground text-xs ml-1.5">{row.regionName}</span>
-                ) : null}
-              </td>
-              {/* 设备模块建好后替换为真实绑定设备码 */}
-              <td className="px-2.5 py-3 border-b border-border">-</td>
-              <td className="px-2.5 py-3 border-b border-border">{row.issueCount}</td>
-              <td className="px-2.5 py-3 border-b border-border">
-                <Pill tone={stateTone(row.status)}>{row.status || "-"}</Pill>
+                <Pill tone={stateTone(row.employment_status)}>{employmentLabel(row.employment_status)}</Pill>
               </td>
               <td className="px-2.5 py-3 border-b border-border">
                 <Button variant="link" className="h-auto p-0 text-primary font-semibold" onClick={() => onEdit(row)}>

@@ -12,6 +12,16 @@ from app.models.auth import (
     role_permissions,
     user_roles,
 )
+from app.models.device import Device, DeviceBinding, DeviceBindingRequest
+from app.models.imports import ImportBatch, ImportItem
+from app.models.migration import MigrationBatch, MigrationItem
+from app.models.org import (
+    Employee,
+    OrganizationNode,
+    Position,
+    RecordingConsent,
+    Store,
+)
 
 __all__ = [
     "AuditLog",
@@ -24,4 +34,16 @@ __all__ = [
     "UserSession",
     "role_permissions",
     "user_roles",
+    "Device",
+    "DeviceBinding",
+    "DeviceBindingRequest",
+    "ImportBatch",
+    "ImportItem",
+    "MigrationBatch",
+    "MigrationItem",
+    "Employee",
+    "OrganizationNode",
+    "Position",
+    "RecordingConsent",
+    "Store",
 ]

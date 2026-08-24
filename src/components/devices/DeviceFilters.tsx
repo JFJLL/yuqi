@@ -1,6 +1,5 @@
-import { RotateCcw, Search } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import type { Store } from "@/lib/admin"
+import { Search } from "lucide-react"
+import type { StoreItem } from "@/lib/v1"
 
 export interface DeviceFilterState {
   keyword: string
@@ -10,13 +9,13 @@ export interface DeviceFilterState {
   storeId: string
 }
 
-export const DEVICE_STATUS_OPTIONS = ["在线", "录音中", "离线"]
-export const DEVICE_TYPE_OPTIONS = ["WiFi胸牌", "4G胸牌"]
+export const DEVICE_STATUS_OPTIONS = ["在线", "离线"]
+export const DEVICE_TYPE_OPTIONS = ["BADGE"]
 export const BIND_STATUS_OPTIONS = ["已绑定", "未绑定"]
 
 interface DeviceFiltersProps {
   filters: DeviceFilterState
-  stores: Store[]
+  stores: StoreItem[]
   onChange: (next: DeviceFilterState) => void
 }
 
@@ -32,7 +31,7 @@ export function DeviceFilters({ filters, stores, onChange }: DeviceFiltersProps)
           <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             className={`${fieldClass} pl-8`}
-            placeholder="设备码 / 员工 / 门店"
+            placeholder="设备码"
             value={filters.keyword}
             onChange={(e) => onChange({ ...filters, keyword: e.target.value })}
           />
@@ -49,21 +48,6 @@ export function DeviceFilters({ filters, stores, onChange }: DeviceFiltersProps)
           {DEVICE_STATUS_OPTIONS.map((status) => (
             <option key={status} value={status}>
               {status}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="grid gap-1.5">
-        <label className="text-muted-foreground text-xs">设备类型</label>
-        <select
-          className={fieldClass}
-          value={filters.deviceType}
-          onChange={(e) => onChange({ ...filters, deviceType: e.target.value })}
-        >
-          <option value="">全部</option>
-          {DEVICE_TYPE_OPTIONS.map((type) => (
-            <option key={type} value={type}>
-              {type}
             </option>
           ))}
         </select>
@@ -98,15 +82,7 @@ export function DeviceFilters({ filters, stores, onChange }: DeviceFiltersProps)
           ))}
         </select>
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-9 gap-1.5"
-        onClick={() => onChange({ keyword: "", deviceStatus: "", deviceType: "", bindStatus: "", storeId: "" })}
-      >
-        <RotateCcw className="w-4 h-4" />
-        重置
-      </Button>
+      <span className="text-muted-foreground text-xs leading-9 hidden lg:block">筛选由服务端执行</span>
     </div>
   )
 }

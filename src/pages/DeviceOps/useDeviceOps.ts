@@ -1,87 +1,73 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import {
-  fetchList,
-  type Device,
-  type DeviceBinding,
-  type DeviceLog,
-  type Employee,
-  type Store,
-} from "@/lib/admin"
+  fetchDeviceEvents,
+  fetchDeviceSummary,
+  totalPages,
+  type DeviceEventItem,
+  type DeviceSummary,
+} from "@/lib/v1"
 import type { DeviceLogRow } from "@/components/device-ops/DeviceLogTable"
 
-// 设备运行页逻辑: 设备汇总计算 + 日志类型过滤
+const PAGE_SIZE = 20
+
+// 设备运行页: 汇总卡片由服务端计算, 事件流来自审计日志 (服务端分页+筛选)
 export function useDeviceOps() {
-  const [devices, setDevices] = useState<Device[]>([])
-  const [logs, setLogs] = useState<DeviceLog[]>([])
-  const [bindings, setBindings] = useState<DeviceBinding[]>([])
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [stores, setStores] = useState<Store[]>([])
+  const [summary, setSummary] = useState<DeviceSummary>({ total: 0, online: 0, offline: 0, bound: 0, unbound: 0, low_power: 0 })
+  const [events, setEvents] = useState<DeviceEventItem[]>([])
   const [tab, setTab] = useState("全部")
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
 
+  const loadEvents = useCallback(
+    async (nextTab: string, nextPage = 1) => {
+      setLoading(true)
+      try {
+        const data = await fetchDeviceEvents({
+          page: nextPage,
+          page_size: PAGE_SIZE,
+          event_type: nextTab === "全部" ? undefined : nextTab,
+        })
+        setEvents(data.items)
+        setTotal(data.total)
+        setPage(data.page)
+      } catch {
+        toast.error("设备运行数据加载失败，请稍后重试")
+      } finally {
+        setLoading(false)
+      }
+    },
+    [],
+  )
+
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    Promise.all([
-      fetchList<Device>("devices", { perPage: 200 }),
-      fetchList<DeviceLog>("device_logs", { perPage: 500 }),
-      fetchList<DeviceBinding>("device_bindings", { perPage: 500 }),
-      fetchList<Employee>("employees", { perPage: 200 }),
-      fetchList<Store>("stores", { perPage: 200 }),
-    ])
-      .then(([deviceData, logData, bindingData, employeeData, storeData]) => {
-        if (cancelled) return
-        setDevices(deviceData.items ?? [])
-        setLogs(logData.items ?? [])
-        setBindings(bindingData.items ?? [])
-        setEmployees(employeeData.items ?? [])
-        setStores(storeData.items ?? [])
-      })
-      .catch(() => {
-        if (!cancelled) toast.error("设备运行数据加载失败，请稍后重试")
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
+    fetchDeviceSummary()
+      .then(setSummary)
+      .catch(() => toast.error("设备汇总加载失败，请稍后重试"))
   }, [])
 
-  const deviceById = useMemo(() => new Map(devices.map((d) => [d.id, d])), [devices])
-  const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees])
-  const storeById = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores])
+  useEffect(() => {
+    loadEvents(tab, 1)
+  }, [tab, loadEvents])
 
-  const activeBindingByDevice = useMemo(() => {
-    const map = new Map<string, DeviceBinding>()
-    for (const binding of bindings) {
-      if (binding.status !== "已绑定") continue
-      const prev = map.get(binding.device)
-      if (!prev || (binding.created ?? "") > (prev.created ?? "")) map.set(binding.device, binding)
-    }
-    return map
-  }, [bindings])
+  const goToPage = (next: number) => {
+    loadEvents(tab, next)
+  }
 
-  const rows: DeviceLogRow[] = useMemo(() => {
-    const sorted = [...logs].sort((a, b) => (b.occurred_at ?? "").localeCompare(a.occurred_at ?? ""))
-    return sorted
-      .filter((log) => tab === "全部" || log.type === tab)
-      .map((log) => {
-        const device = deviceById.get(log.device)
-        const binding = activeBindingByDevice.get(log.device)
-        const employee = binding ? employeeById.get(binding.employee) : undefined
-        const store = binding ? storeById.get(binding.store) : undefined
-        return {
-          ...log,
-          deviceNo: device?.device_no ?? "-",
-          employeeName: employee?.name ?? "",
-          storeName: store?.name ?? "",
-        }
-      })
-  }, [logs, tab, deviceById, activeBindingByDevice, employeeById, storeById])
+  const rows: DeviceLogRow[] = events.map((event) => ({
+    id: event.id,
+    occurred_at: event.occurred_at,
+    type: event.type,
+    content: event.content,
+    status: event.status,
+    deviceNo: event.device_code ?? "-",
+    employeeName: event.employee_name ?? "",
+    storeName: "",
+    actorName: event.actor_name,
+  }))
 
-  return { devices, rows, tab, loading, setTab }
+  return { summary, rows, tab, page, total, totalPages: totalPages(total, PAGE_SIZE), loading, setTab, setPage: goToPage }
 }
 
 export type DeviceOpsProps = ReturnType<typeof useDeviceOps>

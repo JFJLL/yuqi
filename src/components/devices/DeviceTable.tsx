@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button"
-import { Pill, stateTone } from "@/components/dashboard/Pill"
-import type { Device } from "@/lib/admin"
+import { Pill } from "@/components/dashboard/Pill"
+import type { DeviceItem } from "@/lib/v1"
 
-export interface DeviceRow extends Device {
+export interface DeviceRow extends DeviceItem {
   employeeName: string
   storeName: string
   bound: boolean
@@ -12,18 +12,19 @@ interface DeviceTableProps {
   rows: DeviceRow[]
   loading: boolean
   onAdjust: (row: DeviceRow) => void
+  onUnbind: (row: DeviceRow) => void
 }
 
-const HEADS = ["设备码", "类型", "员工", "门店", "状态", "电量", "今日文本", "最近在线", "操作"]
+const HEADS = ["设备码", "员工", "门店", "在线状态", "电量", "最近心跳", "操作"]
 
-function formatPower(power: number): string {
+function formatPower(power: number | null): string {
   if (power === null || power === undefined) return "-"
   return `${power}%`
 }
 
-function formatOnline(at: string): string {
+function formatOnline(at: string | null): string {
   if (!at) return "-"
-  const date = new Date(at.includes("T") ? at : at.replace(" ", "T"))
+  const date = new Date(at)
   if (Number.isNaN(date.getTime())) return at
   const diffMin = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000))
   if (diffMin < 1) return "刚刚"
@@ -32,7 +33,7 @@ function formatOnline(at: string): string {
   return `${date.getMonth() + 1}-${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
 }
 
-export function DeviceTable({ rows, loading, onAdjust }: DeviceTableProps) {
+export function DeviceTable({ rows, loading, onAdjust, onUnbind }: DeviceTableProps) {
   return (
     <div className="overflow-auto">
       <table className="w-full border-collapse text-[13px]">
@@ -58,24 +59,35 @@ export function DeviceTable({ rows, loading, onAdjust }: DeviceTableProps) {
           )}
           {rows.map((row) => (
             <tr key={row.id} className="hover:bg-accent/40">
-              <td className="px-2.5 py-3 border-b border-border font-semibold whitespace-nowrap">{row.device_no}</td>
-              <td className="px-2.5 py-3 border-b border-border">{row.type}</td>
+              <td className="px-2.5 py-3 border-b border-border font-semibold whitespace-nowrap">{row.device_code}</td>
               <td className="px-2.5 py-3 border-b border-border">{row.bound ? row.employeeName : "未绑定"}</td>
               <td className="px-2.5 py-3 border-b border-border">{row.bound ? row.storeName : "未绑定"}</td>
               <td className="px-2.5 py-3 border-b border-border">
-                <Pill tone={stateTone(row.status)}>{row.status}</Pill>
+                <Pill tone={row.online_status === "ONLINE" ? "green" : "amber"}>
+                  {row.online_status === "ONLINE" ? "在线" : "离线"}
+                </Pill>
               </td>
               <td className="px-2.5 py-3 border-b border-border">
-                <span className={row.power <= 20 ? "text-[hsl(var(--destructive))] font-semibold" : ""}>
-                  {formatPower(row.power)}
+                <span className={(row.battery_level ?? 100) <= 20 ? "text-[hsl(var(--destructive))] font-semibold" : ""}>
+                  {formatPower(row.battery_level)}
                 </span>
               </td>
-              <td className="px-2.5 py-3 border-b border-border">{row.texts_today ?? 0}</td>
-              <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">{formatOnline(row.last_online_at)}</td>
-              <td className="px-2.5 py-3 border-b border-border">
+              <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">
+                {formatOnline(row.last_heartbeat_at)}
+              </td>
+              <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">
                 <Button variant="link" className="h-auto p-0 text-primary font-semibold" onClick={() => onAdjust(row)}>
                   调整
                 </Button>
+                {row.bound && (
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-muted-foreground font-semibold ml-3"
+                    onClick={() => onUnbind(row)}
+                  >
+                    解绑
+                  </Button>
+                )}
               </td>
             </tr>
           ))}

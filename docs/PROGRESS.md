@@ -39,3 +39,18 @@
 - 后端: ruff ✅ / mypy ✅ / pytest 23 passed ✅ / alembic 空库升级 ✅ / compileall ✅
 - 前端: lint ✅ / typecheck ✅ / test 8 passed ✅ / build ✅
 - PostgreSQL/Redis 集成测试: 未执行 (本机无服务), 已留标记测试
+
+## 阶段二：组织/员工/设备/动态绑定/知情同意/Excel 导入 — 已完成
+
+**产出**
+- [x] 模型: OrganizationNode(树形), Employee(唯一 employee_no, 手机号存储明文+展示脱敏), Device(唯一 device_code), DeviceEmployeeBinding(动态绑定, 单活跃约束, 解绑=软删除), RecordingConsent(知情同意), ImportBatch/ImportRow, MigrationBatch/MigrationItem
+- [x] API: 组织树 / 员工 CRUD+服务端分页+筛选(keyword/job_title/region)+手机号脱敏 / 设备 CRUD+绑定信息联查 / 绑定·解绑 / summary+audit 事件 / Excel 导入(模板下载+校验+分批导入+回滚)
+- [x] 审计: 操作审计统一落库(含 resource_id), 设备事件表可查
+- [x] 迁移工具链: `export_legacy_snapshot.py`(PocketBase 快照导出) → `migrate_pocketbase_to_postgres.py`(幂等迁移: 稳定 legacy_id + migration_batches/items 跟踪 + dry-run) → `verify_migration.py`(校验+回滚)
+- [x] 前端迁移: 门店员工页(服务端分页/筛选/脱敏/新增编辑) / 设备绑定页(分页+绑定解绑走 API) / 设备运行页(summary 卡片+审计事件表) / `src/lib/v1.ts` typed client
+- [x] 迁移: 0002 `org device and imports`(含 PG 部分唯一索引, env.py 已排除 autogenerate 比对)
+
+**门禁**
+- 后端: ruff ✅ / mypy ✅ / pytest 48 passed ✅ / alembic upgrade+check ✅
+- 前端: lint ✅ / typecheck ✅ / test 13 passed ✅ / build ✅
+- PocketBase → PostgreSQL 迁移脚本: dry-run/commit/rollback 幂等测试 ✅

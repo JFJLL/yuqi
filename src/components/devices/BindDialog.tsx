@@ -1,24 +1,20 @@
 import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import type { Employee, Store } from "@/lib/admin"
-import { DEVICE_TYPE_OPTIONS } from "./DeviceFilters"
+import type { EmployeeItem, StoreItem } from "@/lib/v1"
 
 export interface BindFormValues {
   deviceNo: string
   employeeId: string
-  storeId: string
-  deviceType: string
   effectiveDate: string
 }
 
 interface BindDialogProps {
   open: boolean
-  // 调整已有设备时带入设备码与类型, 新增绑定时为空
+  // 调整已有设备时带入设备码, 新增绑定时为空
   deviceNo: string
-  deviceType: string
-  employees: Employee[]
-  stores: Store[]
+  employees: EmployeeItem[]
+  stores: StoreItem[]
   saving: boolean
   onCancel: () => void
   onSave: (values: BindFormValues) => void
@@ -32,21 +28,10 @@ function todayText(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
 }
 
-export function BindDialog({
-  open,
-  deviceNo,
-  deviceType,
-  employees,
-  stores,
-  saving,
-  onCancel,
-  onSave,
-}: BindDialogProps) {
+export function BindDialog({ open, deviceNo, employees, stores, saving, onCancel, onSave }: BindDialogProps) {
   const [values, setValues] = useState<BindFormValues>({
     deviceNo: "",
     employeeId: "",
-    storeId: "",
-    deviceType: "WiFi胸牌",
     effectiveDate: todayText(),
   })
 
@@ -55,23 +40,21 @@ export function BindDialog({
     setValues({
       deviceNo,
       employeeId: employees[0]?.id ?? "",
-      storeId: stores[0]?.id ?? "",
-      deviceType: deviceType || "WiFi胸牌",
       effectiveDate: todayText(),
     })
-  }, [open, deviceNo, deviceType, employees, stores])
+  }, [open, deviceNo, employees, stores])
 
   function set<K extends keyof BindFormValues>(key: K, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }))
   }
 
-  const canSave = values.deviceNo.trim().length > 0 && values.employeeId.length > 0 && values.storeId.length > 0
+  const canSave = values.deviceNo.trim().length > 0 && values.employeeId.length > 0
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onCancel()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>绑定设备</DialogTitle>
+          <DialogTitle>{deviceNo ? "调整设备绑定" : "绑定设备"}</DialogTitle>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
           <div className="grid gap-1.5 col-span-2 max-sm:col-span-1">
@@ -99,31 +82,6 @@ export function BindDialog({
             </select>
           </div>
           <div className="grid gap-1.5">
-            <label className="text-muted-foreground text-xs">门店</label>
-            <select className={fieldClass} value={values.storeId} onChange={(e) => set("storeId", e.target.value)}>
-              {stores.map((store) => (
-                <option key={store.id} value={store.id}>
-                  {store.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid gap-1.5">
-            <label className="text-muted-foreground text-xs">设备类型</label>
-            <select
-              className={fieldClass}
-              value={values.deviceType}
-              disabled={deviceNo.length > 0}
-              onChange={(e) => set("deviceType", e.target.value)}
-            >
-              {DEVICE_TYPE_OPTIONS.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid gap-1.5">
             <label className="text-muted-foreground text-xs">生效日期</label>
             <input
               type="date"
@@ -132,6 +90,9 @@ export function BindDialog({
               onChange={(e) => set("effectiveDate", e.target.value)}
             />
           </div>
+          <p className="text-muted-foreground text-xs col-span-2 m-0">
+            门店归属按员工档案自动确定；调整绑定将先解绑当前生效绑定，再建立新绑定。
+          </p>
         </div>
         <div className="flex justify-end gap-2.5 pt-1">
           <Button variant="outline" onClick={onCancel}>

@@ -1,21 +1,23 @@
 import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import type { Employee, Store } from "@/lib/admin"
-import { ROLE_OPTIONS, STATUS_OPTIONS } from "./EmployeeFilters"
+import type { StoreItem } from "@/lib/v1"
+import type { EmployeeItem } from "@/lib/v1"
+import { ROLE_OPTIONS } from "./EmployeeFilters"
 
 export interface EmployeeFormValues {
+  employeeNo: string
   name: string
-  phone: string
-  role: string
+  mobile: string
+  jobTitle: string
   store: string
-  status: string
+  joinedAt: string
 }
 
 interface EmployeeDialogProps {
   open: boolean
-  initial: Employee | null
-  stores: Store[]
+  initial: EmployeeItem | null
+  stores: StoreItem[]
   saving: boolean
   onCancel: () => void
   onSave: (values: EmployeeFormValues) => void
@@ -24,7 +26,7 @@ interface EmployeeDialogProps {
 const fieldClass =
   "min-h-9 w-full border border-border rounded-lg bg-card text-foreground outline-none px-2.5 text-sm focus:border-primary focus:shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]"
 
-const EMPTY: EmployeeFormValues = { name: "", phone: "", role: "营业员", store: "", status: "在职" }
+const EMPTY: EmployeeFormValues = { employeeNo: "", name: "", mobile: "", jobTitle: "营业员", store: "", joinedAt: "" }
 
 export function EmployeeDialog({ open, initial, stores, saving, onCancel, onSave }: EmployeeDialogProps) {
   const [values, setValues] = useState<EmployeeFormValues>(EMPTY)
@@ -34,11 +36,12 @@ export function EmployeeDialog({ open, initial, stores, saving, onCancel, onSave
     setValues(
       initial
         ? {
+            employeeNo: initial.employee_no ?? "",
             name: initial.name ?? "",
-            phone: initial.phone ?? "",
-            role: initial.role || "营业员",
-            store: initial.store ?? "",
-            status: initial.status || "在职",
+            mobile: initial.mobile ?? "",
+            jobTitle: initial.job_title || "营业员",
+            store: initial.store_id ?? "",
+            joinedAt: initial.joined_at?.slice(0, 10) ?? "",
           }
         : { ...EMPTY, store: stores[0]?.id ?? "" },
     )
@@ -48,7 +51,8 @@ export function EmployeeDialog({ open, initial, stores, saving, onCancel, onSave
     setValues((prev) => ({ ...prev, [key]: value }))
   }
 
-  const canSave = values.name.trim().length > 0 && values.store.length > 0
+  const canSave =
+    values.employeeNo.trim().length > 0 && values.name.trim().length > 0 && values.mobile.trim().length >= 5
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onCancel()}>
@@ -57,6 +61,15 @@ export function EmployeeDialog({ open, initial, stores, saving, onCancel, onSave
           <DialogTitle>{initial ? "编辑员工" : "新增员工"}</DialogTitle>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+          <div className="grid gap-1.5">
+            <label className="text-muted-foreground text-xs">员工号</label>
+            <input
+              className={fieldClass}
+              placeholder="如 A001"
+              value={values.employeeNo}
+              onChange={(e) => set("employeeNo", e.target.value)}
+            />
+          </div>
           <div className="grid gap-1.5">
             <label className="text-muted-foreground text-xs">姓名</label>
             <input
@@ -71,13 +84,13 @@ export function EmployeeDialog({ open, initial, stores, saving, onCancel, onSave
             <input
               className={fieldClass}
               placeholder="请输入手机号"
-              value={values.phone}
-              onChange={(e) => set("phone", e.target.value)}
+              value={values.mobile}
+              onChange={(e) => set("mobile", e.target.value)}
             />
           </div>
           <div className="grid gap-1.5">
             <label className="text-muted-foreground text-xs">岗位</label>
-            <select className={fieldClass} value={values.role} onChange={(e) => set("role", e.target.value)}>
+            <select className={fieldClass} value={values.jobTitle} onChange={(e) => set("jobTitle", e.target.value)}>
               {ROLE_OPTIONS.map((role) => (
                 <option key={role} value={role}>
                   {role}
@@ -95,18 +108,15 @@ export function EmployeeDialog({ open, initial, stores, saving, onCancel, onSave
               ))}
             </select>
           </div>
-          {initial && (
-            <div className="grid gap-1.5">
-              <label className="text-muted-foreground text-xs">状态</label>
-              <select className={fieldClass} value={values.status} onChange={(e) => set("status", e.target.value)}>
-                {STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="grid gap-1.5">
+            <label className="text-muted-foreground text-xs">入职日期</label>
+            <input
+              type="date"
+              className={fieldClass}
+              value={values.joinedAt}
+              onChange={(e) => set("joinedAt", e.target.value)}
+            />
+          </div>
         </div>
         <div className="flex justify-end gap-2.5 pt-1">
           <Button variant="outline" onClick={onCancel}>

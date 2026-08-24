@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { DeviceFilters } from "@/components/devices/DeviceFilters"
 import { DeviceTable } from "@/components/devices/DeviceTable"
 import { BindDialog } from "@/components/devices/BindDialog"
+import { TablePagination } from "@/components/ui/table-pagination"
 import type { DevicesProps } from "./useDevices"
 
 // 设备绑定视图: 只消费 props, 不自调逻辑 hook
@@ -11,15 +12,20 @@ export function DevicesPage({
   stores,
   rows,
   filters,
+  page,
+  total,
+  totalPages,
   loading,
   saving,
   dialogOpen,
   adjusting,
   setFilters,
+  setPage,
   openCreate,
   openAdjust,
   closeDialog,
   handleSave,
+  handleUnbind,
 }: DevicesProps) {
   return (
     <section className="bg-card border border-border rounded-lg" style={{ boxShadow: "var(--elev-ring)" }}>
@@ -39,12 +45,12 @@ export function DevicesPage({
       </div>
       <div className="p-4">
         <DeviceFilters filters={filters} stores={stores} onChange={setFilters} />
-        <DeviceTable rows={rows} loading={loading} onAdjust={openAdjust} />
+        <DeviceTable rows={rows} loading={loading} onAdjust={openAdjust} onUnbind={handleUnbind} />
+        <TablePagination page={page} totalPages={totalPages} total={total} onChange={setPage} />
       </div>
       <BindDialog
         open={dialogOpen}
-        deviceNo={adjusting?.device_no ?? ""}
-        deviceType={adjusting?.type ?? ""}
+        deviceNo={adjusting?.device_code ?? ""}
         employees={employees}
         stores={stores}
         saving={saving}

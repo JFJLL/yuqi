@@ -1,40 +1,29 @@
 import { Pill } from "@/components/dashboard/Pill"
-import type { Device } from "@/lib/admin"
+import type { DeviceSummary } from "@/lib/v1"
 
 interface DeviceOpsCardsProps {
-  devices: Device[]
+  summary: DeviceSummary
 }
 
-export function DeviceOpsCards({ devices }: DeviceOpsCardsProps) {
-  const wifi = devices.filter((d) => d.type === "WiFi胸牌")
-  const fourG = devices.filter((d) => d.type === "4G胸牌")
-  const offline = devices.filter((d) => d.status === "离线")
-
-  const wifiOnline = wifi.filter((d) => d.status !== "离线").length
-  const wifiRecording = wifi.filter((d) => d.status === "录音中").length
-  const wifiLowPower = wifi.filter((d) => d.power <= 20).length
-  const fourGOnline = fourG.filter((d) => d.status !== "离线").length
-  const fourGOffline = fourG.filter((d) => d.status === "离线").length
-  const textsTotal = devices.reduce((sum, d) => sum + (d.texts_today ?? 0), 0)
-
+export function DeviceOpsCards({ summary }: DeviceOpsCardsProps) {
   const cards = [
     {
-      title: "WiFi胸牌",
-      pill: <Pill tone="green">在线 {wifiOnline}</Pill>,
-      desc: `录音中 ${wifiRecording} 台，低电量 ${wifiLowPower} 台。`,
-      percent: wifi.length ? Math.round((wifiOnline / wifi.length) * 100) : 0,
+      title: "设备总数",
+      pill: <Pill tone="blue">{summary.total} 台</Pill>,
+      desc: `已绑定 ${summary.bound} 台，未绑定 ${summary.unbound} 台。`,
+      percent: summary.total ? Math.round((summary.bound / summary.total) * 100) : 0,
     },
     {
-      title: "4G胸牌",
-      pill: <Pill tone="blue">在线 {fourGOnline}</Pill>,
-      desc: `今日上传 ${textsTotal} 段，离线 ${fourGOffline} 台。`,
-      percent: fourG.length ? Math.round((fourGOnline / fourG.length) * 100) : 0,
+      title: "在线设备",
+      pill: <Pill tone="green">在线 {summary.online}</Pill>,
+      desc: `离线 ${summary.offline} 台，需关注设备状态。`,
+      percent: summary.total ? Math.round((summary.online / summary.total) * 100) : 0,
     },
     {
-      title: "离线设备",
-      pill: <Pill tone="amber">{offline.length} 台</Pill>,
-      desc: offline.length ? "需要店长确认设备状态后重新上线。" : "所有设备运行正常。",
-      percent: devices.length ? Math.round((offline.length / devices.length) * 100) : 0,
+      title: "低电量",
+      pill: <Pill tone="amber">{summary.low_power} 台</Pill>,
+      desc: summary.low_power ? "电量 ≤ 20% 的设备需要及时充电。" : "所有设备电量充足。",
+      percent: summary.total ? Math.round((summary.low_power / summary.total) * 100) : 0,
     },
   ]
 

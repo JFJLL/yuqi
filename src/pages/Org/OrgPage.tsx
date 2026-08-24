@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { EmployeeFilters } from "@/components/org/EmployeeFilters"
 import { EmployeeTable } from "@/components/org/EmployeeTable"
 import { EmployeeDialog } from "@/components/org/EmployeeDialog"
+import { TablePagination } from "@/components/ui/table-pagination"
 import type { OrgProps } from "./useOrg"
 
 // 门店员工视图: 只消费 props, 不自调逻辑 hook
@@ -11,11 +12,15 @@ export function OrgPage({
   stores,
   rows,
   filters,
+  page,
+  total,
+  totalPages,
   loading,
   saving,
   dialogOpen,
   editing,
   setFilters,
+  setPage,
   openCreate,
   openEdit,
   closeDialog,
@@ -49,6 +54,7 @@ export function OrgPage({
       <div className="p-4">
         <EmployeeFilters filters={filters} regions={regions} onChange={setFilters} onExport={handleExport} />
         <EmployeeTable rows={rows} loading={loading} onEdit={openEdit} />
+        <TablePagination page={page} totalPages={totalPages} total={total} onChange={setPage} />
       </div>
       <EmployeeDialog
         open={dialogOpen}

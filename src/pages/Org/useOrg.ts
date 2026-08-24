@@ -1,92 +1,95 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
-  createRecord,
-  fetchEmployeeIssueCounts,
-  fetchList,
-  updateRecord,
-  type Employee,
-  type Region,
-  type Store,
-} from "@/lib/admin"
+  createEmployee,
+  fetchEmployees,
+  fetchOrgTree,
+  fetchStores,
+  totalPages,
+  type EmployeeItem,
+  type OrgNodeItem,
+  type StoreItem,
+} from "@/lib/v1"
 import type { OrgFilterState } from "@/components/org/EmployeeFilters"
-import type { EmployeeFormValues, } from "@/components/org/EmployeeDialog"
+import type { EmployeeFormValues } from "@/components/org/EmployeeDialog"
 import type { EmployeeRow } from "@/components/org/EmployeeTable"
 
-// 门店员工页逻辑: 档案数据加载、筛选、新增/编辑、导出
+const PAGE_SIZE = 20
+
+// 门店员工页: 服务端分页 + 服务端筛选 (区域/岗位/状态/关键词), 手机号脱敏
 export function useOrg() {
-  const [regions, setRegions] = useState<Region[]>([])
-  const [stores, setStores] = useState<Store[]>([])
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [issueCounts, setIssueCounts] = useState<Record<string, number>>({})
+  const [regions, setRegions] = useState<OrgNodeItem[]>([])
+  const [stores, setStores] = useState<StoreItem[]>([])
+  const [employees, setEmployees] = useState<EmployeeItem[]>([])
   const [filters, setFilters] = useState<OrgFilterState>({ keyword: "", regionId: "", role: "", status: "" })
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editing, setEditing] = useState<Employee | null>(null)
+  const [editing, setEditing] = useState<EmployeeItem | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const loadEmployees = useCallback(async () => {
-    const data = await fetchList<Employee>("employees", { perPage: 200 })
-    setEmployees(data.items ?? [])
-  }, [])
+  const loadEmployees = useCallback(async (nextPage = 1) => {
+    setLoading(true)
+    try {
+      const data = await fetchEmployees({
+        page: nextPage,
+        page_size: PAGE_SIZE,
+        keyword: filters.keyword.trim(),
+        region_id: filters.regionId || undefined,
+        job_title: filters.role || undefined,
+        status: filters.status ? "ACTIVE" : undefined,
+      })
+      setEmployees(data.items)
+      setTotal(data.total)
+      setPage(data.page)
+    } catch {
+      toast.error("员工数据加载失败，请稍后重试")
+    } finally {
+      setLoading(false)
+    }
+  }, [filters.keyword, filters.regionId, filters.role, filters.status])
 
+  // 筛选变化时回到第 1 页
+  useEffect(() => {
+    loadEmployees(1)
+  }, [loadEmployees])
+
+  // 分页切换 (由分页控件触发)
+  const goToPage = useCallback(
+    (next: number) => {
+      loadEmployees(next)
+    },
+    [loadEmployees],
+  )
+
+  // 组织树 / 门店下拉 (树本身就是全量结构, 门店按需加载)
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    Promise.all([
-      fetchList<Region>("regions", { perPage: 100 }),
-      fetchList<Store>("stores", { perPage: 200 }),
-      fetchList<Employee>("employees", { perPage: 200 }),
-      fetchEmployeeIssueCounts(),
-    ])
-      .then(([regionData, storeData, employeeData, counts]) => {
+    Promise.all([fetchOrgTree(), fetchStores({ page_size: 200 })])
+      .then(([tree, storeData]) => {
         if (cancelled) return
-        setRegions(regionData.items ?? [])
-        setStores(storeData.items ?? [])
-        setEmployees(employeeData.items ?? [])
-        setIssueCounts(counts)
+        setRegions(tree)
+        setStores(storeData.items)
       })
       .catch(() => {
-        if (!cancelled) toast.error("员工数据加载失败，请稍后重试")
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) toast.error("组织数据加载失败，请稍后重试")
       })
     return () => {
       cancelled = true
     }
   }, [])
 
-  const storeById = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores])
-  const regionById = useMemo(() => new Map(regions.map((r) => [r.id, r])), [regions])
-
-  const rows: EmployeeRow[] = useMemo(() => {
-    const keyword = filters.keyword.trim().toLowerCase()
-    return employees
-      .map((employee) => {
-        const store = storeById.get(employee.store)
-        const region = store ? regionById.get(store.region) : undefined
-        return {
-          ...employee,
-          storeName: store?.name ?? "-",
-          regionName: region?.name ?? "",
-          issueCount: issueCounts[employee.id] ?? 0,
-        }
-      })
-      .filter((row) => {
-        if (filters.regionId) {
-          const store = storeById.get(row.store)
-          if (!store || store.region !== filters.regionId) return false
-        }
-        if (filters.role && row.role !== filters.role) return false
-        if (filters.status && row.status !== filters.status) return false
-        if (keyword) {
-          const text = `${row.name}${row.storeName}${row.phone}`.toLowerCase()
-          if (!text.includes(keyword)) return false
-        }
-        return true
-      })
-  }, [employees, filters, storeById, regionById, issueCounts])
+  const rows: EmployeeRow[] = useMemo(
+    () =>
+      employees.map((employee) => ({
+        ...employee,
+        storeName: employee.store_name ?? "-",
+        regionName: "",
+        issueCount: 0,
+      })),
+    [employees],
+  )
 
   function openCreate() {
     setEditing(null)
@@ -103,24 +106,19 @@ export function useOrg() {
   async function handleSave(values: EmployeeFormValues) {
     setSaving(true)
     try {
-      const body = {
+      await createEmployee({
+        employee_no: values.employeeNo.trim(),
         name: values.name.trim(),
-        phone: values.phone.trim(),
-        role: values.role,
-        store: values.store,
-        status: values.status,
-      }
-      if (editing) {
-        await updateRecord<Employee>("employees", editing.id, body)
-        toast.success("员工信息已更新")
-      } else {
-        await createRecord<Employee>("employees", body)
-        toast.success("员工已保存")
-      }
+        mobile: values.mobile.trim(),
+        job_title: values.jobTitle || null,
+        store_id: values.store || null,
+        joined_at: values.joinedAt || null,
+      })
+      toast.success(editing ? "员工信息已更新" : "员工已保存")
       setDialogOpen(false)
-      await loadEmployees()
+      await loadEmployees(page)
     } catch {
-      toast.error("保存失败，请稍后重试")
+      toast.error("保存失败，请检查员工号/手机号是否重复")
     } finally {
       setSaving(false)
     }
@@ -128,16 +126,16 @@ export function useOrg() {
 
   function handleExport() {
     if (rows.length === 0) {
-      toast.error("当前没有可导出的员工")
+      toast.error("当前页没有可导出的员工")
       return
     }
-    const head = ["员工", "手机号", "岗位", "门店", "区域", "本月问题", "状态"]
+    const head = ["员工号", "员工", "手机号", "岗位", "门店", "状态"]
     const lines = rows.map((row) =>
-      [row.name, row.phone, row.role, row.storeName, row.regionName, row.issueCount, row.status]
+      [row.employee_no, row.name, row.mobile_masked ?? "-", row.job_title ?? "-", row.storeName, row.employment_status]
         .map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`)
         .join(","),
     )
-    const csv = ["﻿" + head.join(","), ...lines].join("\n")
+    const csv = ["\ufeff" + head.join(","), ...lines].join("\n")
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
@@ -153,11 +151,15 @@ export function useOrg() {
     stores,
     rows,
     filters,
+    page,
+    total,
+    totalPages: totalPages(total, PAGE_SIZE),
     loading,
     saving,
     dialogOpen,
     editing,
     setFilters,
+    setPage: goToPage,
     openCreate,
     openEdit,
     closeDialog,
