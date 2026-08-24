@@ -118,7 +118,12 @@ function handleList(e, config) {
       if (v === undefined || v === null || v === "") continue
       const key = "qf" + i
       parts.push(f + " = {:" + key + "}")
-      params[key] = sanitizeFilterValue(v, 200)
+      // bool 过滤值转布尔 (如 enabled=true)
+      if (v === "true" || v === "false") {
+        params[key] = v === "true"
+      } else {
+        params[key] = sanitizeFilterValue(v, 200)
+      }
     }
 
     // 自定义过滤器 (如 asr_jobs 的 active=1)

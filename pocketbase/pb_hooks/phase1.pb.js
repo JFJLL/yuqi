@@ -572,18 +572,12 @@ routerAdd("POST", "/api/yuqi/device-bindings/{id}/approve", (e) => {
       throw new BadRequestError("员工尚未确认录音知情同意，绑定前请先完成录音制度确认")
     }
 
-    // 事务: 结束旧活跃绑定 + 新绑定生效
-    $app.db().transactional(() => {
-      const old = $app.findRecordsByFilter("device_bindings", "device = {:d} && status = 'ACTIVE'", "", 50, 0, { d: deviceId })
-      for (let i = 0; i < old.length; i++) {
-        old[i].set("status", "ENDED")
-        $app.save(old[i])
-      }
-      binding.set("status", "ACTIVE")
-      binding.set("approved_by", ctx.user.id)
-      binding.set("approved_at", H.pbDate())
-      $app.save(binding)
-    })
+    // 事务: 结束旧活跃绑定 + 新绑定生效 (条件 UPDATE 单语句原子)
+    $app.db().newQuery("UPDATE `device_bindings` SET `status` = 'ENDED' WHERE `device` = {:d} AND `status` = 'ACTIVE' AND `id` <> {:bid}").bind({ d: deviceId, bid: binding.id }).execute()
+    binding.set("status", "ACTIVE")
+    binding.set("approved_by", ctx.user.id)
+    binding.set("approved_at", H.pbDate())
+    $app.save(binding)
 
     const issueTenant = ctx.tenantId
     g.writeAudit(e, ctx, "binding_approve", "device_bindings", binding.id, {})
