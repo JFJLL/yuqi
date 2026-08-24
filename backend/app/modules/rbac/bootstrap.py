@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.auth import Permission, Role, RoleDataScope, Tenant
 
@@ -106,7 +107,13 @@ async def ensure_platform_role_templates(session: AsyncSession) -> dict[str, Rol
 
     perms = await ensure_platform_permissions(session)
     existing = (
-        (await session.execute(select(Role).where(Role.tenant_id.is_(None))))
+        (
+            await session.execute(
+                select(Role)
+                .options(selectinload(Role.permissions), selectinload(Role.data_scopes))
+                .where(Role.tenant_id.is_(None))
+            )
+        )
         .scalars()
         .all()
     )
@@ -149,9 +156,11 @@ async def materialize_tenant_roles(session: AsyncSession, tenant: Tenant) -> dic
         .all()
     )
     by_code = {r.code: r for r in existing}
-    for code, template in templates.items():
+    # 直接按规格表迭代, 避免触发平台模板对象的关系懒加载 (async 下会 MissingGreenlet)
+    for code, (_name, _perm_codes, scopes) in ROLE_TEMPLATES.items():
         if code in by_code:
             continue
+        template = templates[code]
         role = Role(
             tenant_id=tenant.id,
             code=template.code,
@@ -162,12 +171,12 @@ async def materialize_tenant_roles(session: AsyncSession, tenant: Tenant) -> dic
         )
         session.add(role)
         await session.flush()
-        for scope in template.data_scopes:
+        for scope_type, _org_id in scopes:
             session.add(
                 RoleDataScope(
                     tenant_id=tenant.id,
                     role_id=role.id,
-                    scope_type=scope.scope_type,
+                    scope_type=scope_type,
                     org_node_id=None,
                     store_id=None,
                 )
