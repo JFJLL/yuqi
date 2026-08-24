@@ -1,344 +1,222 @@
-// 药店连锁 AI 运营管理后台 — 工作台聚合路由 + 演示数据
-// GET  /api/admin/dashboard/summary?tab=all|high|appealing
-// POST /api/admin/seed   (幂等: 先清空 7 张业务表再写入演示数据)
-// POST /api/admin/sync   (模拟一次数据同步, 返回同步时间)
+// pb_hooks/admin_dashboard.pb.js — 工作台聚合路由 (服务端聚合, 受保护)
+//
+// GET /api/admin/dashboard/summary?tab=all|high|appealing
+//   - 需要登录 (ADMIN/COMPLIANCE/REGION_MANAGER/STORE_MANAGER/AUDITOR)
+//   - 数据范围: tenant + 用户数据范围
+//
+// 演示 seed 已移除, 幂等 seed 见 scripts/seed-phase1-demo.mjs (仅 dev/test)。
+// 不再提供匿名 /api/admin/seed。
 
 routerAdd("GET", "/api/admin/dashboard/summary", function (e) {
   try {
+
+function text(rec, field) {
+  try {
+    var v = rec.get(field)
+    if (v === null || v === undefined) return ""
+    return String(v)
+  } catch (err) {
+    return ""
+  }
+}
+
+function idOf(v) {
+  if (Array.isArray(v)) return v.length > 0 ? String(v[0]) : ""
+  return String(v || "")
+}
+
+function startOfToday() {
+  var d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+}
+
+function closedStates() {
+  return ["CLOSED", "CONFIRMED", "DONE", "已完成", "已关闭"]
+}
+
+function isClosed(state) {
+  var s = String(state || "")
+  var list = closedStates()
+  for (var i = 0; i < list.length; i++) {
+    if (s === list[i]) return true
+  }
+  return false
+}
+
+function openIssueStates() {
+  return ["open", "OPEN", "pending", "PENDING", "reviewing", "REVIEWING", "待复核", "待处理", "进行中"]
+}
+
+function isOpenIssue(state) {
+  var s = String(state || "")
+  var list = openIssueStates()
+  for (var i = 0; i < list.length; i++) {
+    if (s === list[i]) return true
+  }
+  return false
+}
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var ctx = g.requireAuth(e)
+    g.requireRole(e, ctx, ["ADMIN", "COMPLIANCE", "REGION_MANAGER", "STORE_MANAGER", "AUDITOR"])
+
     var query = e.requestInfo().query || {}
     var tab = String(query["tab"] || "all")
 
-    function allIn(collName) {
+    var scope = g.buildScopeFilter(e, ctx, {
+      storeField: "store",
+      employeeField: "employee",
+    })
+
+    // 门店名称/员工名称索引
+    var storeName = {}
+    var empName = {}
+    try {
+      var stores = $app.findRecordsByFilter("stores", scope.filter, "", 500, 0, scope.params)
+      for (var si = 0; si < stores.length; si++) storeName[text(stores[si], "id")] = text(stores[si], "name") || text(stores[si], "code")
+    } catch (_) {}
+    try {
+      var emps = $app.findRecordsByFilter("employees", scope.filter, "", 500, 0, scope.params)
+      for (var ei = 0; ei < emps.length; ei++) empName[text(emps[ei], "id")] = text(emps[ei], "name")
+    } catch (_) {}
+
+    var today = startOfToday()
+    var nowIso = new Date().toISOString()
+    var todayFilter = scope.filter + " && created >= {:today}"
+    var todayParams = Object.assign({}, scope.params, { today: today })
+
+    function countAll(coll, filter, params, max) {
       try {
-        var recs = $app.findRecordsByFilter(collName, "id != ''", "", 500, 0)
+        var recs = $app.findRecordsByFilter(coll, filter, "", max || 500, 0, params)
         return recs || []
       } catch (err) {
         return []
       }
     }
 
-    function text(rec, field) {
-      try {
-        var v = rec.get(field)
-        if (v === null || v === undefined) return ""
-        return String(v)
-      } catch (err) {
-        return ""
-      }
-    }
-
-    var issues = allIn("inspection_issues")
-    var transcripts = allIn("transcripts")
-    var tasks = allIn("rectify_tasks")
-    var appeals = allIn("appeals")
-    var stores = allIn("stores")
-    var employees = allIn("employees")
-
-    var storeName = {}
-    var si = 0
-    for (si = 0; si < stores.length; si++) {
-      storeName[text(stores[si], "id")] = text(stores[si], "name")
-    }
-    var empName = {}
-    var ei = 0
-    for (ei = 0; ei < employees.length; ei++) {
-      empName[text(employees[ei], "id")] = text(employees[ei], "name")
-    }
-
-    // 今日巡检文本覆盖的门店
+    var transcriptsToday = countAll("transcripts", todayFilter, todayParams, 500)
     var covered = {}
-    var coveredCount = 0
-    var ti = 0
-    for (ti = 0; ti < transcripts.length; ti++) {
-      var tStore = text(transcripts[ti], "store")
-      if (tStore && !covered[tStore]) {
-        covered[tStore] = true
-        coveredCount++
-      }
+    for (var ti = 0; ti < transcriptsToday.length; ti++) {
+      var sid = idOf(transcriptsToday[ti].get("store"))
+      if (sid) covered[sid] = true
     }
 
-    // 问题统计
+    var issues = countAll("inspection_issues", scope.filter, scope.params, 500)
+    var issuesToday = []
     var highRisk = 0
-    var storeIssueCount = {}
-    var ii = 0
-    for (ii = 0; ii < issues.length; ii++) {
-      if (text(issues[ii], "risk") === "高") highRisk++
-      var iStore = text(issues[ii], "store")
-      if (iStore) {
-        storeIssueCount[iStore] = (storeIssueCount[iStore] || 0) + 1
+    var openCount = 0
+    var storeCount = {}
+    var keyIssues = []
+    for (var ii = 0; ii < issues.length; ii++) {
+      var iss = issues[ii]
+      var created = text(iss, "created")
+      var risk = text(iss, "risk").toLowerCase()
+      var state = text(iss, "state")
+      var iStore = idOf(iss.get("store"))
+      if (created && created >= today) issuesToday.push(iss)
+      if (risk === "high" && !isClosed(state)) highRisk++
+      if (isOpenIssue(state)) openCount++
+      if (iStore) storeCount[iStore] = (storeCount[iStore] || 0) + 1
+    }
+
+    // 按 tab 过滤 key_issues
+    for (var kj = 0; kj < issues.length; kj++) {
+      var k = issues[kj]
+      var kState = text(k, "state")
+      var kRisk = text(k, "risk")
+      var include = true
+      if (tab === "high" && String(kRisk).toLowerCase() !== "high") include = false
+      if (tab === "appealing") {
+        // 有申诉的问题
+        include = false
+        try {
+          var ap = $app.findFirstRecordByFilter("appeals", "issue = {:i}", { i: text(k, "id") })
+          if (ap) include = true
+        } catch (_) {}
+      }
+      if (include) {
+        keyIssues.push({
+          id: text(k, "id"),
+          employee_name: empName[idOf(k.get("employee"))] || "未知员工",
+          store_name: storeName[idOf(k.get("store"))] || "未知门店",
+          issue_type: text(k, "issue_type") || text(k, "category") || "",
+          risk: kRisk,
+          state: kState,
+          quote: text(k, "quote"),
+          advice: text(k, "advice"),
+          occurred_at: text(k, "occurred_at") || text(k, "created"),
+        })
       }
     }
+    keyIssues = keyIssues.slice(0, 8)
 
-    // 整改完成率
-    var taskDone = 0
-    var taskOverdue = 0
-    var taskOpen = 0
-    var ki = 0
-    for (ki = 0; ki < tasks.length; ki++) {
-      var tState = text(tasks[ki], "state")
-      if (tState === "已完成") taskDone++
-      if (tState === "逾期") taskOverdue++
-      if (tState === "待整改" || tState === "进行中") taskOpen++
+    var rectifyTasks = countAll("rectify_tasks", scope.filter, scope.params, 500)
+    var closedTasks = 0
+    var openTasks = 0
+    var overdueTasks = 0
+    for (var rt = 0; rt < rectifyTasks.length; rt++) {
+      var r = rectifyTasks[rt]
+      var rs = text(r, "status")
+      if (isClosed(rs)) {
+        closedTasks++
+      } else {
+        openTasks++
+        var due = text(r, "due_at")
+        if (due && due < nowIso) overdueTasks++
+      }
     }
-    var rectifyRate = 0
-    if (tasks.length > 0) {
-      rectifyRate = Math.round((taskDone / tasks.length) * 100)
-    }
+    var rectifyRate = rectifyTasks.length > 0 ? Math.round((closedTasks / rectifyTasks.length) * 100) : 0
 
-    // 申诉统计 (超过 24 小时未复核)
-    var nowMs = new Date().getTime()
+    var appeals = countAll("appeals", scope.filter, scope.params, 500)
     var pendingAppeals = 0
     var overdueAppeals = 0
-    var ai = 0
-    for (ai = 0; ai < appeals.length; ai++) {
-      if (text(appeals[ai], "status") === "待复核") {
+    var threeDaysAgo = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
+    for (var ai = 0; ai < appeals.length; ai++) {
+      var a = appeals[ai]
+      var as = text(a, "status")
+      if (as === "PENDING" || as === "pending") {
         pendingAppeals++
-        var createdRaw = text(appeals[ai], "created")
-        if (createdRaw) {
-          var createdMs = new Date(createdRaw.replace(" ", "T")).getTime()
-          if (nowMs - createdMs > 24 * 3600 * 1000) overdueAppeals++
-        }
+        if (text(a, "created") < threeDaysAgo) overdueAppeals++
       }
     }
 
-    // 重点问题列表 (按风险等级、发生时间排序)
-    function riskWeight(r) {
-      if (r === "高") return 3
-      if (r === "中") return 2
-      return 1
+    var storeRank = []
+    var rankKeys = Object.keys(storeCount)
+    rankKeys.sort(function (x, y) { return storeCount[y] - storeCount[x] })
+    for (var ri = 0; ri < rankKeys.length && ri < 5; ri++) {
+      var sk = rankKeys[ri]
+      var cnt = storeCount[sk]
+      var share = issues.length > 0 ? Math.round((cnt / issues.length) * 1000) / 10 : 0
+      storeRank.push({ store_id: sk, store_name: storeName[sk] || "未知门店", issue_count: cnt, share: share })
     }
-    var filtered = []
-    var fi = 0
-    for (fi = 0; fi < issues.length; fi++) {
-      var risk = text(issues[fi], "risk")
-      var state = text(issues[fi], "state")
-      if (tab === "high" && risk !== "高") continue
-      if (tab === "appealing" && state !== "申诉中") continue
-      filtered.push({
-        id: text(issues[fi], "id"),
-        issue_type: text(issues[fi], "issue_type"),
-        risk: risk,
-        state: state,
-        quote: text(issues[fi], "quote"),
-        advice: text(issues[fi], "advice"),
-        occurred_at: text(issues[fi], "occurred_at"),
-        employee_name: empName[text(issues[fi], "employee")] || "-",
-        store_name: storeName[text(issues[fi], "store")] || "-"
-      })
-    }
-    filtered.sort(function (a, b) {
-      var w = riskWeight(b.risk) - riskWeight(a.risk)
-      if (w !== 0) return w
-      return a.occurred_at < b.occurred_at ? 1 : -1
-    })
 
-    // 门店排行
-    var rank = []
-    var storeId = ""
-    for (storeId in storeIssueCount) {
-      rank.push({
-        store_id: storeId,
-        store_name: storeName[storeId] || "-",
-        issue_count: storeIssueCount[storeId]
-      })
-    }
-    rank.sort(function (a, b) {
-      return b.issue_count - a.issue_count
-    })
-    var maxCount = rank.length > 0 ? rank[0].issue_count : 0
-    var ri = 0
-    for (ri = 0; ri < rank.length; ri++) {
-      rank[ri].share = maxCount > 0 ? Math.round((rank[ri].issue_count / maxCount) * 100) : 0
-    }
+    var storesTotal = Object.keys(storeName).length
 
     return e.json(200, {
+      generated_at: nowIso,
       stats: {
-        transcripts_today: transcripts.length,
-        stores_covered: coveredCount,
-        stores_total: stores.length,
-        issues_today: issues.length,
+        transcripts_today: transcriptsToday.length,
+        stores_covered: Object.keys(covered).length,
+        stores_total: storesTotal,
+        issues_today: issuesToday.length,
         high_risk: highRisk,
         rectify_rate: rectifyRate,
+        open_tasks: openTasks,
+        overdue_tasks: overdueTasks,
         pending_appeals: pendingAppeals,
         overdue_appeals: overdueAppeals,
-        overdue_tasks: taskOverdue,
-        open_tasks: taskOpen
       },
-      key_issues: filtered,
-      store_rank: rank,
-      generated_at: new Date().toISOString()
+      key_issues: keyIssues,
+      store_rank: storeRank,
     })
   } catch (err) {
-    var msg = String((err && err.message) || err)
-    try { $app.logger().error("dashboard_summary_failed: " + msg) } catch (logErr) {}
-    return e.json(500, {
-      error: "dashboard_summary_failed",
-      message: msg,
-      fingerprint: msg.slice(0, 80)
-    })
-  }
-})
-
-routerAdd("POST", "/api/admin/seed", function (e) {
-  // 安全止血: demo seed 默认关闭, 仅当显式设置 YUQI_ALLOW_DEMO_SEED=1 且非生产环境时可用。
-  var allowSeed = String($os.getenv("YUQI_ALLOW_DEMO_SEED") || "") === "1"
-  var envName = String($os.getenv("YUQI_ENV") || "").toLowerCase()
-  if (envName === "production" || envName === "prod") allowSeed = false
-  if (!allowSeed) {
-    return e.json(403, { error: "demo_seed_disabled", message: "演示数据接口已关闭" })
-  }
-  try {
-    function wipe(collName) {
-      var rows = []
-      try {
-        rows = $app.findRecordsByFilter(collName, "id != ''", "", 1000, 0) || []
-      } catch (err) {
-        rows = []
-      }
-      var wi = 0
-      for (wi = 0; wi < rows.length; wi++) {
-        try { $app.delete(rows[wi]) } catch (delErr) {}
-      }
-    }
-
-    wipe("appeals")
-    wipe("rectify_tasks")
-    wipe("inspection_issues")
-    wipe("transcripts")
-    wipe("employees")
-    wipe("stores")
-    wipe("regions")
-
-    function make(collName, values) {
-      var col = $app.findCollectionByNameOrId(collName)
-      var rec = new Record(col)
-      var key = ""
-      for (key in values) {
-        rec.set(key, values[key])
-      }
-      $app.save(rec)
-      return rec
-    }
-
-    function isoAgo(minutes) {
-      var d = new Date()
-      d.setTime(d.getTime() - minutes * 60 * 1000)
-      return d.toISOString()
-    }
-
-    function isoAhead(days) {
-      var d = new Date()
-      d.setTime(d.getTime() + days * 24 * 3600 * 1000)
-      return d.toISOString()
-    }
-
-    // 区域
-    var east = make("regions", { name: "华东一区", code: "R-EAST-1" })
-    var south = make("regions", { name: "华南一区", code: "R-SOUTH-1" })
-
-    // 门店
-    var s1 = make("stores", { name: "解放路旗舰店", region: east.id, address: "杭州市上城区解放路128号" })
-    var s2 = make("stores", { name: "万达广场店", region: east.id, address: "杭州市拱墅区万达广场1层" })
-    var s3 = make("stores", { name: "东站社区店", region: east.id, address: "杭州市上城区东站社区服务中心旁" })
-    var s4 = make("stores", { name: "滨江健康药房", region: south.id, address: "广州市天河区滨江路88号" })
-
-    // 员工
-    var p1 = make("employees", { name: "李娜", phone: "138****2211", role: "店长", store: s1.id, status: "在职" })
-    var p2 = make("employees", { name: "王强", phone: "139****3322", role: "执业药师", store: s1.id, status: "在职" })
-    var p3 = make("employees", { name: "张伟", phone: "137****4433", role: "营业员", store: s2.id, status: "在职" })
-    var p4 = make("employees", { name: "刘芳", phone: "136****5544", role: "营业员", store: s2.id, status: "在职" })
-    var p5 = make("employees", { name: "陈静", phone: "135****6655", role: "执业药师", store: s3.id, status: "在职" })
-    var p6 = make("employees", { name: "赵磊", phone: "158****7766", role: "店长", store: s4.id, status: "在职" })
-
-    // 录音转写
-    make("transcripts", { device: "WP-A1023", employee: p1.id, store: s1.id, summary: "顾客咨询感冒药, 推荐联合购买并提醒用法", full_text: "顾客: 最近有点感冒, 有什么药推荐? 李娜: 建议复方感冒药配合维C, 按说明书服用, 多喝水休息。", qc_result: "无问题", occurred_at: isoAgo(30) })
-    make("transcripts", { device: "WP-A1023", employee: p2.id, store: s1.id, summary: "处方药销售核验流程完整", full_text: "王强: 请出示一下处方, 我帮您核验。这个药需要按医嘱服用, 不能自行加量。", qc_result: "无问题", occurred_at: isoAgo(55) })
-    make("transcripts", { device: "WP-A1087", employee: p3.id, store: s2.id, summary: "向顾客介绍保健品功效, 提及治愈率", full_text: "张伟: 这个保健品吃一个疗程基本就能根治, 我们这边治愈率在九成以上, 很多老顾客都在用。", qc_result: "有问题", occurred_at: isoAgo(40) })
-    make("transcripts", { device: "WP-A1087", employee: p4.id, store: s2.id, summary: "销售止咳药未询问基础疾病", full_text: "刘芳: 这个止咳药直接吃就行, 一天三次, 您拿好按说明书吃就行。", qc_result: "有问题", occurred_at: isoAgo(75) })
-    make("transcripts", { device: "WP-B2044", employee: p5.id, store: s3.id, summary: "慢病顾客用药指导, 提醒复诊", full_text: "陈静: 降压药要每天固定时间吃, 这个月和您在吃的其他药我核对过了, 没有冲突, 记得下周复诊。", qc_result: "无问题", occurred_at: isoAgo(90) })
-    make("transcripts", { device: "WP-A1087", employee: p3.id, store: s2.id, summary: "联合推荐感冒药与退烧药", full_text: "张伟: 感冒药和退烧药一起买, 一起吃好得快, 都不用单独跑了。", qc_result: "有问题", occurred_at: isoAgo(20) })
-    make("transcripts", { device: "WP-C3011", employee: p6.id, store: s4.id, summary: "孕哺期顾客用药咨询", full_text: "赵磊: 这个药孕妇也能吃, 没事的, 您放心用就行。", qc_result: "有问题", occurred_at: isoAgo(120) })
-    make("transcripts", { device: "WP-A1087", employee: p4.id, store: s2.id, summary: "推荐降压药并说明禁忌", full_text: "刘芳: 这款降压药和您之前用的成分一样, 注意不要和柚子汁同服, 每天固定时间服用。", qc_result: "无问题", occurred_at: isoAgo(140) })
-
-    // 合规问题
-    var iss1 = make("inspection_issues", { transcript: "", employee: p3.id, store: s2.id, issue_type: "夸大疗效表达", risk: "高", state: "待整改", quote: "这个保健品吃一个疗程基本就能根治, 我们这边治愈率在九成以上", advice: "立即停用治愈率、根治等绝对化表述, 按合规话术模板介绍保健品仅起辅助作用, 并完成处方药销售合规课程学习。", occurred_at: isoAgo(40) })
-    var iss2 = make("inspection_issues", { transcript: "", employee: p3.id, store: s2.id, issue_type: "联合用药风险", risk: "高", state: "申诉中", quote: "感冒药和退烧药一起买, 一起吃好得快", advice: "含对乙酰氨基酚的复方感冒药与退烧药同服会导致成分超量, 推荐前须核对成分表, 建议间隔用药或单选其一。", occurred_at: isoAgo(20) })
-    var iss3 = make("inspection_issues", { transcript: "", employee: p4.id, store: s2.id, issue_type: "处方药提醒缺失", risk: "中", state: "待整改", quote: "这个止咳药直接吃就行, 一天三次", advice: "销售处方药前须核验处方并提醒用法用量与禁忌, 补充基础疾病询问环节。", occurred_at: isoAgo(75) })
-    var iss4 = make("inspection_issues", { transcript: "", employee: p4.id, store: s2.id, issue_type: "基础疾病询问缺失", risk: "中", state: "待整改", quote: "您拿好, 按说明书吃就行", advice: "销售降压、降糖等慢病用药前, 须询问基础疾病与过敏史并记录。", occurred_at: isoAgo(70) })
-    var iss5 = make("inspection_issues", { transcript: "", employee: p1.id, store: s1.id, issue_type: "夸大疗效表达", risk: "中", state: "已完成", quote: "这个药效果特别好, 保证两天见效", advice: "已替换为标准话术, 避免保证类承诺, 复查通过。", occurred_at: isoAgo(200) })
-    var iss6 = make("inspection_issues", { transcript: "", employee: p6.id, store: s4.id, issue_type: "特殊人群提醒缺失", risk: "低", state: "申诉中", quote: "这个药孕妇也能吃, 没事的", advice: "孕哺期顾客用药须引导至药师复核流程, 不得口头承诺安全性。", occurred_at: isoAgo(120) })
-    var iss7 = make("inspection_issues", { transcript: "", employee: p5.id, store: s3.id, issue_type: "禁忌提醒缺失", risk: "低", state: "已完成", quote: "这个和您在吃的药不冲突", advice: "联合用药建议前须核对在服药品清单, 已完善核对流程。", occurred_at: isoAgo(260) })
-
-    // 整改任务
-    make("rectify_tasks", { title: "万达广场店夸大疗效话术整改", owner: p3.id, store: s2.id, source_issue: iss1.id, due_date: isoAhead(3), progress: 40, state: "进行中" })
-    make("rectify_tasks", { title: "联合用药成分核对流程上线", owner: p4.id, store: s2.id, source_issue: iss2.id, due_date: isoAhead(5), progress: 0, state: "待整改" })
-    make("rectify_tasks", { title: "解放路旗舰店话术合规复查", owner: p1.id, store: s1.id, source_issue: iss5.id, due_date: isoAhead(-1), progress: 100, state: "已完成" })
-    make("rectify_tasks", { title: "处方药销售提醒专项培训", owner: p2.id, store: s1.id, source_issue: iss3.id, due_date: isoAhead(-2), progress: 55, state: "逾期" })
-
-    // 申诉
-    var ap1 = make("appeals", { issue: iss2.id, reason: "当时已口头提醒顾客两种药需间隔四小时服用, 录音片段未完整收录, 申请复核完整录音。", status: "待复核", reviewer: "", reviewed_at: "" })
-    make("appeals", { issue: iss6.id, reason: "顾客自述非孕期, 且当班药师在场确认, 建议调取药师复核记录。", status: "待复核", reviewer: "", reviewed_at: "" })
-    make("appeals", { issue: iss3.id, reason: "当日系统处方核验记录正常, 认为提醒已到位。", status: "已驳回", reviewer: "周审核", reviewed_at: isoAgo(300) })
-    make("appeals", { issue: iss5.id, reason: "话术已当场更正, 申请认定为低风险。", status: "已通过", reviewer: "周审核", reviewed_at: isoAgo(400) })
-
-    // 把第一条申诉的创建时间回拨 30 小时, 制造「超过 24 小时未复核」提醒
+    var gm = null
     try {
-      $app.db().newQuery("UPDATE appeals SET created = {:c}, updated = {:c} WHERE id = {:id}").bind({ c: isoAgo(30 * 60), id: ap1.id }).execute()
-    } catch (updErr) {
-      try { $app.logger().error("seed_backdate_failed: " + String((updErr && updErr.message) || updErr)) } catch (logErr2) {}
-    }
-
-    return e.json(200, {
-      ok: true,
-      seeded: {
-        regions: 2,
-        stores: 4,
-        employees: 6,
-        transcripts: 8,
-        inspection_issues: 7,
-        rectify_tasks: 4,
-        appeals: 4
-      },
-      seeded_at: new Date().toISOString()
-    })
-  } catch (err) {
-    var msg = String((err && err.message) || err)
-    try { $app.logger().error("admin_seed_failed: " + msg) } catch (logErr) {}
-    return e.json(500, {
-      error: "admin_seed_failed",
-      message: msg,
-      fingerprint: msg.slice(0, 80)
-    })
-  }
-})
-
-routerAdd("POST", "/api/admin/sync", function (e) {
-  try {
-    function countOf(collName) {
-      try {
-        var rows = $app.findRecordsByFilter(collName, "id != ''", "", 500, 0)
-        return rows ? rows.length : 0
-      } catch (err) {
-        return 0
-      }
-    }
-    return e.json(200, {
-      ok: true,
-      synced_at: new Date().toISOString(),
-      counts: {
-        stores: countOf("stores"),
-        employees: countOf("employees"),
-        transcripts: countOf("transcripts"),
-        inspection_issues: countOf("inspection_issues")
-      }
-    })
-  } catch (err) {
-    var msg = String((err && err.message) || err)
-    try { $app.logger().error("admin_sync_failed: " + msg) } catch (logErr) {}
-    return e.json(500, {
-      error: "admin_sync_failed",
-      message: msg,
-      fingerprint: msg.slice(0, 80)
-    })
+      gm = require(`${__hooks}/_lib/guards.js`)
+    } catch (_) {}
+    var msg = gm ? gm.safeMessage(err) : String(err && err.message || err)
+    var code = Number(err && err.status) || 500
+    if (code < 400 || code > 599) code = 500
+    return e.json(code, { code: code, message: msg })
   }
 })
