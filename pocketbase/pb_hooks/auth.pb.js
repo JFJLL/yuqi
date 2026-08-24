@@ -280,6 +280,32 @@ routerAdd("POST", "/api/yuqi/auth/employee/login", (e) => {
   }
 })
 
+// ---- 上传令牌一次性消费 (内部服务) ----
+routerAdd("POST", "/api/yuqi/internal/upload-token/consume", (e) => {
+  try {
+    const g = require(`${__hooks}/_lib/guards.js`)
+    const AH = require(`${__hooks}/_lib/auth-helpers.js`)
+    if (!g.isServiceRequest(e)) throw new ForbiddenError("仅内部服务可访问")
+    const body = e.requestInfo().body || {}
+    const nonce = String(body.nonce || "")
+    if (!nonce) throw new BadRequestError("nonce 必填")
+    let rec = null
+    try {
+      rec = $app.findFirstRecordByFilter("upload_tokens", "nonce = {:n}", { n: nonce })
+    } catch (_) {
+      rec = null
+    }
+    if (!rec) throw new NotFoundError("令牌不存在")
+    if (String(rec.get("used_at") || "") !== "") throw new BadRequestError("令牌已使用")
+    rec.set("used_at", AH.pbDate())
+    $app.save(rec)
+    return e.json(200, { ok: true })
+  } catch (err) {
+    const status = Number(err && err.status) || 500
+    return e.json(status >= 400 && status <= 599 ? status : 500, { error: "consume_failed", message: String((err && err.message) || "消费失败") })
+  }
+})
+
 // ---- 短期上传令牌 (管理员) ----
 routerAdd("POST", "/api/yuqi/upload-token", (e) => {
   try {
@@ -297,7 +323,7 @@ routerAdd("POST", "/api/yuqi/upload-token", (e) => {
       nonce,
       action: "asr_upload",
     }
-    const token = $security.newJWT(payload, secret, 600 * 1e9) // 10 分钟
+    const token = $security.createJWT(payload, secret, 600) // 10 分钟 (v0.40: createJWT 第三参为秒)
     const coll = $app.findCollectionByNameOrId("upload_tokens")
     const rec = new Record(coll)
     rec.set("tenant", ctx.tenantId)

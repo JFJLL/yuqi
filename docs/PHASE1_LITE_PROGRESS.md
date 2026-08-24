@@ -55,6 +55,35 @@
   验证码登录、验证码复用拒绝、生产环境固定码禁用(503 sms_not_configured);
   未登录访问业务数据 401/403; 跨集合锁定 35 个集合。
 
+## 阶段 3 验证记录 (2026-08-24)
+
+- processing_jobs 集合 + 内部任务路由 (/api/yuqi/internal/jobs/*, X-Yuqi-Service-Token 鉴权):
+  enqueue(幂等键)/claim(原子条件 UPDATE 领取+锁超时)/success/retry/fail;
+- v0.40 JSVM 无 $app.db().transactional, 原子领取改用单条条件 UPDATE (SQLite 单语句原子);
+- server/business-worker.mjs (PM2 进程名 yuqi-business-worker): 轮询领取→执行→回写,
+  失败指数退避, max_attempts 进入 FAILED; 通过 YUQI_PB_URL/YUQI_SERVICE_TOKEN 连接;
+- server/rule-analyzer.mjs: 纯 Node 规则分析器 (KEYWORD_ANY/ALL/REGEX/COMBINATION), 可单测;
+- risk_rules 增 created_by/updated_by 字段迁移; 规则修改生成 risk_rule_versions 快照;
+- init-builtin 8 条内置规则 (处方药/医保话术/夸大疗效/不合理用药/禁忌症/诱导超量/服务态度/问诊信息);
+- 设备活跃绑定唯一性: 部分唯一索引 (tenant+device WHERE status='ACTIVE');
+- 实测: 会话→入队→Worker 分析→risk_segments+issues 落库→SUCCEEDED;
+  同版本重复分析 0 新建(幂等); 新 analysis_version 正常生成新问题。
+
+## 阶段 4 验证记录 (2026-08-24)
+
+- asr-gateway.mjs 加固: X-Yuqi-Upload-Token 短期一次性上传令牌 (HMAC-SHA256 签名验证
+  + nonce 消费防重放 + 过期/篡改/复用拒绝); Mock 模式 (YUQI_ASR_MOCK=1) 走同一套落库链路;
+  转写成功后创建/更新 session + 写 transcript_segments (sequence 幂等) + 自动入队 RISK_ANALYSIS;
+  ASR 失败只写失败不写“无问题”; 错误信息脱敏; 上传大小/扩展名限制;
+- oss-scanner.mjs: 所有 PB 请求带 X-Yuqi-Service-Token (内部身份);
+- 修复: v0.40 createJWT 第三参为秒 (传纳秒导致 exp 溢出为负); empty date 字段判空需 String() 包裹;
+- 新增 tests/helpers/pb_bootstrap.py: 幂等引导 (superuser→tenant→region/store/employee→app_users→scopes),
+  供集成测试复用;
+- 实测通过: 登录→申请上传令牌→网关 Mock 转写 202→session/segments/RISK_ANALYSIS 生成→
+  Worker 执行→2 个疑似问题 (MEDICAL_INSURANCE_VIOLATION HIGH, INDUCED_OVER_PURCHASE MEDIUM)
+  + 2 个 risk_segments (含 start_ms/end_ms 时间锚点), 初始 review=PENDING + employee_visibility=HIDDEN;
+  令牌复用/缺失/篡改均 403。
+
 ## 提交历史 (按序)
 
 - chore: establish lightweight phase one baseline
@@ -62,3 +91,4 @@
 - (阶段 1-2) feat: add pocketbase authentication, tenant context and guarded CRUD
 - (阶段 1-2) feat: add phase one workflow routes (review/appeal/rectification/device/employee)
 - (阶段 1-2) fix: lock collection api rules and harden legacy hooks
+- (阶段 3+5) feat: add processing jobs, node business worker and rule based risk analysis
