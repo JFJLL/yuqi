@@ -1,7 +1,9 @@
-import { ShieldAlert } from "lucide-react"
+import { Play, ShieldAlert } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { IssueFilters } from "@/components/inspection/IssueFilters"
 import { IssueTable } from "@/components/inspection/IssueTable"
 import { IssueDetailDialog } from "@/components/inspection/IssueDetailDialog"
+import { TablePagination } from "@/components/ui/table-pagination"
 import type { InspectionProps } from "./useInspection"
 
 const TABS: { key: InspectionProps["tab"]; label: string }[] = [
@@ -17,13 +19,22 @@ export function InspectionPage({
   tab,
   loading,
   pushing,
+  reviewing,
+  rerunning,
   detail,
   typeOptions,
+  total,
+  page,
+  totalPages,
   setFilters,
   setTab,
+  setPage,
   openDetail,
   closeDetail,
+  handleReview,
+  handleClose,
   pushRectify,
+  handleRerun,
   handleExport,
 }: InspectionProps) {
   return (
@@ -34,6 +45,10 @@ export function InspectionPage({
           <p className="mt-0.5 mb-0 text-muted-foreground text-xs">查看 AI 识别的问题、命中文本、风险等级和整改建议。</p>
         </div>
         <div className="flex items-center gap-3">
+          <Button size="sm" variant="outline" className="gap-1.5" disabled={rerunning} onClick={() => void handleRerun()}>
+            <Play className="w-3.5 h-3.5" />
+            {rerunning ? "分析中…" : "重跑分析"}
+          </Button>
           <div className="inline-grid grid-flow-col gap-1 p-1 border border-border rounded-lg bg-background">
             {TABS.map((item) => (
               <button
@@ -58,8 +73,17 @@ export function InspectionPage({
       <div className="p-4">
         <IssueFilters filters={filters} typeOptions={typeOptions} onChange={setFilters} onExport={handleExport} />
         <IssueTable rows={rows} loading={loading} onDetail={openDetail} />
+        <TablePagination page={page} totalPages={totalPages} total={total} onChange={setPage} />
       </div>
-      <IssueDetailDialog issue={detail} pushing={pushing} onClose={closeDetail} onPushRectify={pushRectify} />
+      <IssueDetailDialog
+        issue={detail}
+        pushing={pushing}
+        reviewing={reviewing}
+        onClose={closeDetail}
+        onPushRectify={pushRectify}
+        onReview={(approve, comment) => void handleReview(approve, comment)}
+        onCloseIssue={() => void handleClose()}
+      />
     </section>
   )
 }

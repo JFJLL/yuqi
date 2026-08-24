@@ -10,7 +10,7 @@ export interface IssueFilterState {
 }
 
 export const RISK_OPTIONS = ["高", "中", "低"]
-export const STATE_OPTIONS = ["待整改", "申诉中", "已完成"]
+export const STATE_OPTIONS = ["待复核", "待整改", "申诉中", "已完成", "已驳回"]
 export const TYPE_OPTIONS = [
   "夸大疗效表达",
   "处方药提醒缺失",

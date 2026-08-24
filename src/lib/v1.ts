@@ -274,6 +274,135 @@ export const fetchRecordVersions = (id: string) => apiFetch<TextVersionV1[]>(`/r
 
 export const deleteRecording = (id: string) => apiFetch<{ ok: boolean }>(`/recordings/${id}`, { method: "DELETE" })
 
+// ---- 风险规则 / 疑似问题 (阶段四) ----
+export interface RiskRuleItem {
+  id: string
+  rule_set: string
+  code: string
+  name: string
+  description: string
+  category: string
+  severity: string
+  keywords: string[]
+  enabled: boolean
+  version_no: number
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface RiskRuleVersionItem {
+  id: string
+  version_no: number
+  snapshot: Record<string, unknown>
+  changed_by: string | null
+  change_note: string | null
+  created_at: string
+}
+
+export interface IssueItem {
+  id: string
+  issue_no: string
+  occurred_at: string | null
+  employee: string | null
+  store: string | null
+  employee_name: string | null
+  store_name: string | null
+  issue_type: string
+  risk: string
+  quote: string
+  advice: string
+  source: string
+  state: string
+  review_status: string
+  appeal_status: string
+  remediation_status: string
+  close_status: string
+  employee_view_status: string
+  segment_count: number
+  due_date: string | null
+}
+
+export interface IssueSegmentItem {
+  id: string
+  rule_code: string
+  rule_name: string
+  matched_text: string
+  matched_keywords: string[]
+  speaker: string
+  start_ms: number | null
+  end_ms: number | null
+  status: string
+}
+
+export interface IssueDetail extends IssueItem {
+  segments: IssueSegmentItem[]
+  review: {
+    reviewed_by: string | null
+    reviewed_at: string | null
+    review_comment: string | null
+    dismissed_reason: string | null
+  }
+}
+
+export const fetchRules = (params: {
+  page?: number
+  page_size?: number
+  keyword?: string
+  enabled?: string
+} = {}) => apiFetch<Page<RiskRuleItem>>(`/rules${qs(params)}`)
+
+export const createRule = (body: {
+  code: string
+  name: string
+  category: string
+  severity: string
+  keywords: string[]
+  description?: string
+  enabled?: boolean
+  change_note?: string
+}) => apiFetch<RiskRuleItem>("/rules", { method: "POST", body: JSON.stringify(body) })
+
+export const updateRule = (id: string, body: Partial<{
+  name: string
+  description: string
+  category: string
+  severity: string
+  keywords: string[]
+  enabled: boolean
+  change_note: string
+}>) => apiFetch<RiskRuleItem>(`/rules/${id}`, { method: "PATCH", body: JSON.stringify(body) })
+
+export const fetchRuleVersions = (id: string) => apiFetch<RiskRuleVersionItem[]>(`/rules/${id}/versions`)
+
+export const deleteRule = (id: string) => apiFetch<{ ok: boolean }>(`/rules/${id}`, { method: "DELETE" })
+
+export const fetchIssues = (params: {
+  page?: number
+  page_size?: number
+  keyword?: string
+  risk?: string
+  state?: string
+  issue_type?: string
+  date?: string
+  store_id?: string
+  employee_id?: string
+} = {}) => apiFetch<Page<IssueItem>>(`/issues${qs(params)}`)
+
+export const fetchIssueDetail = (id: string) => apiFetch<IssueDetail>(`/issues/${id}`)
+
+export const reviewIssue = (id: string, body: { approve: boolean; comment?: string | null }) =>
+  apiFetch<{ ok: boolean; review_status: string }>(`/issues/${id}/review`, { method: "POST", body: JSON.stringify(body) })
+
+export const closeIssue = (id: string, body: { comment?: string | null } = {}) =>
+  apiFetch<{ ok: boolean; close_status: string }>(`/issues/${id}/close`, { method: "POST", body: JSON.stringify(body) })
+
+export const pushRectify = (id: string, body: { due_date?: string | null } = {}) =>
+  apiFetch<{ ok: boolean; rectify_task_id: string; status: string }>(`/issues/${id}/push-rectify`, { method: "POST", body: JSON.stringify(body) })
+
+export const rerunAnalysis = () =>
+  apiFetch<{ ok: boolean; issues_created: number; segments_created: number; rules_matched: number }>("/analysis/rerun", { method: "POST", body: JSON.stringify({}) })
+
 // ---- 通用分页工具 ----
 export function totalPages(total: number, pageSize: number): number {
   return Math.max(1, Math.ceil(total / pageSize))

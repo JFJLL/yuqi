@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button"
 import { Pill, riskTone, stateTone } from "@/components/dashboard/Pill"
-import type { InspectionIssueRecord } from "@/lib/admin"
+import type { IssueItem } from "@/lib/v1"
 
-export interface IssueRow extends InspectionIssueRecord {
+export interface IssueRow extends IssueItem {
   employeeName: string
   storeName: string
 }
@@ -48,7 +48,7 @@ export function IssueTable({ rows, loading, onDetail }: IssueTableProps) {
               <td className="px-2.5 py-3 border-b border-border">{row.storeName || "-"}</td>
               <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">{row.issue_type}</td>
               <td className="px-2.5 py-3 border-b border-border max-w-[320px]">
-                <span className="inline-block border-l-[3px] border-primary bg-background rounded-r-md px-2 py-1 leading-relaxed text-foreground/90">
+                <span className="inline-block border-l-[3px] border-primary bg-background rounded-r-md px-2 py-1 leading-relaxed text-foreground/90 line-clamp-2">
                   {row.quote}
                 </span>
               </td>

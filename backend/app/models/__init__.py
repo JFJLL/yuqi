@@ -14,6 +14,7 @@ from app.models.auth import (
 )
 from app.models.device import Device, DeviceBinding, DeviceBindingRequest
 from app.models.imports import ImportBatch, ImportItem
+from app.models.issue import Issue, Rectification, RiskRule, RiskRuleVersion, RiskSegment
 from app.models.migration import MigrationBatch, MigrationItem
 from app.models.org import (
     Employee,
@@ -46,6 +47,11 @@ __all__ = [
     "DeviceBindingRequest",
     "ImportBatch",
     "ImportItem",
+    "Issue",
+    "Rectification",
+    "RiskRule",
+    "RiskRuleVersion",
+    "RiskSegment",
     "MigrationBatch",
     "MigrationItem",
     "Employee",

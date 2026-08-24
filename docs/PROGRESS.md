@@ -70,3 +70,19 @@
 - 后端: ruff ✅ / mypy ✅ / pytest 62 passed ✅ (新增 14: recordings 上传/详情/过滤/范围/权限/版本/重试/删除/内部端点 + providers) / alembic upgrade+check ✅
 - 前端: lint ✅ / typecheck ✅ / test 17 passed ✅ (新增 Records 页 4 项) / build ✅
 - ASR mock 全链路 (上传→转写→会话→版本) 有 API 测试覆盖; 生产 ASR/OSS 未连接 (无服务器权限)
+
+## 阶段四：规则库 / RiskAnalyzer / 风险片段 / 疑似问题 / 人工复核 — 已完成
+
+**产出**
+- [x] 模型 (迁移 0004): `risk_rules`(版本化) / `risk_rule_versions`(快照) / `risk_segments`(命中片段) / `issues`(多状态: review/appeal/remediation/close/employee_view) / `rectifications`
+- [x] RiskAnalyzer: 启用规则关键词扫描转写片段 → 风险片段 + 疑似问题 (一会话/规则一条, 幂等防重复)
+- [x] 规则库 API: CRUD + 版本快照 + 启停 (rules:manage), 修改自动递增版本
+- [x] 疑似问题 API: 列表(服务端分页+风险/状态/类型/关键词/门店/员工过滤+数据范围) / 详情(含命中片段) / 复核通过·驳回 / 关闭 / 推送整改 (issue:review / issue:close / rectify:confirm)
+- [x] 重跑分析 `POST /analysis/rerun` (analysis:rerun, 单会话或全量 READY 会话)
+- [x] 证据锁: 被疑似问题引用的录音禁止删除
+- [x] 前端: 合规巡检页服务端分页 + 复核/驳回/关闭/推送整改 + 重跑分析按钮; 知识库页改造为合规规则库 (新增/编辑/启停/版本历史)
+
+**门禁**
+- 后端: ruff ✅ / mypy ✅ / pytest 67 passed ✅ (新增 5: 规则 CRUD+版本 / 分析→问题→复核→整改→关闭全流程 / 驳回+证据锁 / 权限 / 门店范围) / alembic upgrade+check ✅
+- 前端: lint ✅ / typecheck ✅ / test 24 passed ✅ (新增 Inspection 3 项 + Knowledge 规则库 4 项) / build ✅
+- 分析引擎基于关键词规则; LLM 规则分析为预留 (LLM_ENABLED 默认关闭)

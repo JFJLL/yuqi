@@ -290,11 +290,20 @@ class IngestionService:
     async def soft_delete(
         self, audio_file_id: uuid.UUID, actor_id: uuid.UUID | None
     ) -> None:
-        """软删除音频与会话. (证据锁: 阶段四引入 Issue 引用检查后启用)"""
+        """软删除音频与会话; 会话被疑似问题引用时拒绝删除 (证据锁)."""
         audio = await self._get_audio(audio_file_id)
         if audio.conversation_id:
-            # 阶段四: 若会话被疑似问题引用, 此处应拒绝删除 (证据锁)
-            pass
+            from app.models.issue import Issue
+
+            referenced = await self.session.scalar(
+                select(Issue.id).where(
+                    Issue.tenant_id == audio.tenant_id,
+                    Issue.conversation_id == audio.conversation_id,
+                    Issue.deleted_at.is_(None),
+                ).limit(1)
+            )
+            if referenced is not None:
+                raise AppError(400, "issue_referenced", "该录音已被疑似问题引用, 不能删除 (证据锁)")
         conversation = (
             await self.session.scalar(
                 select(Conversation).where(Conversation.audio_file_id == audio.id)
