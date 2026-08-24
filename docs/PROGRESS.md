@@ -22,3 +22,20 @@
 - [x] 原管理端构建通过；ASR/OSS Node 代码未改动
 
 **阶段零门禁**: `pnpm lint` ✅ / `pnpm typecheck` ✅ / `pnpm build` ✅；未触碰生产数据。
+
+## 阶段一：正式后端、安全底座与管理员登录 — 已完成
+
+**产出**
+- [x] `backend/`: FastAPI + SQLAlchemy 2.x(async) + Alembic + Pydantic v2 + ARQ worker/scheduler
+- [x] 分环境配置 + 校验 (`.env.example`), 结构化日志 + 请求 ID + 日志脱敏, 统一错误响应, OpenAPI
+- [x] `/health/live` `/health/ready`; 核心表 UUID 主键 + UTC + tenant_id + 软删除
+- [x] 认证: Argon2id, Access(15min JWT, 含 token_version) + Refresh(可撤销/轮换/HttpOnly Cookie), 登录限流, 登录日志, 改密/重置/停用
+- [x] RBAC: 8 默认角色模板 + 权限 + 数据范围 (TenantContext/PermissionService/DataScopeService)
+- [x] 管理端: 登录页 / 路由守卫 / 403 / 404 / 修改密码 / 退出 / 权限菜单 / 当前用户与租户
+- [x] openapi-typescript 自动生成 `src/lib/api.gen.ts` (`scripts/export_openapi.py` + `pnpm gen:api`)
+- [x] 测试: 后端 23 项 (登录/限流/轮换/退出/停用/跨租户/权限/改密/密码哈希/数据范围), 前端 8 项
+
+**门禁**
+- 后端: ruff ✅ / mypy ✅ / pytest 23 passed ✅ / alembic 空库升级 ✅ / compileall ✅
+- 前端: lint ✅ / typecheck ✅ / test 8 passed ✅ / build ✅
+- PostgreSQL/Redis 集成测试: 未执行 (本机无服务), 已留标记测试

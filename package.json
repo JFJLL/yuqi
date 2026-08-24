@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
+    "gen:api": "bash backend/scripts/export_openapi.sh && openapi-typescript openapi.json -o src/lib/api.gen.ts",
     "preview": "vite preview"
   },
   "dependencies": {
