@@ -31,7 +31,18 @@ onBootstrap(function (e) {
       addField({ name: 'code', type: 'text', max: 40 })
       addField({ name: "created", type: "autodate", onCreate: true })
       addField({ name: "updated", type: "autodate", onCreate: true, onUpdate: true })
-      if (changed) {
+            var rulesChanged = false
+      try {
+        if (existing.listRule !== null || existing.viewRule !== null || existing.createRule !== null || existing.updateRule !== null || existing.deleteRule !== null) {
+          existing.listRule = null
+          existing.viewRule = null
+          existing.createRule = null
+          existing.updateRule = null
+          existing.deleteRule = null
+          rulesChanged = true
+        }
+      } catch (_) {}
+if (changed || rulesChanged) {
         $app.save(existing)
         try { $app.logger().info("regions collection upgraded") } catch (_) {}
       }
@@ -56,128 +67,5 @@ onBootstrap(function (e) {
 })
 
 // GET /api/regions?page=1&perPage=50&sort=-created&code=...
-routerAdd("GET", "/api/regions", function (e) {
-  function ensureCollLocal() {
-    try { return $app.findCollectionByNameOrId("regions") } catch (_) {}
-    var col = new Collection({
-      type: "base",
-      name: "regions",
-      listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
-      fields: [
-          { name: 'name', type: 'text', required: true, max: 60 },
-          { name: 'code', type: 'text', max: 40 },
-        { name: "created", type: "autodate", onCreate: true },
-        { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
-      ],
-    })
-    $app.save(col)
-    return $app.findCollectionByNameOrId("regions")
-  }
-  try {
-    ensureCollLocal()
-    var info = e.requestInfo()
-    var query = info.query || {}
-    var page = parseInt(String(query.page || "1"), 10) || 1
-    var perPage = parseInt(String(query.perPage || "50"), 10) || 50
-    if (perPage > 200) perPage = 200
-    var sort = String(query.sort || "-created")
-    var filterParts = []
-    var params = {}
-    if (query.code !== undefined && query.code !== "") {
-      filterParts.push("code = {:code}")
-      params.code = String(query.code)
-    }
-    var filter = filterParts.length > 0 ? filterParts.join(" && ") : ""
-    var records = filter
-      ? $app.findRecordsByFilter("regions", filter, sort, perPage, (page - 1) * perPage, params)
-      : $app.findRecordsByFilter("regions", "", sort, perPage, (page - 1) * perPage)
-    var items = []
-    for (var i = 0; i < records.length; i++) {
-      items.push(records[i].publicExport())
-    }
-    return e.json(200, { items: items, page: page, perPage: perPage, totalItems: items.length })
-  } catch (err) {
-    var msg = String(err && err.message || err)
-    try { $app.logger().error("regions list: " + msg) } catch (_) {}
-    return e.json(500, { error: "list_failed", message: msg, fingerprint: msg.substring(0, 80) })
-  }
-})
-// GET /api/regions/{id}
-routerAdd("GET", "/api/regions/{id}", function (e) {
-  try {
-    var id = e.request.pathValue("id")
-    if (!id) return e.json(400, { error: "id_required" })
-    var rec = null
-    try { rec = $app.findRecordById("regions", id) } catch (_) { rec = null }
-    if (!rec) return e.json(404, { error: "not_found" })
-    return e.json(200, rec.publicExport())
-  } catch (err) {
-    var msg = String(err && err.message || err)
-    return e.json(500, { error: "get_failed", message: msg, fingerprint: msg.substring(0, 80) })
-  }
-})
-// POST /api/regions  body 字段: name, code
-routerAdd("POST", "/api/regions", function (e) {
-  function ensureCollLocal() {
-    try { return $app.findCollectionByNameOrId("regions") } catch (_) {}
-    var col = new Collection({
-      type: "base",
-      name: "regions",
-      listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
-      fields: [
-          { name: 'name', type: 'text', required: true, max: 60 },
-          { name: 'code', type: 'text', max: 40 },
-        { name: "created", type: "autodate", onCreate: true },
-        { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
-      ],
-    })
-    $app.save(col)
-    return $app.findCollectionByNameOrId("regions")
-  }
-  try {
-    var coll = ensureCollLocal()
-    var body = e.requestInfo().body || {}
-    var rec = new Record(coll)
-    rec.set("name", body.name === undefined || body.name === null ? "" : String(body.name))
-    rec.set("code", body.code === undefined || body.code === null ? "" : String(body.code))
-    $app.save(rec)
-    return e.json(200, rec.publicExport())
-  } catch (err) {
-    var msg = String(err && err.message || err)
-    try { $app.logger().error("regions create: " + msg) } catch (_) {}
-    return e.json(500, { error: "create_failed", message: msg, fingerprint: msg.substring(0, 80) })
-  }
-})
-// PATCH /api/regions/{id}  body 字段同 POST, 只更新 body 里出现的字段
-routerAdd("PATCH", "/api/regions/{id}", function (e) {
-  try {
-    var id = e.request.pathValue("id")
-    if (!id) return e.json(400, { error: "id_required" })
-    var rec = null
-    try { rec = $app.findRecordById("regions", id) } catch (_) { rec = null }
-    if (!rec) return e.json(404, { error: "not_found" })
-    var body = e.requestInfo().body || {}
-    if ("name" in body) rec.set("name", body.name === undefined || body.name === null ? "" : String(body.name))
-    if ("code" in body) rec.set("code", body.code === undefined || body.code === null ? "" : String(body.code))
-    $app.save(rec)
-    return e.json(200, rec.publicExport())
-  } catch (err) {
-    var msg = String(err && err.message || err)
-    return e.json(500, { error: "update_failed", message: msg, fingerprint: msg.substring(0, 80) })
-  }
-})
-// DELETE /api/regions/{id}
-routerAdd("DELETE", "/api/regions/{id}", function (e) {
-  try {
-    var id = e.request.pathValue("id")
-    if (!id) return e.json(400, { error: "id_required" })
-    var rec = null
-    try { rec = $app.findRecordById("regions", id) } catch (_) { rec = null }
-    if (!rec) return e.json(404, { error: "not_found" })
-    $app.delete(rec)
-    return e.json(200, { ok: true })
-  } catch (err) {
-    var msg = String(err && err.message || err)
-    return e.json(500, { error: "delete_failed", message: msg, fingerprint: msg.substring(0, 80) })
-  }
-})
+
+// 匿名 CRUD 路由已由 pocketbase/pb_hooks/business.pb.js 统一守卫路由替代。
