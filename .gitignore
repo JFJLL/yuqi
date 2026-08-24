@@ -52,5 +52,9 @@ tests/tmp/
 tests/.tmp/
 *.tsbuildinfo
 
+# Python 临时文件
+__pycache__/
+*.pyc
+
 # PocketBase 二进制 (不在仓库中提交)
 pocketbase/pocketbase*
