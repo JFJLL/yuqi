@@ -179,12 +179,32 @@ class IngestionService:
             result = await self.asr.poll(job.remote_job_id)
             job.last_polled_at = datetime.now(UTC)
             if result.status == "succeeded":
-                await self._import_result(job, audio, result)
+                conversation = await self._import_result(job, audio, result)
                 job.status = "succeeded"
                 job.finished_at = datetime.now(UTC)
                 job.result_imported_at = datetime.now(UTC)
                 audio.status = "SUCCEEDED"
                 await self.session.commit()
+                # 转写完成 → 风险分析: 内存队列同会话执行, 生产走 ARQ worker 任务
+                try:
+                    from app.core.config import get_settings
+                    from app.providers.queue import InMemoryTaskQueue, get_task_queue
+
+                    queue = get_task_queue(get_settings())
+                    if isinstance(queue, InMemoryTaskQueue):
+                        from app.modules.analysis.service import RiskAnalyzer
+
+                        await RiskAnalyzer(self.session).analyze_conversation(conversation.id)
+                        await self.session.commit()
+                    else:
+                        await queue.enqueue(
+                            "run_risk_analysis",
+                            conversation_id=str(conversation.id),
+                        )
+                except Exception:  # noqa: BLE001
+                    logger.exception(
+                        "analysis_enqueue_failed", conversation_id=str(conversation.id)
+                    )
             else:
                 # 未完成: 保留 running, 由 scheduler 或下次重试轮询
                 await self.session.commit()

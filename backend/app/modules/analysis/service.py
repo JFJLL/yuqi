@@ -371,3 +371,27 @@ async def _next_issue_no(session: AsyncSession, tenant_id: uuid.UUID) -> str:
     )
 
     return f"ISS-{date.today().strftime('%Y%m%d')}-{count + 1:05d}"
+
+
+async def run_risk_analysis(conversation_id: str, job_id: str | None = None) -> dict:
+    """Worker 任务: 对指定会话执行风险分析 (转写完成后由队列触发).
+
+    - 无请求上下文: 以会话自身的 tenant 为边界, 不做数据范围过滤 (后台任务)
+    - 幂等: 一会话/规则最多一条问题
+    """
+
+    from app.core.logging import get_logger
+    from app.db.session import get_session_factory
+
+    logger = get_logger("yuqi.worker")
+    async with get_session_factory()() as session:
+        analyzer = RiskAnalyzer(session)
+        result = await analyzer.analyze_conversation(uuid.UUID(conversation_id))
+        await session.commit()
+    logger.info(
+        "risk_analysis_done",
+        conversation_id=conversation_id,
+        issues_created=result["issues_created"],
+        job_id=job_id,
+    )
+    return result

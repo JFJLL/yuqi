@@ -119,3 +119,17 @@
 - 后端: ruff ✅ / mypy ✅ / pytest 79 passed ✅ (新增 8: 报表总览/区域聚合/门店范围/审计列表与权限/设置读写/保留清理证据锁/工作台) / alembic upgrade+check ✅ (全新库 0001→0006)
 - 前端: lint ✅ / typecheck ✅ / test 35 passed ✅ (新增 Reports 2 项 + Settings 3 项) / build ✅
 - 部署脚本仅交付未执行 (无服务器权限); 正式切换按 DEPLOYMENT.md 顺序人工执行
+
+## 验收补漏（最终复查后补齐）— 已完成
+
+对照 `PHASE1_IMPLEMENTATION_PLAN.md` 验收门槛复查, 补齐以下缺口:
+
+- [x] **短信验证码登录** (阶段五): `POST /auth/sms/send` + `POST /auth/sms/login`; SmsProvider 抽象 (mock: 日志+非生产 debug_code, 固定码仅测试环境); 验证码内存存储含 TTL/尝试次数上限; 手机号跨租户重复不泄露存在性; 首次登录自动建档 EMPLOYEE 角色账号
+- [x] **员工 H5** (阶段五): `apps/employee-h5` 独立 Vite 应用 (短信登录 → 我的问题/申诉 → 我的整改/提交), 全部走真实 `/api/v1`, 无假数据; 构建产物 `apps/employee-h5/dist`
+- [x] **异步分析任务** (阶段四): 注册 `run_risk_analysis` worker 任务 (ARQ/内存队列双实现); 转写完成后自动入队分析, 内存队列同会话执行保持测试确定性; 上传→ASR→自动分析→疑似问题全链路闭环
+- [x] **8 类风险规则** (阶段四): seed 演示规则扩至 8 类 (夸大疗效/处方药核验/联合用药/基础疾病询问/价格承诺/服务态度/医保违规/超范围经营)
+- [x] **水印导出 + 审计** (阶段六): `GET /reports/export` (report:export) 服务端生成带水印 CSV (租户/操作人/时间/内部提示), 导出动作写审计 `report.export`; 前端报表页增加导出按钮
+- [x] **手机号脱敏** (阶段二复核确认): 员工列表仅返回 mobile_masked, 不返回完整手机号
+- [x] **compileall** 门禁补跑通过
+
+**门禁 (补漏后全量)**: 后端 ruff ✅ / mypy ✅ (77 files) / pytest 83 passed ✅ (新增 SMS 3 + 导出 1 + 自动分析断言更新) / 前端 lint ✅ / typecheck ✅ / test 35 ✅ / build ✅ (含 apps/employee-h5) / alembic 全新库 upgrade+check ✅

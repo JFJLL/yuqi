@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
+  exportReportCsv,
   fetchReportOverview,
   fetchReportRegions,
   type RegionReportItem,
@@ -27,6 +28,7 @@ export function useReports() {
   const [overview, setOverview] = useState<ReportOverview>(EMPTY_OVERVIEW)
   const [regions, setRegions] = useState<RegionReportItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
   const [viewing, setViewing] = useState<ReportSummary | null>(null)
 
   useEffect(() => {
@@ -103,7 +105,19 @@ export function useReports() {
   const openReport = useCallback((report: ReportSummary) => setViewing(report), [])
   const closeReport = useCallback(() => setViewing(null), [])
 
-  return { regionRows, reports, loading, viewing, openReport, closeReport }
+  const handleExport = useCallback(async () => {
+    setExporting(true)
+    try {
+      await exportReportCsv()
+      toast.success("报表已导出 (服务端水印 CSV, 已留审计)")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "导出失败，请稍后重试")
+    } finally {
+      setExporting(false)
+    }
+  }, [])
+
+  return { regionRows, reports, loading, exporting, viewing, openReport, closeReport, handleExport }
 }
 
 export type ReportsProps = ReturnType<typeof useReports>

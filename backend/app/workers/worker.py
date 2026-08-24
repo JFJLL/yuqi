@@ -20,9 +20,11 @@ WORKER_FUNCTIONS: dict[str, Callable[..., Any]] = {}
 
 
 def _register_builtin_functions() -> None:
+    from app.modules.analysis.service import run_risk_analysis
     from app.modules.ingestion.service import run_asr_job
 
     WORKER_FUNCTIONS["run_asr_job"] = run_asr_job
+    WORKER_FUNCTIONS["run_risk_analysis"] = run_risk_analysis
 
 
 _register_builtin_functions()

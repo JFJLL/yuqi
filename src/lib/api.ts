@@ -55,6 +55,37 @@ export interface ApiInit extends RequestInit {
   skipRefresh?: boolean
 }
 
+/** 下载型请求 (CSV/文件): 携带鉴权与 401 刷新, 返回 Blob 而非 JSON. */
+export async function apiFetchBlob(path: string, init: ApiInit = {}): Promise<Blob> {
+  const headers: Record<string, string> = {
+    "X-Request-Id": await requestId(),
+    ...(init.headers as Record<string, string> | undefined),
+  }
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+
+  let resp = await fetch(`/api/v1${path}`, { ...init, headers, credentials: "include" })
+
+  if (resp.status === 401 && !init.skipRefresh) {
+    const fresh = await refreshAccessToken()
+    if (fresh) {
+      headers.Authorization = `Bearer ${fresh}`
+      resp = await fetch(`/api/v1${path}`, { ...init, headers, credentials: "include" })
+    }
+  }
+
+  if (!resp.ok) {
+    let message = `请求失败 (HTTP ${resp.status})`
+    try {
+      const body = (await resp.json()) as { error?: { message?: string } }
+      message = body.error?.message ?? message
+    } catch {
+      // 非 JSON 响应
+    }
+    throw new ApiError(resp.status, "http_error", message)
+  }
+  return resp.blob()
+}
+
 export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     "X-Request-Id": await requestId(),

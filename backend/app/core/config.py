@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     # SMS Provider
     sms_provider: str = "mock"
     sms_mock_fixed_code: str = "123456"  # 仅测试环境
+    sms_code_ttl_seconds: int = 300
+    sms_max_attempts: int = 5
 
     @field_validator("jwt_secret")
     @classmethod

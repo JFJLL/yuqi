@@ -13,6 +13,21 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class SmsSendRequest(BaseModel):
+    mobile: str = Field(min_length=6, max_length=32, description="员工手机号")
+
+
+class SmsSendResponse(BaseModel):
+    ok: bool
+    expires_in: int
+    debug_code: str | None = None  # 仅非生产环境 (mock provider) 返回
+
+
+class SmsLoginRequest(BaseModel):
+    mobile: str = Field(min_length=6, max_length=32)
+    code: str = Field(min_length=4, max_length=8)
+
+
 class RoleOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

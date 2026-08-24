@@ -74,15 +74,15 @@ async def test_analyzer_creates_issues_and_review_flow(client, session_factory):
     token = await login(client, "superadmin")
     await _create_rule(client, token)
     await _upload(client, token)
-    # 重跑分析: mock 转写文本含 "重点介绍了 ... 阿莫西林胶囊"
-    resp = await client.post("/api/v1/analysis/rerun", json={}, headers=auth_headers(token))
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert body["issues_created"] == 1
-    # 列表
+    # 上传 → ASR 完成 → 队列自动风险分析 (内存队列同步执行)
     resp = await client.get("/api/v1/issues", headers=auth_headers(token))
     items = resp.json()["items"]
     assert len(items) == 1
+    # 重跑分析: 幂等, 不再产生重复问题 (mock 转写文本含 "重点介绍了 ... 阿莫西林胶囊")
+    resp = await client.post("/api/v1/analysis/rerun", json={}, headers=auth_headers(token))
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["issues_created"] == 0
     issue = items[0]
     assert issue["issue_type"] == "夸大疗效表达"
     assert issue["risk"] == "高"
@@ -165,8 +165,11 @@ async def test_issue_scope_for_store_manager(client, session_factory):
             "/api/v1/recordings/upload", files=files, data=data, headers=auth_headers(admin)
         )
         assert resp.status_code == 201
+    # 两条录音上传后均自动分析 → 管理端可见 2 条问题
+    resp = await client.get("/api/v1/issues", headers=auth_headers(admin))
+    assert resp.json()["total"] == 2
     resp = await client.post("/api/v1/analysis/rerun", json={}, headers=auth_headers(admin))
-    assert resp.json()["issues_created"] == 2
+    assert resp.json()["issues_created"] == 0  # 幂等
     manager = await login(client, "store_a_manager")
     resp = await client.get("/api/v1/issues", headers=auth_headers(manager))
     items = resp.json()["items"]

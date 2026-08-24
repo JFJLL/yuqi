@@ -1,7 +1,7 @@
 // 阶段二端点类型化客户端: 组织 / 员工 / 门店 / 设备 / 绑定 / 运行事件
 // 全部使用 FastAPI 服务端分页, 不再拉全量后在浏览器聚合。
 
-import { apiFetch } from "./api"
+import { apiFetch, apiFetchBlob } from "./api"
 
 export interface PageMeta {
   page: number
@@ -581,6 +581,17 @@ export const fetchReportOverview = (params: { from?: string; to?: string } = {})
   apiFetch<ReportOverview>(`/reports/overview${qs(params)}`)
 
 export const fetchReportRegions = () => apiFetch<{ items: RegionReportItem[] }>("/reports/regions")
+
+// 服务端水印导出 (CSV, 含审计留痕)
+export const exportReportCsv = async () => {
+  const blob = await apiFetchBlob("/reports/export")
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = `compliance-report-${new Date().toISOString().slice(0, 10)}.csv`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
 
 export const fetchAuditLogs = (params: {
   page?: number

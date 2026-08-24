@@ -28,9 +28,14 @@ async def _upload_and_analyze(client, token: str, employee_id: str | None = None
     resp = await client.post("/api/v1/recordings/upload", files=files, data=data, headers=auth_headers(token))
     assert resp.status_code == 201, resp.text
     audio_id = resp.json()["id"]
+    # 上传 → ASR 完成 → 队列自动风险分析 (内存队列同步执行), 问题已生成
+    resp = await client.get("/api/v1/issues", headers=auth_headers(token))
+    assert resp.status_code == 200
+    assert resp.json()["total"] >= 1
+    # 重跑分析: 幂等, 不再产生重复问题
     resp = await client.post("/api/v1/analysis/rerun", json={}, headers=auth_headers(token))
     assert resp.status_code == 200
-    assert resp.json()["issues_created"] >= 1
+    assert resp.json()["issues_created"] == 0
     return audio_id
 
 

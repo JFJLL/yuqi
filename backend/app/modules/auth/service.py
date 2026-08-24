@@ -104,6 +104,59 @@ class AuthService:
         ctx = await self._build_context(user)
         return ctx, access_token, refresh_token
 
+    # ---- 短信验证码登录 (员工 H5) ----
+    async def login_by_employee(
+        self,
+        employee,
+        *,
+        ip: str | None,
+        user_agent: str | None,
+        mobile: str,
+    ) -> tuple[TenantContext, str, str]:
+        """员工手机号验证码登录: 按手机号定位员工 → 确保账号存在 (EMPLOYEE 角色) → 签发令牌."""
+        tenant = await self.session.get(Tenant, employee.tenant_id)
+        if tenant is None or tenant.status != "ACTIVE":
+            raise AppError(403, "tenant_disabled", "租户不可用")
+
+        user = await self.session.scalar(
+            select(User).where(User.tenant_id == employee.tenant_id, User.employee_id == employee.id)
+        )
+        if user is None:
+            username = f"emp:{employee.employee_no}"
+            user = User(
+                tenant_id=employee.tenant_id,
+                username=username,
+                mobile=mobile,
+                display_name=employee.name,
+                password_hash=hash_password(new_refresh_token()),  # 随机口令, 仅验证码登录
+                employee_id=employee.id,
+                status="ACTIVE",
+            )
+            # 绑定 EMPLOYEE 角色 (保证员工仅见本人数据)
+            role = await self.session.scalar(
+                select(Role).where(
+                    Role.tenant_id == employee.tenant_id, Role.code == "EMPLOYEE"
+                )
+            )
+            if role is None:
+                raise AppError(500, "role_missing", "员工角色未初始化")
+            user.roles = [role]
+            self.session.add(user)
+            await self.session.flush()
+        elif user.status != "ACTIVE" or user.deleted_at is not None:
+            raise AppError(403, "user_disabled", "账号已停用")
+
+        user.last_login_at = datetime.now(UTC)
+        user.tenant = tenant  # 填充关系, 避免异步懒加载
+        access_token = create_access_token(
+            str(user.id), str(user.tenant_id), self.settings, user.token_version
+        )
+        refresh_token = await self._create_session(user, ip, user_agent)
+        await self._record_login(mobile, True, ip, user_agent, None)
+        await self.session.commit()
+        ctx = await self._build_context(user)
+        return ctx, access_token, refresh_token
+
     async def _check_rate_limit(self, username: str, ip: str | None) -> None:
         since = datetime.now(UTC) - timedelta(minutes=self.settings.login_lock_minutes)
         stmt = (

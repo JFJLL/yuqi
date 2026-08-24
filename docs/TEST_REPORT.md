@@ -37,26 +37,27 @@
 |---|---|
 | ruff check (app + tests) | 通过 |
 | mypy app | 通过 (76 files, no issues) |
-| pytest 全量 | **79 passed** |
+| pytest 全量 | **83 passed** |
 | alembic upgrade head (全新库 0001→0006) | 通过 |
 | alembic check (模型 vs 迁移) | 通过, 无漂移 |
 | PostgreSQL 集成 (`pytest -m postgresql`) | 未执行 (本机无 PG, 已标记 skip) |
 | Redis Worker 集成 (`pytest -m redis`) | 未执行 (本机无 Redis, 已标记 skip) |
 
-### 后端测试覆盖 (79)
+### 后端测试覆盖 (83)
 
 - auth/rbac: 登录/刷新/登出、权限矩阵、数据范围 (店长门店/员工本人/跨租户 404)
+- sms (3): 发送验证码 → 手机号登录首次建档、验证码 TTL/尝试上限、跨租户手机号不泄露存在性
 - org/imports: 组织树、员工门店、Excel 导入幂等与失败工作簿
 - devices: 建档/绑定/解绑/换绑历史/绑定申请复核/同意书
 - recordings (14): 上传 → ASR(mock) → 会话+片段+文本版本 → 重试幂等 → 软删除证据锁 → 列表过滤与数据范围 → internal 上传/回调
 - providers: 对象存储 (local/mock) 与 ASR mock 提交
-- analysis (5+): 规则 CRUD+版本、RiskAnalyzer → 问题 → 复核 → 整改 → 关闭全流程、驳回、权限、门店范围
+- analysis (5+): 规则 CRUD+版本、RiskAnalyzer → 问题 → 复核 → 整改 → 关闭全流程、驳回、权限、门店范围; 上传后自动分析 + 重跑幂等
 - employee (4): 仅本人数据、申诉→复核、提交整改→确认、通知 + SLA 扫描升级
-- reports (8): 报表总览、区域聚合、门店范围限制、审计列表/权限、设置读写、保留清理证据锁、工作台 summary + tab
+- reports (9): 报表总览、区域聚合、门店范围限制、审计列表/权限、设置读写、保留清理证据锁、工作台 summary + tab、水印导出 (含审计留痕)
 
 ## 端到端链路 (mock, 有测试覆盖)
 
-上传录音 → 登记 audio_files → 队列 (内存同步) → ASR mock 完成 → 会话/片段/文本版本落库 → RiskAnalyzer 命中规则 → 疑似问题 → 人工复核 → 推送整改 → 员工提交 → 管理端确认 → 通知; 超期 → SLA 升级; 录音超保留期 → 定时清理 (证据锁)。
+上传录音 → 登记 audio_files → 队列 (内存同步) → ASR mock 完成 → 会话/片段/文本版本落库 → **自动入队风险分析** → RiskAnalyzer 命中规则 → 疑似问题 → 人工复核 → 推送整改 → 员工提交 → 管理端确认 → 通知; 超期 → SLA 升级; 录音超保留期 → 定时清理 (证据锁)。
 
 ## 未覆盖 / 未执行
 

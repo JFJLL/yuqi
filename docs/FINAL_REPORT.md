@@ -18,15 +18,15 @@
 - [x] **B3 录音接入与转写**: 上传 (multipart, 200MB, 格式白名单) → 对象存储 → ASR 队列 (内存同步/ARQ 双实现) → 会话/片段/文本版本; 内部 API (服务令牌) 承接 OSS Scanner 与 ASR 网关回调。
 - [x] **B4 文本版本**: 每次 ASR 完成与人工编辑生成新版本, 支持历史回溯; 编辑留痕 (edited_by/reason)。
 - [x] **B5 规则库**: 版本化规则 (CRUD + 快照 + 启停, 修改自动递增版本)。
-- [x] **B6 RiskAnalyzer**: 关键词规则扫描转写片段 → 风险片段 + 疑似问题 (一会话/规则一条, 幂等); 重跑分析入口。
+- [x] **B6 RiskAnalyzer**: 关键词规则扫描转写片段 → 风险片段 + 疑似问题 (一会话/规则一条, 幂等); 转写完成后自动入队分析 (内存队列同会话/ARQ worker 双实现) + 重跑分析入口。
 - [x] **B7 疑似问题与人工复核**: 多状态机 (review/appeal/remediation/close/employee_view), 复核通过/驳回/关闭/推送整改; 证据锁禁止删除被引用录音。
 - [x] **B8 整改闭环**: 派发 (截止日期) → 员工提交 → 管理端确认/驳回 → 通知; 跟进调整截止/进度。
 - [x] **B9 申诉闭环**: 员工仅本人问题可申诉 → 管理端复核队列 (通过/驳回) → 状态联动。
 - [x] **B10 通知与 SLA**: 通知中心 (未读计数/全部已读); 定时扫描整改逾期 → 升级店长/合规, 通知员工。
-- [x] **B11 员工自服务 API**: /me/issues /me/issues/{id}/appeal /me/rectifications /me/rectifications/{id}/submit (仅本人数据)。
+- [x] **B11 员工自服务 API + H5**: /me/issues /me/issues/{id}/appeal /me/rectifications /me/rectifications/{id}/submit (仅本人数据); 短信验证码登录 (POST /auth/sms/send + /auth/sms/login, SmsProvider 抽象, 首次登录自动建档 EMPLOYEE); 独立员工 H5 应用 (apps/employee-h5, 短信登录 → 我的问题/申诉 → 我的整改/提交)。
 
 ### C. 报表与运维 (阶段六)
-- [x] **C1 统计报表**: 服务端聚合 (总览 + 区域维度), 数据范围强制, 日期区间。
+- [x] **C1 统计报表**: 服务端聚合 (总览 + 区域维度), 数据范围强制, 日期区间; 水印导出 (GET /reports/export, 租户/操作人/时间/内部提示, 写审计 report.export)。
 - [x] **C2 工作台**: dashboard/summary (统计卡片 + 重点问题 + 门店排行, tab 过滤)。
 - [x] **C3 审计查询**: /audit-logs 服务端分页 + 关键字/操作/日期筛选。
 - [x] **C4 保留策略**: settings (retention_days) + 每日清理任务 (证据锁保护)。
@@ -34,7 +34,7 @@
 - [x] **C6 前端全量迁移**: 工作台/门店员工/设备/设备运行/录音转写/合规巡检/规则库/整改/申诉/报表/日志/设置 全部走 typed v1 client; 删除 legacy PocketBase 业务 API 层 (admin.ts/asr.ts)。
 
 ### D. 质量与数据
-- [x] **D1 测试**: 前端 35 passed; 后端 79 passed; 门禁 (lint/typecheck/build/ruff/mypy/alembic check) 全绿; 详见 TEST_REPORT.md。
+- [x] **D1 测试**: 前端 35 passed; 后端 83 passed; 门禁 (lint/typecheck/build/ruff/mypy/alembic check) 全绿; 详见 TEST_REPORT.md。
 - [x] **D2 演示数据**: seed_demo.py 幂等造数 (组织/员工/设备/规则/录音/会话/问题/整改/通知/设置), 全新库验证, 生产环境拒绝执行。
 - [x] **D3 文档**: CURRENT_ARCHITECTURE / DATA_MIGRATION / DEPLOYMENT / SECURITY_MODEL / DECISIONS / LEGACY_POCKETBASE_ROUTES / PROGRESS / TEST_REPORT / FINAL_REPORT。
 
@@ -43,5 +43,5 @@
 - 生产 OSS / 真实 ASR / Redis ARQ 未连接 (无服务器权限与密钥); 以 Provider 抽象 + mock 全链路测试覆盖。
 - PostgreSQL / Redis 集成测试未执行 (本机未安装); 迁移链已在全新 SQLite 库验证 0001→0006。
 - 部署脚本与正式切换未执行 (无服务器); 切换顺序按 DEPLOYMENT.md 人工执行。
-- 员工 H5 未单独建前端应用; 自服务 API 齐备, 管理端内置员工角色视图可登录。
+- 员工 H5 已单独建前端应用 (apps/employee-h5, 短信登录 + 我的问题/申诉/整改), 构建通过; 移动端原生 App/小程序仍可复用同一套自服务 API。
 - LLM 规则分析为预留 (LLM_ENABLED 默认关闭); 当前分析基于关键词规则, 非伪造结果。

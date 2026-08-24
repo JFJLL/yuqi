@@ -207,6 +207,34 @@ async def test_settings_get_and_update(client, session_factory):
 
 
 @pytest.mark.asyncio
+async def test_report_export_watermark_and_audit(client, session_factory):
+    org = await build_org(session_factory)
+    await _add_issue(session_factory, org, store=org["store_a"], emp=org["emp_a1"], risk="高")
+    token = await login(client, "superadmin")
+    resp = await client.get("/api/v1/reports/export", headers=auth_headers(token))
+    assert resp.status_code == 200, resp.text
+    text = resp.text
+    assert "水印" in text or "内部数据" in text
+    assert "问题总数" in text
+    assert "华东" in text
+    assert resp.headers["content-type"].startswith("text/csv")
+
+    # 导出已留审计
+    logs = await client.get("/api/v1/audit-logs?keyword=report.export", headers=auth_headers(token))
+    assert logs.status_code == 200
+    assert logs.json()["total"] >= 1
+
+    # 无 report:export 权限的员工拒绝
+    from tests.conftest import create_user
+
+    async with session_factory() as session:
+        await create_user(session, org["tenant"], username="emp_no_export", role_codes=["EMPLOYEE"])
+    emp_token = await login(client, "emp_no_export")
+    denied = await client.get("/api/v1/reports/export", headers=auth_headers(emp_token))
+    assert denied.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_dashboard_summary(client, session_factory):
     org = await build_org(session_factory)
     await _add_issue(session_factory, org, store=org["store_a"], emp=org["emp_a1"], risk="高")

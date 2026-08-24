@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, time
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,8 +39,8 @@ async def report_overview(
     session: SessionDep,
     ctx: CurrentUser,
     _: TenantContext = Depends(RequirePermission("report:view")),
-    date_from: date | None = Query(None, alias="from"),
-    date_to: date | None = Query(None, alias="to"),
+    date_from: Annotated[date | None, Query(alias="from")] = None,
+    date_to: Annotated[date | None, Query(alias="to")] = None,
 ) -> dict:
     """租户级合规总览: 问题/高风险/整改率/录音/转写/申诉/逾期."""
     scope = DataScopeService(ctx)
@@ -152,6 +153,78 @@ async def report_overview(
         "pending_appeals": pending_appeals,
         "stores_total": store_total,
     }
+
+
+@router.get("/reports/export", response_model=None)
+async def export_reports_csv(
+    request: Request,
+    session: SessionDep,
+    ctx: CurrentUser,
+    _: TenantContext = Depends(RequirePermission("report:export")),
+) -> Response:
+    """服务端报表导出 (CSV): 带水印 (租户/操作人/时间) + 审计留痕 (report.export)."""
+    from datetime import datetime as _dt
+
+    from app.models.auth import Tenant
+    from app.modules.audit.service import AuditService
+
+    scope = DataScopeService(ctx)
+    await _visible_store_ids(session, ctx, scope)
+    now = _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+    tenant = await session.get(Tenant, ctx.tenant_id)
+
+    # 汇总数据 (复用 overview/regions 逻辑)
+    overview = await report_overview(session, ctx, _=ctx)
+    regions = await report_regions(session, ctx, _=ctx)
+
+    def esc(cell: object) -> str:
+        return f'"{str(cell if cell is not None else "").replace(chr(34), chr(34) + chr(34))}"'
+
+    rows: list[str] = []
+    # 水印头: 导出人 / 时间 / 租户 / 生成方式
+    rows.append(esc(f"{ctx.user.display_name or ctx.user.username} @ {now}"))
+    rows.append(esc(f"租户: {tenant.name if tenant else '-'}"))
+    rows.append(esc("内部数据, 请勿外传 — 合规报表导出"))
+    rows.append("")
+    rows.append(esc("== 租户总览 =="))
+    rows.append(",".join([
+        esc("问题总数"), esc("高风险"), esc("今日新增"), esc("整改完成率"),
+        esc("整改总数"), esc("逾期任务"), esc("录音总数"), esc("转写完成"),
+        esc("待复核申诉"), esc("门店数"),
+    ]))
+    rows.append(",".join([
+        esc(overview["issues_total"]), esc(overview["high_risk"]), esc(overview["issues_today"]),
+        esc(f"{overview['rectify_rate']}%"), esc(overview["rectify_total"]), esc(overview["overdue_tasks"]),
+        esc(overview["recordings_total"]), esc(overview["transcripts_total"]),
+        esc(overview["pending_appeals"]), esc(overview["stores_total"]),
+    ]))
+    rows.append("")
+    rows.append(esc("== 区域维度 =="))
+    rows.append(",".join([
+        esc("区域"), esc("门店数"), esc("录音数"), esc("问题数"),
+        esc("高风险"), esc("整改完成率"), esc("申诉通过率"),
+    ]))
+    for region in regions["items"]:
+        rows.append(",".join([
+            esc(region["region_name"]), esc(region["store_count"]), esc(region["recording_count"]),
+            esc(region["issue_count"]), esc(region["high_risk"]),
+            esc(f"{region['rectify_rate']}%"), esc(f"{region['appeal_pass_rate']}%"),
+        ]))
+
+    await AuditService(session, ctx, request).record(
+        action="report.export",
+        resource_type="reports",
+        detail=f"overview+regions by {ctx.user.username}",
+    )
+    await session.commit()
+
+    csv_body = "\uFEFF" + "\n".join(rows)  # BOM 供 Excel 识别 UTF-8
+    filename = f"compliance-report-{_dt.now().strftime('%Y%m%d-%H%M%S')}.csv"
+    return Response(
+        content=csv_body,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/reports/regions", response_model=dict)

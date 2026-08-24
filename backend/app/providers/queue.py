@@ -72,10 +72,12 @@ class ArqTaskQueue(TaskQueue):
 
 def default_worker_functions() -> dict[str, JobFunc]:
     """注册业务任务函数 (与 app.workers.worker.WORKER_FUNCTIONS 保持同步)."""
+    from app.modules.analysis.service import run_risk_analysis
     from app.modules.ingestion.service import run_asr_job
 
     return {
         "run_asr_job": run_asr_job,
+        "run_risk_analysis": run_risk_analysis,
     }
 
 
