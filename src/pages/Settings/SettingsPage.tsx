@@ -1,9 +1,9 @@
 import { RuleListPanel } from "@/components/settings/RuleListPanel"
-import { SystemFormPanel } from "@/components/settings/SystemFormPanel"
+import { RetentionPanel } from "@/components/settings/RetentionPanel"
 import type { SettingsProps } from "./useSettings"
 
 // 系统设置视图: 只消费 props, 不自调逻辑 hook
-export function SettingsPage({ rules, form, saving, setForm, handleToggle, handleSave, handleTest }: SettingsProps) {
+export function SettingsPage({ rules, form, saving, setForm, handleToggle, handleSave }: SettingsProps) {
   return (
     <div>
       <div className="h-1 w-12 rounded-full bg-primary mb-3" aria-hidden />
@@ -12,13 +12,7 @@ export function SettingsPage({ rules, form, saving, setForm, handleToggle, handl
         style={{ boxShadow: "var(--elev-ring)" }}
       >
         <RuleListPanel rules={rules} onToggle={handleToggle} />
-        <SystemFormPanel
-          values={form}
-          saving={saving}
-          onChange={setForm}
-          onSave={handleSave}
-          onTest={handleTest}
-        />
+        <RetentionPanel values={form} saving={saving} onChange={setForm} onSave={handleSave} />
       </div>
     </div>
   )

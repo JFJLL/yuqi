@@ -1,47 +1,42 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
-  fetchList,
-  type AppealRecord,
-  type InspectionIssueRecord,
-  type RectifyTaskRecord,
-  type Region,
-  type Store,
-  type TranscriptRecord,
-} from "@/lib/admin"
+  fetchReportOverview,
+  fetchReportRegions,
+  type RegionReportItem,
+  type ReportOverview,
+} from "@/lib/v1"
 import type { ReportSummary } from "@/components/reports/ReportCards"
 import type { RegionRow } from "@/components/reports/RegionTable"
 
-// 统计报表页逻辑: 按区域聚合巡检与整改数据
+const EMPTY_OVERVIEW: ReportOverview = {
+  issues_total: 0,
+  high_risk: 0,
+  issues_today: 0,
+  rectify_rate: 0,
+  rectify_total: 0,
+  overdue_tasks: 0,
+  recordings_total: 0,
+  transcripts_total: 0,
+  pending_appeals: 0,
+  stores_total: 0,
+}
+
+// 统计报表页逻辑: 服务端聚合 (租户总览 + 区域维度)
 export function useReports() {
-  const [regions, setRegions] = useState<Region[]>([])
-  const [stores, setStores] = useState<Store[]>([])
-  const [transcripts, setTranscripts] = useState<TranscriptRecord[]>([])
-  const [issues, setIssues] = useState<InspectionIssueRecord[]>([])
-  const [tasks, setTasks] = useState<RectifyTaskRecord[]>([])
-  const [appeals, setAppeals] = useState<AppealRecord[]>([])
+  const [overview, setOverview] = useState<ReportOverview>(EMPTY_OVERVIEW)
+  const [regions, setRegions] = useState<RegionReportItem[]>([])
   const [loading, setLoading] = useState(true)
   const [viewing, setViewing] = useState<ReportSummary | null>(null)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    Promise.all([
-      fetchList<Region>("regions", { perPage: 100 }),
-      fetchList<Store>("stores", { perPage: 200 }),
-      fetchList<TranscriptRecord>("transcripts", { perPage: 500 }),
-      fetchList<InspectionIssueRecord>("inspection_issues", { perPage: 500 }),
-      fetchList<RectifyTaskRecord>("rectify_tasks", { perPage: 500 }),
-      fetchList<AppealRecord>("appeals", { perPage: 500 }),
-    ])
-      .then(([regionData, storeData, transcriptData, issueData, taskData, appealData]) => {
+    Promise.all([fetchReportOverview(), fetchReportRegions()])
+      .then(([overviewData, regionData]) => {
         if (cancelled) return
-        setRegions(regionData.items ?? [])
-        setStores(storeData.items ?? [])
-        setTranscripts(transcriptData.items ?? [])
-        setIssues(issueData.items ?? [])
-        setTasks(taskData.items ?? [])
-        setAppeals(appealData.items ?? [])
+        setOverview(overviewData)
+        setRegions(regionData.items)
       })
       .catch(() => {
         if (!cancelled) toast.error("报表数据加载失败，请稍后重试")
@@ -54,39 +49,20 @@ export function useReports() {
     }
   }, [])
 
-  const regionRows: RegionRow[] = useMemo(() => {
-    return regions.map((region) => {
-      const regionStores = new Set(stores.filter((store) => store.region === region.id).map((store) => store.id))
-      const regionTranscripts = transcripts.filter((t) => regionStores.has(t.store))
-      const regionIssues = issues.filter((issue) => regionStores.has(issue.store))
-      const regionTasks = tasks.filter((task) => regionStores.has(task.store))
-      const highRisk = regionIssues.filter((issue) => issue.risk === "高").length
-      const doneTasks = regionTasks.filter((task) => task.state === "已完成").length
-      const rectifyRate = regionTasks.length ? Math.round((doneTasks / regionTasks.length) * 100) : 0
-      const issueIds = new Set(regionIssues.map((issue) => issue.id))
-      const regionAppeals = appeals.filter((appeal) => issueIds.has(appeal.issue))
-      const passedAppeals = regionAppeals.filter((appeal) => appeal.status === "已通过").length
-      const reviewedAppeals = regionAppeals.filter((appeal) => appeal.status !== "待复核").length
-      const appealPassRate = reviewedAppeals ? Math.round((passedAppeals / reviewedAppeals) * 100) : 0
-      return {
-        regionId: region.id,
-        regionName: region.name,
-        storeCount: regionStores.size,
-        transcriptCount: regionTranscripts.length,
-        issueCount: regionIssues.length,
-        highRisk,
-        rectifyRate,
-        appealPassRate,
-      }
-    })
-  }, [regions, stores, transcripts, issues, tasks, appeals])
-
-  const totals = useMemo(() => {
-    const highRisk = issues.filter((issue) => issue.risk === "高").length
-    const doneTasks = tasks.filter((task) => task.state === "已完成").length
-    const rectifyRate = tasks.length ? Math.round((doneTasks / tasks.length) * 100) : 0
-    return { highRisk, rectifyRate, issueCount: issues.length, transcriptCount: transcripts.length }
-  }, [issues, tasks, transcripts])
+  const regionRows: RegionRow[] = useMemo(
+    () =>
+      regions.map((region) => ({
+        regionId: region.region_id,
+        regionName: region.region_name,
+        storeCount: region.store_count,
+        recordingCount: region.recording_count,
+        issueCount: region.issue_count,
+        highRisk: region.high_risk,
+        rectifyRate: region.rectify_rate,
+        appealPassRate: region.appeal_pass_rate,
+      })),
+    [regions],
+  )
 
   const reports: ReportSummary[] = useMemo(
     () => [
@@ -95,9 +71,9 @@ export function useReports() {
         title: "门店合规月报",
         desc: "问题趋势、门店排名、整改完成率。",
         points: [
-          `本月共记录巡检问题 ${totals.issueCount} 条，其中高风险 ${totals.highRisk} 条`,
-          `整改完成率 ${totals.rectifyRate}%，目标 80%`,
-          `问题最多的门店排在门店排行首位，建议优先复盘`,
+          `本月共记录巡检问题 ${overview.issues_total} 条，其中高风险 ${overview.high_risk} 条（今日新增 ${overview.issues_today} 条）`,
+          `整改完成率 ${overview.rectify_rate}%，目标 80%（共 ${overview.rectify_total} 项整改任务，逾期 ${overview.overdue_tasks} 项）`,
+          `待复核申诉 ${overview.pending_appeals} 条，建议优先处理`,
         ],
       },
       {
@@ -115,13 +91,13 @@ export function useReports() {
         title: "品类服务分析",
         desc: "常见咨询、组合销售执行和风险分布。",
         points: [
-          `本期累计转写文本 ${totals.transcriptCount} 条`,
-          "感冒、咽痛、联合用药为高频咨询场景",
+          `累计录音 ${overview.recordings_total} 条，转写完成 ${overview.transcripts_total} 条`,
+          `覆盖门店 ${overview.stores_total} 家`,
           "AI荐药经营模块建设中，品类数据后续接入",
         ],
       },
     ],
-    [totals],
+    [overview],
   )
 
   const openReport = useCallback((report: ReportSummary) => setViewing(report), [])

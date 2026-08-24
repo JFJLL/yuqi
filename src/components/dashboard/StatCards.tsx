@@ -1,5 +1,5 @@
 import { BadgeCheck, FileText, MessagesSquare, ScanSearch } from "lucide-react"
-import type { DashboardStats } from "@/lib/admin"
+import type { DashboardStats } from "@/lib/v1"
 
 interface StatCardsProps {
   stats: DashboardStats | null

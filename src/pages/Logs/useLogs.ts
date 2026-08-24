@@ -1,25 +1,35 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
-import { exportCsv, fetchList, updateRecord, type SyncLog } from "@/lib/admin"
+import { exportCsv } from "@/lib/export"
+import { fetchAuditLogs, type AuditLogItem } from "@/lib/v1"
 import type { LogFilterState } from "@/components/logs/LogFilters"
 
-// 接口日志页逻辑: 筛选、详情、重试失败项
+// 审计日志页逻辑: 服务端分页 + 关键字/操作/日期筛选 + 导出
 export function useLogs() {
-  const [logs, setLogs] = useState<SyncLog[]>([])
-  const [filters, setFilters] = useState<LogFilterState>({ keyword: "", type: "", status: "", date: "" })
+  const [logs, setLogs] = useState<AuditLogItem[]>([])
+  const [filters, setFilters] = useState<LogFilterState>({ keyword: "", action: "", date: "" })
   const [loading, setLoading] = useState(true)
-  const [detail, setDetail] = useState<SyncLog | null>(null)
-  const [retrying, setRetrying] = useState(false)
-
-  const reload = useCallback(async () => {
-    const data = await fetchList<SyncLog>("sync_logs", { perPage: 500 })
-    setLogs(data.items ?? [])
-  }, [])
+  const [detail, setDetail] = useState<AuditLogItem | null>(null)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    reload()
+    fetchAuditLogs({
+      page,
+      page_size: 20,
+      keyword: filters.keyword || undefined,
+      action: filters.action || undefined,
+      date: filters.date || undefined,
+    })
+      .then((data) => {
+        if (cancelled) return
+        setLogs(data.items)
+        setTotal(data.total)
+        setTotalPages(data.total_pages)
+      })
       .catch(() => {
         if (!cancelled) toast.error("日志加载失败，请稍后重试")
       })
@@ -29,66 +39,52 @@ export function useLogs() {
     return () => {
       cancelled = true
     }
-  }, [reload])
+  }, [page, filters])
 
-  const rows = useMemo(() => {
-    const keyword = filters.keyword.trim().toLowerCase()
-    return logs
-      .filter((log) => {
-        if (filters.type && log.type !== filters.type) return false
-        if (filters.status && log.status !== filters.status) return false
-        if (filters.date && !(log.occurred_at ?? "").startsWith(filters.date)) return false
-        if (keyword) {
-          const text = `${log.object}${log.store}${log.type}`.toLowerCase()
-          if (!text.includes(keyword)) return false
-        }
-        return true
-      })
-      .sort((a, b) => (b.occurred_at ?? "").localeCompare(a.occurred_at ?? ""))
-  }, [logs, filters])
+  const changeFilters = useCallback((next: LogFilterState) => {
+    setFilters(next)
+    setPage(1)
+  }, [])
 
-  async function handleRetry() {
-    const failed = logs.filter((log) => log.status === "失败")
-    if (failed.length === 0) {
-      toast.info("当前没有失败项需要重试")
-      return
-    }
-    setRetrying(true)
-    try {
-      await Promise.all(
-        failed.map((log) =>
-          updateRecord("sync_logs", log.id, {
-            status: "重试中",
-            result: `${log.result}（已重新入队）`,
-          }),
-        ),
-      )
-      toast.success(`${failed.length} 条失败项已进入重试队列`)
-      await reload()
-    } catch {
-      toast.error("重试失败，请稍后再试")
-    } finally {
-      setRetrying(false)
-    }
-  }
+  const changePage = useCallback((next: number) => setPage(next), [])
 
   function handleExport() {
-    if (rows.length === 0) {
+    if (logs.length === 0) {
       toast.error("当前没有可导出的日志")
       return
     }
     exportCsv(
-      "接口日志.csv",
-      ["时间", "类型", "对象", "门店", "状态", "结果"],
-      rows.map((log) => [log.occurred_at, log.type, log.object, log.store, log.status, log.result]),
+      "审计日志.csv",
+      ["时间", "操作", "资源", "对象", "执行人", "详情"],
+      logs.map((log) => [
+        log.created_at ?? "",
+        log.action,
+        log.resource_type,
+        log.resource_id ?? "",
+        log.actor_name ?? "",
+        log.detail ?? "",
+      ]),
     )
-    toast.success(`已导出 ${rows.length} 条日志`)
+    toast.success(`已导出 ${logs.length} 条日志`)
   }
 
-  const openDetail = useCallback((row: SyncLog) => setDetail(row), [])
+  const openDetail = useCallback((row: AuditLogItem) => setDetail(row), [])
   const closeDetail = useCallback(() => setDetail(null), [])
 
-  return { rows, filters, loading, retrying, detail, setFilters, handleRetry, handleExport, openDetail, closeDetail }
+  return {
+    rows: logs,
+    filters,
+    loading,
+    detail,
+    page,
+    total,
+    totalPages,
+    setFilters: changeFilters,
+    setPage: changePage,
+    handleExport,
+    openDetail,
+    closeDetail,
+  }
 }
 
 export type LogsProps = ReturnType<typeof useLogs>

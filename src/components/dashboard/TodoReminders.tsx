@@ -1,5 +1,5 @@
 import { ClipboardCheck, MessageSquareWarning, ShieldAlert } from "lucide-react"
-import type { DashboardStats } from "@/lib/admin"
+import type { DashboardStats } from "@/lib/v1"
 
 interface TodoRemindersProps {
   stats: DashboardStats | null

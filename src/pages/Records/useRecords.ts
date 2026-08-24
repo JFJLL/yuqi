@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { exportCsv } from "@/lib/admin"
+import { exportCsv } from "@/lib/export"
 import {
   deleteRecording,
   fetchEmployees,
@@ -16,7 +16,7 @@ import {
   type StoreItem,
 } from "@/lib/v1"
 import { uploadRecording } from "@/lib/v1"
-import type { AsrSubmission } from "@/lib/asr"
+import type { AsrSubmission } from "@/lib/v1"
 import type { RecordFilterState } from "@/components/records/RecordFilters"
 import type { RecordRow } from "@/components/records/RecordTable"
 

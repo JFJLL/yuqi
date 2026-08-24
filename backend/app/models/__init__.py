@@ -31,6 +31,7 @@ from app.models.recording import (
     TextVersion,
     TranscriptSegment,
 )
+from app.models.setting import AppSetting
 
 __all__ = [
     "AuditLog",
@@ -66,4 +67,5 @@ __all__ = [
     "ProcessingJob",
     "TextVersion",
     "TranscriptSegment",
+    "AppSetting",
 ]

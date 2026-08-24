@@ -1,8 +1,8 @@
-import type { StoreRankItem } from "@/lib/admin"
+import type { DashboardStoreRankItem } from "@/lib/v1"
 import { Pill } from "./Pill"
 
 interface StoreRankProps {
-  items: StoreRankItem[]
+  items: DashboardStoreRankItem[]
 }
 
 function countTone(count: number): "red" | "amber" | "green" {

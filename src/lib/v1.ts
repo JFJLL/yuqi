@@ -539,6 +539,117 @@ export const submitMyRectification = (id: string, comment: string) =>
     body: JSON.stringify({ comment }),
   })
 
+// ---- 报表 / 审计 / 设置 (阶段六) ----
+export interface ReportOverview {
+  issues_total: number
+  high_risk: number
+  issues_today: number
+  rectify_rate: number
+  rectify_total: number
+  overdue_tasks: number
+  recordings_total: number
+  transcripts_total: number
+  pending_appeals: number
+  stores_total: number
+}
+
+export interface RegionReportItem {
+  region_id: string
+  region_name: string
+  store_count: number
+  recording_count: number
+  issue_count: number
+  high_risk: number
+  rectify_rate: number
+  appeal_pass_rate: number
+}
+
+export interface AuditLogItem {
+  id: string
+  actor_id: string | null
+  actor_name: string | null
+  action: string
+  resource_type: string
+  resource_id: string | null
+  detail: string | null
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  created_at: string | null
+}
+
+export const fetchReportOverview = (params: { from?: string; to?: string } = {}) =>
+  apiFetch<ReportOverview>(`/reports/overview${qs(params)}`)
+
+export const fetchReportRegions = () => apiFetch<{ items: RegionReportItem[] }>("/reports/regions")
+
+export const fetchAuditLogs = (params: {
+  page?: number
+  page_size?: number
+  keyword?: string
+  action?: string
+  date?: string
+} = {}) => apiFetch<Page<AuditLogItem>>(`/audit-logs${qs(params)}`)
+
+export const fetchSettings = () => apiFetch<{ retention_days: string }>("/settings")
+
+export const updateSettings = (body: { retention_days: number }) =>
+  apiFetch<{ ok: boolean; retention_days: string }>("/settings", { method: "PUT", body: JSON.stringify(body) })
+
+// ---- 录音上传 (multipart) ----
+export interface AsrSubmission {
+  file: File
+  device?: string
+  employee?: string
+  store?: string
+  occurred_at?: string
+  language?: string
+  hotwords?: string
+}
+
+// ---- 工作台 (阶段六) ----
+export type DashboardTab = "all" | "high" | "appealing"
+
+export interface DashboardStats {
+  transcripts_today: number
+  stores_covered: number
+  stores_total: number
+  issues_today: number
+  high_risk: number
+  rectify_rate: number
+  open_tasks: number
+  overdue_tasks: number
+  pending_appeals: number
+  overdue_appeals: number
+}
+
+export interface DashboardKeyIssue {
+  id: string
+  employee_name: string | null
+  store_name: string | null
+  issue_type: string
+  risk: string
+  state: string
+  quote: string
+  advice: string
+  occurred_at: string | null
+}
+
+export interface DashboardStoreRankItem {
+  store_id: string
+  store_name: string
+  issue_count: number
+  share: number
+}
+
+export interface DashboardSummary {
+  stats: DashboardStats
+  key_issues: DashboardKeyIssue[]
+  store_rank: DashboardStoreRankItem[]
+}
+
+export const fetchDashboardSummary = (tab: DashboardTab = "all") =>
+  apiFetch<DashboardSummary>(`/dashboard/summary${qs({ tab })}`)
+
 // ---- 通用分页工具 ----
 export function totalPages(total: number, pageSize: number): number {
   return Math.max(1, Math.ceil(total / pageSize))

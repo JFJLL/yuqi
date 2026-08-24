@@ -1,10 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import type { KeyIssue } from "@/lib/admin"
+import type { DashboardKeyIssue } from "@/lib/v1"
 import { Pill, riskTone, stateTone } from "./Pill"
 
 interface IssueDetailDialogProps {
-  issue: KeyIssue | null
+  issue: DashboardKeyIssue | null
   onClose: () => void
 }
 

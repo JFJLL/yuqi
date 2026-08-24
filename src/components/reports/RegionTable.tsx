@@ -2,7 +2,7 @@ export interface RegionRow {
   regionId: string
   regionName: string
   storeCount: number
-  transcriptCount: number
+  recordingCount: number
   issueCount: number
   highRisk: number
   rectifyRate: number
@@ -14,7 +14,7 @@ interface RegionTableProps {
   loading: boolean
 }
 
-const HEADS = ["区域", "门店数", "巡检文本", "问题数", "高风险", "整改完成率", "申诉通过率"]
+const HEADS = ["区域", "门店数", "录音数", "问题数", "高风险", "整改完成率", "申诉通过率"]
 
 export function RegionTable({ rows, loading }: RegionTableProps) {
   return (
@@ -49,7 +49,7 @@ export function RegionTable({ rows, loading }: RegionTableProps) {
               <tr key={row.regionId} className="hover:bg-accent/40">
                 <td className="px-2.5 py-3 border-b border-border font-semibold">{row.regionName}</td>
                 <td className="px-2.5 py-3 border-b border-border">{row.storeCount}</td>
-                <td className="px-2.5 py-3 border-b border-border">{row.transcriptCount}</td>
+                <td className="px-2.5 py-3 border-b border-border">{row.recordingCount}</td>
                 <td className="px-2.5 py-3 border-b border-border">{row.issueCount}</td>
                 <td className="px-2.5 py-3 border-b border-border">
                   <span className={row.highRisk > 0 ? "text-[hsl(var(--destructive))] font-semibold" : ""}>

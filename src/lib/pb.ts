@@ -16,13 +16,7 @@ export function getPocketBaseUrl(): string {
   return prefix ? `${prefix}/__pb` : "/__pb"
 }
 
-// React Router 的 basename: 子路径部署时返回 app 前缀, 本地 dev 返回 "/"。
-// <BrowserRouter basename={getBasename()}> 之后, 站内 <Link to="/x"> / navigate("/x")
-// 会自动拼上前缀, 不会再掉到域名根 (即 vibex.runninghub.cn/x 这种错误跳转)。
-export function getBasename(): string {
-  return matchVibexPrefix() ?? "/"
-}
-
+// 仅 AI 能力 (aigc/llm) 通过 __pb 代理调用 pb_hooks 路由; 业务数据一律走 /api/v1。
 export const pb = new PocketBase(getPocketBaseUrl())
 
 // B1 沙箱域(*.apps.vibex.cn)上访问者身份靠 X-Vibex-Scoped-Token 承载

@@ -1,10 +1,10 @@
 import { Switch } from "@/components/ui/switch"
 import { Pill, riskTone } from "@/components/dashboard/Pill"
-import type { ComplianceRule } from "@/lib/admin"
+import type { RiskRuleItem } from "@/lib/v1"
 
 interface RuleListPanelProps {
-  rules: ComplianceRule[]
-  onToggle: (rule: ComplianceRule, enabled: boolean) => void
+  rules: RiskRuleItem[]
+  onToggle: (rule: RiskRuleItem, enabled: boolean) => void
 }
 
 export function RuleListPanel({ rules, onToggle }: RuleListPanelProps) {
@@ -21,13 +21,15 @@ export function RuleListPanel({ rules, onToggle }: RuleListPanelProps) {
         {rules.map((rule) => (
           <div key={rule.id} className="border border-border rounded-lg p-3 bg-background grid gap-2">
             <div className="flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2">
-                <strong className="text-sm">{rule.name}</strong>
-                <Pill tone={riskTone(rule.risk)}>{rule.risk}风险</Pill>
+              <div className="flex items-center gap-2 min-w-0">
+                <strong className="text-sm truncate">{rule.name}</strong>
+                <Pill tone={riskTone(rule.severity)}>{rule.severity}风险</Pill>
               </div>
               <Switch checked={!!rule.enabled} onCheckedChange={(next) => onToggle(rule, next)} />
             </div>
-            <span className="text-muted-foreground text-xs">{rule.description}</span>
+            <span className="text-muted-foreground text-xs line-clamp-2">
+              {rule.description || rule.keywords.join("、")}
+            </span>
           </div>
         ))}
       </div>

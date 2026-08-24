@@ -1,13 +1,13 @@
-import type { DashboardTab, KeyIssue } from "@/lib/admin"
+import type { DashboardKeyIssue, DashboardTab } from "@/lib/v1"
 import { Button } from "@/components/ui/button"
 import { Pill, riskTone, stateTone } from "./Pill"
 
 interface KeyIssuesProps {
-  issues: KeyIssue[]
+  issues: DashboardKeyIssue[]
   tab: DashboardTab
   loading: boolean
   onTabChange: (tab: DashboardTab) => void
-  onView: (issue: KeyIssue) => void
+  onView: (issue: DashboardKeyIssue) => void
 }
 
 const TABS: { key: DashboardTab; label: string }[] = [

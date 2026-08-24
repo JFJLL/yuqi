@@ -102,3 +102,20 @@
 - 后端: ruff ✅ / mypy ✅ / pytest 71 passed ✅ (新增 4: 员工仅本人数据/申诉→复核/提交整改→确认/通知+SLA 扫描) / alembic upgrade+check ✅ (全新库验证)
 - 前端: lint ✅ / typecheck ✅ / test 30 passed ✅ (新增 Tasks 3 项 + Appeals 3 项) / build ✅
 - 员工 H5 页面未单独建前端应用; 自服务 API 齐备, 由后续移动端/小程序接入 (一期管理端内置员工角色视图可登录)
+
+## 阶段六：报表 / 审计 / 保留策略 / 部署脚本 / 切换工具 — 已完成
+
+**产出**
+- [x] 报表 API (report:view, 强制数据范围): `GET /reports/overview`(问题/高风险/整改率/录音/转写/申诉/逾期, 支持日期区间) + `GET /reports/regions`(区域维度: 门店数/录音数/问题数/高风险/整改率/申诉通过率)
+- [x] 工作台 API: `GET /dashboard/summary`(登录可见, tab=all/high/appealing: 统计卡片 + 重点问题 + 门店排行)
+- [x] 审计 API: `GET /audit-logs`(audit:view, 服务端分页 + 关键字/操作/日期筛选)
+- [x] 保留策略: `app_settings` 表 (迁移 0006) + `GET/PUT /settings`(users:manage, retention_days) + scheduler 每日 04:00 清理超期录音 (证据锁保护被疑似问题引用的会话)
+- [x] 前端迁移: 工作台 / 统计报表 / 接口日志 / 系统设置 全部切到 typed v1 client (服务端分页+真实聚合数据)
+- [x] 清理 legacy: 删除 admin.ts / asr.ts (PocketBase 业务 API), exportCsv/getBasename 抽离; 仅 AI 能力保留 __pb 代理
+- [x] 部署脚本: deploy/scripts/ (install/check-env/build/migrate/backup/health-check/deploy-test/deploy-production/rollback) + deploy/pm2/ 双环境 ecosystem
+- [x] 切换工具: export_legacy_snapshot / migrate_pocketbase_to_postgres / verify_migration / seed_demo 齐备 (DEPLOYMENT.md 已记录切换顺序)
+
+**门禁**
+- 后端: ruff ✅ / mypy ✅ / pytest 79 passed ✅ (新增 8: 报表总览/区域聚合/门店范围/审计列表与权限/设置读写/保留清理证据锁/工作台) / alembic upgrade+check ✅ (全新库 0001→0006)
+- 前端: lint ✅ / typecheck ✅ / test 35 passed ✅ (新增 Reports 2 项 + Settings 3 项) / build ✅
+- 部署脚本仅交付未执行 (无服务器权限); 正式切换按 DEPLOYMENT.md 顺序人工执行

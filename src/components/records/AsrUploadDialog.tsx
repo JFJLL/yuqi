@@ -2,7 +2,7 @@ import { useMemo, useState } from "react"
 import { Upload } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import type { AsrSubmission } from "@/lib/asr"
+import type { AsrSubmission } from "@/lib/v1"
 
 export interface NamedOption {
   id: string

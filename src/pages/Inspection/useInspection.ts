@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { exportCsv } from "@/lib/admin"
+import { exportCsv } from "@/lib/export"
 import {
   closeIssue,
   fetchIssueDetail,
