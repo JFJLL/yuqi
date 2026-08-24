@@ -1,50 +1,53 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
-  createRecord,
-  fetchList,
-  updateRecord,
-  type Employee,
-  type InspectionIssueRecord,
-  type RectifyTaskRecord,
-  type Store,
-} from "@/lib/admin"
+  confirmRectification,
+  fetchRectifications,
+  fetchRectificationSummary,
+  updateRectification,
+  type RectificationItem,
+  type RectificationSummary,
+} from "@/lib/v1"
 import type { TaskFormValues } from "@/components/tasks/TaskDialog"
 import type { TaskRow } from "@/components/tasks/TaskTable"
 
-// 整改任务页逻辑: 统计、派发、跟进更新
+const PAGE_SIZE = 20
+
+// 整改任务页逻辑: 服务端分页 + 跟进(截止/进度) + 确认员工提交 (整改闭环管理端)
 export function useTasks() {
-  const [tasks, setTasks] = useState<RectifyTaskRecord[]>([])
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [stores, setStores] = useState<Store[]>([])
-  const [issues, setIssues] = useState<InspectionIssueRecord[]>([])
+  const [rows, setRows] = useState<RectificationItem[]>([])
+  const [stats, setStats] = useState<RectificationSummary>({
+    total: 0, pending: 0, submitted: 0, confirmed: 0, rejected: 0,
+    overdue: 0, escalated: 0, new_today: 0, completion_rate: 0,
+  })
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState("")
   const [saving, setSaving] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [dialogMode, setDialogMode] = useState<"create" | "follow">("create")
   const [following, setFollowing] = useState<TaskRow | null>(null)
+  const [confirming, setConfirming] = useState<TaskRow | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
+  const [confirmComment, setConfirmComment] = useState("")
 
-  const reload = useCallback(async () => {
-    const data = await fetchList<RectifyTaskRecord>("rectify_tasks", { perPage: 500 })
-    setTasks(data.items ?? [])
+  const reload = useCallback(async (pageNum: number, status: string) => {
+    const data = await fetchRectifications({ page: pageNum, page_size: PAGE_SIZE, status: status || undefined })
+    setRows(data.items)
+    return data
+  }, [])
+
+  const refreshStats = useCallback(async () => {
+    try {
+      setStats(await fetchRectificationSummary())
+    } catch {
+      // 统计失败不阻塞列表
+    }
   }, [])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    Promise.all([
-      fetchList<RectifyTaskRecord>("rectify_tasks", { perPage: 500 }),
-      fetchList<Employee>("employees", { perPage: 200 }),
-      fetchList<Store>("stores", { perPage: 200 }),
-      fetchList<InspectionIssueRecord>("inspection_issues", { perPage: 500 }),
-    ])
-      .then(([taskData, employeeData, storeData, issueData]) => {
-        if (cancelled) return
-        setTasks(taskData.items ?? [])
-        setEmployees(employeeData.items ?? [])
-        setStores(storeData.items ?? [])
-        setIssues(issueData.items ?? [])
-      })
+    Promise.all([reload(1, ""), refreshStats()])
       .catch(() => {
         if (!cancelled) toast.error("整改任务加载失败，请稍后重试")
       })
@@ -54,93 +57,96 @@ export function useTasks() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reload, refreshStats])
 
-  const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees])
-  const storeById = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores])
-  const issueById = useMemo(() => new Map(issues.map((issue) => [issue.id, issue])), [issues])
+  useEffect(() => {
+    reload(page, statusFilter).catch(() => toast.error("整改任务刷新失败，请稍后重试"))
+  }, [page, statusFilter, reload])
 
-  const rows: TaskRow[] = useMemo(() => {
-    const todayText = new Date().toISOString().slice(0, 10)
-    return tasks
-      .map((task) => ({
-        ...task,
-        ownerName: employeeById.get(task.owner)?.name ?? "",
-        storeName: storeById.get(task.store)?.name ?? "",
-        sourceIssueType: issueById.get(task.source_issue)?.issue_type ?? "",
-        isNewToday: (task.created ?? "").startsWith(todayText),
-      }))
-      .sort((a, b) => (b.created ?? "").localeCompare(a.created ?? ""))
-  }, [tasks, employeeById, storeById, issueById])
+  const rowsMapped: TaskRow[] = useMemo(
+    () => rows.map((r) => ({ ...r, ownerName: r.employee_name ?? "", storeName: r.store_name ?? "" })),
+    [rows],
+  )
 
-  const stats = useMemo(() => {
-    const openCount = tasks.filter((task) => task.state === "待整改" || task.state === "进行中").length
-    const overdueCount = tasks.filter((task) => task.state === "逾期").length
-    const doneCount = tasks.filter((task) => task.state === "已完成").length
-    const completionRate = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0
-    const todayText = new Date().toISOString().slice(0, 10)
-    const newToday = tasks.filter((task) => (task.created ?? "").startsWith(todayText)).length
-    return { openCount, overdueCount, completionRate, newToday }
-  }, [tasks])
-
-  function openCreate() {
-    setDialogMode("create")
-    setFollowing(null)
-    setDialogOpen(true)
-  }
-
-  function openFollow(row: TaskRow) {
-    setDialogMode("follow")
+  const openFollow = useCallback((row: TaskRow) => {
     setFollowing(row)
     setDialogOpen(true)
-  }
-
+  }, [])
   const closeDialog = useCallback(() => setDialogOpen(false), [])
 
-  async function handleSave(values: TaskFormValues) {
+  const handleSave = useCallback(async (values: TaskFormValues) => {
+    if (!following) return
     setSaving(true)
     try {
-      if (dialogMode === "create") {
-        await createRecord("rectify_tasks", {
-          title: values.requirement.trim().slice(0, 60),
-          owner: values.ownerId,
-          store: employeeById.get(values.ownerId)?.store ?? "",
-          source_issue: "",
-          due_date: values.dueDate,
-          progress: 0,
-          state: "待整改",
-        })
-        toast.success("整改任务已派发")
-      } else if (following) {
-        await updateRecord("rectify_tasks", following.id, {
-          due_date: values.dueDate,
-          progress: values.progress,
-          state: values.state,
-        })
-        toast.success("任务进度已更新")
-      }
+      await updateRectification(following.id, {
+        due_date: values.dueDate || null,
+        progress: values.progress,
+      })
+      toast.success("任务已更新")
       setDialogOpen(false)
-      await reload()
-    } catch {
-      toast.error("保存失败，请稍后重试")
+      setFollowing(null)
+      await reload(page, statusFilter)
+      await refreshStats()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "保存失败")
     } finally {
       setSaving(false)
     }
-  }
+  }, [following, page, statusFilter, reload, refreshStats])
+
+  const openConfirm = useCallback((row: TaskRow) => {
+    setConfirming(row)
+    setConfirmComment("")
+  }, [])
+  const closeConfirm = useCallback(() => setConfirming(null), [])
+
+  const handleConfirm = useCallback(async (approve: boolean) => {
+    if (!confirming || confirmBusy) return
+    setConfirmBusy(true)
+    try {
+      await confirmRectification(confirming.id, { approve, comment: confirmComment || null })
+      toast.success(approve ? "整改已确认" : "已驳回，员工需重新整改")
+      setConfirming(null)
+      await reload(page, statusFilter)
+      await refreshStats()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "确认失败")
+    } finally {
+      setConfirmBusy(false)
+    }
+  }, [confirming, confirmBusy, confirmComment, page, statusFilter, reload, refreshStats])
 
   return {
-    employees,
-    rows,
-    stats,
+    rows: rowsMapped,
+    stats: {
+      openCount: stats.pending + stats.submitted,
+      newToday: stats.new_today,
+      overdueCount: stats.overdue,
+      completionRate: stats.completion_rate,
+    },
     loading,
     saving,
     dialogOpen,
-    dialogMode,
     following,
-    openCreate,
+    confirming,
+    confirmBusy,
+    confirmComment,
+    setConfirmComment,
+    page,
+    totalPages: Math.max(1, Math.ceil(stats.total / PAGE_SIZE)),
+    total: stats.total,
+    statusFilter,
+    setStatusFilter: (v: string) => {
+      setStatusFilter(v)
+      setPage(1)
+    },
+    setPage,
     openFollow,
     closeDialog,
     handleSave,
+    openConfirm,
+    closeConfirm,
+    handleConfirm,
   }
 }
 

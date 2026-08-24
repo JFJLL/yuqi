@@ -86,3 +86,19 @@
 - 后端: ruff ✅ / mypy ✅ / pytest 67 passed ✅ (新增 5: 规则 CRUD+版本 / 分析→问题→复核→整改→关闭全流程 / 驳回+证据锁 / 权限 / 门店范围) / alembic upgrade+check ✅
 - 前端: lint ✅ / typecheck ✅ / test 24 passed ✅ (新增 Inspection 3 项 + Knowledge 规则库 4 项) / build ✅
 - 分析引擎基于关键词规则; LLM 规则分析为预留 (LLM_ENABLED 默认关闭)
+
+## 阶段五：员工自服务 / 申诉 / 整改闭环 / 通知 / SLA — 已完成
+
+**产出**
+- [x] 模型 (迁移 0005): `notifications`(通知: 整改派发/逾期/驳回/申诉结果/整改确认) + `rectifications` 升级字段 (overdue_at / escalated_at / escalation_count)
+- [x] 员工自服务 API (employee.self:view/appeal/rectify): `GET /me/issues` / `POST /me/issues/{id}/appeal` / `GET /me/rectifications` / `POST /me/rectifications/{id}/submit` (仅限本人数据)
+- [x] 管理端闭环: `POST /issues/{id}/appeal-review`(appeal:review) / `GET /appeals`(申诉队列) / `POST /rectifications/{id}/confirm`(rectify:confirm, 通过/驳回) / `GET /rectifications` + summary / PATCH 跟进(截止日期+进度)
+- [x] 通知 API: `GET /notifications` / `GET /notifications/unread-count` / `POST /notifications/read`(单条/全部)
+- [x] SLA 扫描 (scheduler 每 30 分钟): 整改逾期 → 置 overdue + 通知员工与店长; 连续逾期 2 次 → 升级店长, 3 次 → 升级合规专员
+- [x] 前端: 整改任务页 (服务端分页+统计卡片+跟进对话框+确认/驳回对话框) / 申诉复核页 (队列+复核工作台+状态筛选+分页) / 顶栏通知中心 (未读徽标+全部已读+点击已读)
+- [x] 状态机优先级: 驳回 > 申诉中 > 申诉通过/已关闭 > 待复核 > 待整改 (issue_display_state)
+
+**门禁**
+- 后端: ruff ✅ / mypy ✅ / pytest 71 passed ✅ (新增 4: 员工仅本人数据/申诉→复核/提交整改→确认/通知+SLA 扫描) / alembic upgrade+check ✅ (全新库验证)
+- 前端: lint ✅ / typecheck ✅ / test 30 passed ✅ (新增 Tasks 3 项 + Appeals 3 项) / build ✅
+- 员工 H5 页面未单独建前端应用; 自服务 API 齐备, 由后续移动端/小程序接入 (一期管理端内置员工角色视图可登录)

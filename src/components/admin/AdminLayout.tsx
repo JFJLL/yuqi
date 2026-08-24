@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   Activity,
@@ -25,7 +25,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { useAuth, hasPermission } from "@/lib/auth"
+import { fetchUnreadCount } from "@/lib/v1"
 import { ChangePasswordDialog } from "./ChangePasswordDialog"
+import { NotificationsDialog } from "./NotificationsDialog"
 
 export interface NavItem {
   path: string
@@ -68,6 +70,15 @@ export function AdminLayout() {
   const { me, logout } = useAuth()
   const navigate = useNavigate()
   const [pwdOpen, setPwdOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [unread, setUnread] = useState(0)
+
+  // 初始加载未读通知数
+  useEffect(() => {
+    fetchUnreadCount()
+      .then((data) => setUnread(data.count))
+      .catch(() => {})
+  }, [])
   const visibleItems = NAV_ITEMS.filter(
     (item) => !item.phase1Hidden && (!item.requiredPermission || hasPermission(me, item.requiredPermission)),
   )
@@ -142,14 +153,26 @@ export function AdminLayout() {
               <LogOut className="w-4 h-4" />
               退出
             </Button>
-            <Button variant="outline" size="icon" className="h-9 w-9" title="通知">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 relative"
+              title="通知"
+              onClick={() => setNotifOpen(true)}
+            >
               <Bell className="w-4 h-4" />
+              {unread > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] leading-4 text-center">
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
             </Button>
           </div>
         </header>
         <Outlet />
       </main>
       <ChangePasswordDialog open={pwdOpen} onOpenChange={setPwdOpen} />
+      <NotificationsDialog open={notifOpen} onOpenChange={setNotifOpen} onUnreadChange={setUnread} />
     </div>
   )
 }

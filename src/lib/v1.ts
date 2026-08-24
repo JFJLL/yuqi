@@ -403,6 +403,142 @@ export const pushRectify = (id: string, body: { due_date?: string | null } = {})
 export const rerunAnalysis = () =>
   apiFetch<{ ok: boolean; issues_created: number; segments_created: number; rules_matched: number }>("/analysis/rerun", { method: "POST", body: JSON.stringify({}) })
 
+// ---- 整改任务 / 申诉 (阶段五) ----
+export interface RectificationItem {
+  id: string
+  issue_id: string
+  title: string
+  issue_type: string
+  quote: string
+  employee_id: string | null
+  employee_name: string | null
+  store_name: string | null
+  due_date: string
+  status: string
+  progress: number
+  submit_comment: string | null
+  overdue: boolean
+  escalation_count: number
+  created_at: string
+}
+
+export interface RectificationSummary {
+  total: number
+  pending: number
+  submitted: number
+  confirmed: number
+  rejected: number
+  overdue: number
+  escalated: number
+  new_today: number
+  completion_rate: number
+}
+
+export interface AppealItem extends IssueItem {
+  appeal_reason: string | null
+  appeal_reviewed_at: string | null
+  appeal_review_comment: string | null
+}
+
+export interface NotificationItem {
+  id: string
+  title: string
+  body: string
+  notif_type: string
+  ref_type: string | null
+  ref_id: string | null
+  read: boolean
+  created_at: string
+}
+
+export interface MyIssueItem {
+  id: string
+  issue_no: string
+  issue_type: string
+  risk: string
+  quote: string
+  advice: string
+  state: string
+  review_status: string
+  appeal_status: string
+  remediation_status: string
+  close_status: string
+  appeal_reason: string | null
+  occurred_at: string | null
+  due_date: string | null
+}
+
+export interface MyRectificationItem {
+  id: string
+  issue_id: string
+  title: string
+  issue_type: string
+  quote: string
+  due_date: string
+  status: string
+  progress: number
+  submit_comment: string | null
+  escalation_count: number
+  escalated_at: string | null
+  created_at: string
+}
+
+export const fetchRectifications = (params: {
+  page?: number
+  page_size?: number
+  status?: string
+  keyword?: string
+} = {}) => apiFetch<Page<RectificationItem>>(`/rectifications${qs(params)}`)
+
+export const fetchRectificationSummary = () => apiFetch<RectificationSummary>("/rectifications/summary")
+
+export const updateRectification = (id: string, body: { due_date?: string | null; progress?: number | null }) =>
+  apiFetch<{ ok: boolean; id: string }>(`/rectifications/${id}`, { method: "PATCH", body: JSON.stringify(body) })
+
+export const confirmRectification = (id: string, body: { approve: boolean; comment?: string | null }) =>
+  apiFetch<{ ok: boolean; status: string }>(`/rectifications/${id}/confirm`, { method: "POST", body: JSON.stringify(body) })
+
+export const fetchAppeals = (params: {
+  page?: number
+  page_size?: number
+  status?: string
+} = {}) => apiFetch<Page<AppealItem>>(`/appeals${qs(params)}`)
+
+export const reviewAppeal = (id: string, body: { approve: boolean; comment?: string | null }) =>
+  apiFetch<{ ok: boolean; appeal_status: string }>(`/issues/${id}/appeal-review`, { method: "POST", body: JSON.stringify(body) })
+
+export const fetchNotifications = (params: {
+  page?: number
+  page_size?: number
+  unread_only?: boolean
+} = {}) => apiFetch<Page<NotificationItem>>(`/notifications${qs(params)}`)
+
+export const fetchUnreadCount = () => apiFetch<{ count: number }>("/notifications/unread-count")
+
+export const markNotificationsRead = (id?: string) =>
+  apiFetch<{ ok: boolean; marked: number }>("/notifications/read", {
+    method: "POST",
+    body: JSON.stringify(id ? { id } : {}),
+  })
+
+export const fetchMyIssues = (params: { page?: number; page_size?: number; status?: string } = {}) =>
+  apiFetch<Page<MyIssueItem>>(`/me/issues${qs(params)}`)
+
+export const appealMyIssue = (id: string, reason: string) =>
+  apiFetch<{ ok: boolean; appeal_status: string }>(`/me/issues/${id}/appeal`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  })
+
+export const fetchMyRectifications = (params: { page?: number; page_size?: number; status?: string } = {}) =>
+  apiFetch<Page<MyRectificationItem>>(`/me/rectifications${qs(params)}`)
+
+export const submitMyRectification = (id: string, comment: string) =>
+  apiFetch<{ ok: boolean; status: string }>(`/me/rectifications/${id}/submit`, {
+    method: "POST",
+    body: JSON.stringify({ comment }),
+  })
+
 // ---- 通用分页工具 ----
 export function totalPages(total: number, pageSize: number): number {
   return Math.max(1, Math.ceil(total / pageSize))

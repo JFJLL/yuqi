@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentUser, RequirePermission, SessionDep
+from app.core.errors import AppError
 from app.core.pagination import page_meta
 from app.models.issue import Issue, RiskRule
 from app.models.org import Employee, Store
 from app.modules.analysis.service import IssueWorkflow, RiskAnalyzer, RuleService
+from app.modules.audit.service import AuditService
 from app.services.security_context import DataScopeService, TenantContext
 
 router = APIRouter(tags=["analysis"])
@@ -37,16 +40,18 @@ def rule_out(rule: RiskRule) -> dict[str, Any]:
 
 
 def issue_display_state(issue: Issue) -> str:
-    if issue.review_status == "PENDING":
-        return "待复核"
     if issue.review_status == "DISMISSED":
         return "已驳回"
     if issue.appeal_status == "APPEALING":
         return "申诉中"
-    if issue.close_status == "CLOSED":
+    if issue.appeal_status == "APPEAL_APPROVED" or issue.close_status == "CLOSED":
         return "已完成"
-    if issue.remediation_status in ("PENDING", "SUBMITTED", "CONFIRMED"):
-        return "待整改" if issue.remediation_status != "CONFIRMED" else "已完成"
+    if issue.review_status == "PENDING":
+        return "待复核"
+    if issue.remediation_status in ("PENDING", "SUBMITTED"):
+        return "待整改"
+    if issue.remediation_status == "CONFIRMED":
+        return "已完成"
     return "待整改"
 
 
@@ -94,6 +99,7 @@ async def _visible_issue_stmt(ctx: TenantContext):
 
 
 # ---------- 规则库 ----------
+
 
 @router.get("/rules", response_model=dict)
 async def list_rules(
@@ -166,8 +172,11 @@ async def update_rule(
     from app.modules.audit.service import AuditService
 
     await AuditService(session, ctx, request).record(
-        action="rule.update", resource_type="risk_rules", resource_id=str(rule.id),
-        after={"version": rule.version_no}, detail=rule.code,
+        action="rule.update",
+        resource_type="risk_rules",
+        resource_id=str(rule.id),
+        after={"version": rule.version_no},
+        detail=rule.code,
     )
     await session.commit()
     await session.refresh(rule)
@@ -216,6 +225,7 @@ async def delete_rule(
 
 # ---------- 疑似问题 ----------
 
+
 @router.get("/issues", response_model=dict)
 async def list_issues(
     session: SessionDep,
@@ -263,9 +273,7 @@ async def list_issues(
         emp_ids = (
             select(Employee.id).where(Employee.tenant_id == ctx.tenant_id, Employee.name.like(like)).scalar_subquery()
         )
-        store_ids = (
-            select(Store.id).where(Store.tenant_id == ctx.tenant_id, Store.name.like(like)).scalar_subquery()
-        )
+        store_ids = select(Store.id).where(Store.tenant_id == ctx.tenant_id, Store.name.like(like)).scalar_subquery()
         stmt = stmt.where(
             or_(
                 Issue.quote.like(like),
@@ -277,13 +285,7 @@ async def list_issues(
         )
     total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = (
-        (
-            await session.execute(
-                stmt.order_by(Issue.occurred_at.desc())
-                .offset((page - 1) * page_size)
-                .limit(page_size)
-            )
-        )
+        (await session.execute(stmt.order_by(Issue.occurred_at.desc()).offset((page - 1) * page_size).limit(page_size)))
         .scalars()
         .all()
     )
@@ -358,8 +360,11 @@ async def review_issue(
     from app.modules.audit.service import AuditService
 
     await AuditService(session, ctx, request).record(
-        action="issue.review", resource_type="issues", resource_id=str(issue_id),
-        after={"approve": approve}, detail=f"{issue.issue_no} approve={approve}",
+        action="issue.review",
+        resource_type="issues",
+        resource_id=str(issue_id),
+        after={"approve": approve},
+        detail=f"{issue.issue_no} approve={approve}",
     )
     await session.commit()
     return {"ok": True, "review_status": issue.review_status}
@@ -399,14 +404,284 @@ async def push_rectify(
     from app.modules.audit.service import AuditService
 
     await AuditService(session, ctx, request).record(
-        action="issue.push_rectify", resource_type="rectifications", resource_id=str(rect.id),
+        action="issue.push_rectify",
+        resource_type="rectifications",
+        resource_id=str(rect.id),
         detail=str(issue_id),
     )
     await session.commit()
     return {"ok": True, "rectify_task_id": str(rect.id), "status": rect.status}
 
 
+# ---------- 申诉复核 / 整改闭环 (阶段五) ----------
+
+
+@router.get("/appeals", response_model=dict)
+async def list_appeals(
+    session: SessionDep,
+    ctx: CurrentUser,
+    _: TenantContext = Depends(RequirePermission("appeal:review")),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    status: str = Query(""),
+) -> dict:
+    """申诉队列: 申诉中的疑似问题 (含申诉理由与复核记录)."""
+    stmt = await _visible_issue_stmt(ctx)
+    stmt = stmt.where(Issue.appeal_status != "NONE")
+    if status:
+        stmt = stmt.where(Issue.appeal_status == status)
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = (
+        (await session.execute(stmt.order_by(Issue.updated_at.desc()).offset((page - 1) * page_size).limit(page_size)))
+        .scalars()
+        .all()
+    )
+    items = []
+    for issue in rows:
+        data = await _issue_out(session, issue)
+        data["appeal_reason"] = issue.appeal_reason
+        data["appeal_reviewed_at"] = issue.appeal_reviewed_at.isoformat() if issue.appeal_reviewed_at else None
+        data["appeal_review_comment"] = issue.appeal_review_comment
+        items.append(data)
+    return {"items": items, **page_meta(page, page_size, total)}
+
+
+@router.post("/issues/{issue_id}/appeal-review", response_model=dict)
+async def review_appeal(
+    issue_id: uuid.UUID,
+    body: dict,
+    request: Request,
+    session: SessionDep,
+    ctx: CurrentUser,
+    _: TenantContext = Depends(RequirePermission("appeal:review")),
+) -> dict:
+    from datetime import UTC
+    from datetime import datetime as _dt
+
+    from app.models.auth import User
+    from app.modules.notifications.service import NotificationService
+
+    service = IssueWorkflow(session, ctx)
+    issue = await service.get_issue_or_404(issue_id)
+    if issue.appeal_status != "APPEALING":
+        raise AppError(400, "not_appealing", "该问题不在申诉中")
+    approve = bool(body.get("approve", False))
+    comment = body.get("comment")
+    now = _dt.now(UTC)
+    issue.appeal_status = "APPEAL_APPROVED" if approve else "APPEAL_REJECTED"
+    issue.appeal_reviewed_by = ctx.user.id
+    issue.appeal_reviewed_at = now
+    issue.appeal_review_comment = comment
+    if approve:
+        # 申诉成立: 问题关闭, 不再要求整改
+        issue.close_status = "CLOSED"
+        issue.remediation_status = "NONE"
+    else:
+        # 申诉驳回: 回到整改
+        issue.remediation_status = issue.remediation_status if issue.remediation_status != "NONE" else "PENDING"
+    await session.flush()
+    # 通知员工
+    if issue.employee_id:
+        employee_user = await session.scalar(
+            select(User).where(User.tenant_id == ctx.tenant_id, User.employee_id == issue.employee_id)
+        )
+        if employee_user is not None:
+            await NotificationService(session, ctx).create(
+                tenant_id=ctx.tenant_id,
+                user_id=employee_user.id,
+                title="申诉复核结果",
+                body=f"{issue.issue_type}: {comment or ('申诉成立' if approve else '申诉不成立')}",
+                notif_type="APPEAL_REVIEWED",
+                ref_type="issues",
+                ref_id=str(issue.id),
+            )
+    await AuditService(session, ctx, request).record(
+        action="appeal.review",
+        resource_type="issues",
+        resource_id=str(issue_id),
+        after={"appeal_status": issue.appeal_status},
+        detail=f"approve={approve}",
+    )
+    await session.commit()
+    return {"ok": True, "appeal_status": issue.appeal_status}
+
+
+@router.get("/rectifications", response_model=dict)
+async def list_rectifications(
+    session: SessionDep,
+    ctx: CurrentUser,
+    _: TenantContext = Depends(RequirePermission("rectify:confirm")),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    status: str = Query(""),
+    keyword: str = Query(""),
+) -> dict:
+    from app.models.issue import Rectification
+
+    stmt = select(Rectification).where(Rectification.tenant_id == ctx.tenant_id, Rectification.deleted_at.is_(None))
+    if status:
+        stmt = stmt.where(Rectification.status == status)
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = (
+        (await session.execute(stmt.order_by(Rectification.due_date).offset((page - 1) * page_size).limit(page_size)))
+        .scalars()
+        .all()
+    )
+    items = []
+    for rect in rows:
+        issue = await session.get(Issue, rect.issue_id)
+        emp = await session.get(Employee, rect.employee_id) if rect.employee_id else None
+        store = await session.get(Store, rect.store_id) if rect.store_id else None
+        overdue = rect.status in ("PENDING", "SUBMITTED") and rect.due_date < _today()
+        items.append(
+            {
+                "id": str(rect.id),
+                "title": rect.title,
+                "issue_id": str(rect.issue_id),
+                "issue_type": issue.issue_type if issue else "",
+                "quote": issue.quote if issue else "",
+                "employee_id": str(rect.employee_id) if rect.employee_id else None,
+                "employee_name": emp.name if emp else None,
+                "store_name": store.name if store else None,
+                "due_date": rect.due_date.isoformat(),
+                "status": rect.status,
+                "progress": rect.progress,
+                "submit_comment": rect.submit_comment,
+                "overdue": overdue,
+                "escalation_count": rect.escalation_count,
+                "created_at": rect.created_at.isoformat(),
+            }
+        )
+    return {"items": items, **page_meta(page, page_size, total)}
+
+
+@router.get("/rectifications/summary", response_model=dict)
+async def rectification_summary(
+    session: SessionDep,
+    ctx: CurrentUser,
+    _: TenantContext = Depends(RequirePermission("rectify:confirm")),
+) -> dict:
+    from app.models.issue import Rectification
+
+    rows = (
+        (
+            await session.execute(
+                select(Rectification).where(
+                    Rectification.tenant_id == ctx.tenant_id, Rectification.deleted_at.is_(None)
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    total = len(rows)
+    pending = sum(1 for r in rows if r.status == "PENDING")
+    submitted = sum(1 for r in rows if r.status == "SUBMITTED")
+    confirmed = sum(1 for r in rows if r.status == "CONFIRMED")
+    overdue = sum(1 for r in rows if r.status in ("PENDING", "SUBMITTED") and r.due_date < _today())
+    escalated = sum(1 for r in rows if r.escalation_count > 0)
+    today_text = _today().isoformat()
+    new_today = sum(1 for r in rows if r.created_at.date().isoformat() == today_text)
+    return {
+        "total": total,
+        "pending": pending,
+        "submitted": submitted,
+        "confirmed": confirmed,
+        "rejected": sum(1 for r in rows if r.status == "REJECTED"),
+        "overdue": overdue,
+        "escalated": escalated,
+        "new_today": new_today,
+        "completion_rate": round(confirmed / total * 100) if total else 0,
+    }
+
+
+@router.patch("/rectifications/{rect_id}", response_model=dict)
+async def update_rectification(
+    rect_id: uuid.UUID,
+    body: dict,
+    session: SessionDep,
+    ctx: CurrentUser,
+    _: TenantContext = Depends(RequirePermission("rectify:confirm")),
+) -> dict:
+    from app.models.issue import Rectification
+
+    rect = await session.get(Rectification, rect_id)
+    if rect is None or str(rect.tenant_id) != str(ctx.tenant_id):
+        raise AppError(404, "not_found", "整改任务不存在")
+    if body.get("due_date"):
+        try:
+            rect.due_date = date.fromisoformat(str(body["due_date"]))
+        except ValueError as exc:
+            raise AppError(400, "invalid_due_date", "截止日期格式不正确") from exc
+    if body.get("progress") is not None:
+        rect.progress = max(0, min(int(body["progress"]), 100))
+    await session.commit()
+    return {"ok": True, "id": str(rect.id)}
+
+
+@router.post("/rectifications/{rect_id}/confirm", response_model=dict)
+async def confirm_rectification(
+    rect_id: uuid.UUID,
+    body: dict,
+    request: Request,
+    session: SessionDep,
+    ctx: CurrentUser,
+    _: TenantContext = Depends(RequirePermission("rectify:confirm")),
+) -> dict:
+    from datetime import UTC
+    from datetime import datetime as _dt
+
+    from app.models.auth import User
+    from app.models.issue import Rectification
+    from app.modules.notifications.service import NotificationService
+
+    rect = await session.get(Rectification, rect_id)
+    if rect is None or str(rect.tenant_id) != str(ctx.tenant_id):
+        raise AppError(404, "not_found", "整改任务不存在")
+    if rect.status != "SUBMITTED":
+        raise AppError(400, "not_submitted", "只有已提交的整改可以确认")
+    approve = bool(body.get("approve", False))
+    comment = body.get("comment")
+    rect.status = "CONFIRMED" if approve else "REJECTED"
+    rect.confirmed_by = ctx.user.id
+    rect.confirmed_at = _dt.now(UTC)
+    issue = await session.get(Issue, rect.issue_id)
+    if issue is not None:
+        issue.remediation_status = "CONFIRMED" if approve else "REJECTED"
+        if approve:
+            issue.close_status = "CLOSED"
+    await session.flush()
+    if rect.employee_id:
+        employee_user = await session.scalar(
+            select(User).where(User.tenant_id == ctx.tenant_id, User.employee_id == rect.employee_id)
+        )
+        if employee_user is not None:
+            await NotificationService(session, ctx).create(
+                tenant_id=ctx.tenant_id,
+                user_id=employee_user.id,
+                title="整改复核结果",
+                body=f"{rect.title}: {comment or ('已确认' if approve else '需重新整改')}",
+                notif_type="RECTIFY_CONFIRMED",
+                ref_type="rectifications",
+                ref_id=str(rect.id),
+            )
+    await AuditService(session, ctx, request).record(
+        action="rectification.confirm",
+        resource_type="rectifications",
+        resource_id=str(rect_id),
+        after={"status": rect.status},
+        detail=f"approve={approve}",
+    )
+    await session.commit()
+    return {"ok": True, "status": rect.status}
+
+
+def _today():
+    return date.today()
+
+
 # ---------- 分析执行 ----------
+
 
 @router.post("/analysis/rerun", response_model=dict)
 async def rerun_analysis(
@@ -426,10 +701,12 @@ async def rerun_analysis(
         conv_ids = (
             (
                 await session.execute(
-                    select(Conversation.id).where(
+                    select(Conversation.id)
+                    .where(
                         Conversation.tenant_id == ctx.tenant_id,
                         Conversation.status == "READY",
-                    ).limit(200)
+                    )
+                    .limit(200)
                 )
             )
             .scalars()

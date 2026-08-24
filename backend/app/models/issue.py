@@ -50,9 +50,7 @@ class RiskRule(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, SoftDeleteMixin
     created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     legacy_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "code", name="uq_risk_rule_tenant_code"),
-    )
+    __table_args__ = (UniqueConstraint("tenant_id", "code", name="uq_risk_rule_tenant_code"),)
 
 
 class RiskRuleVersion(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
@@ -68,9 +66,7 @@ class RiskRuleVersion(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     changed_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     change_note: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "rule_id", "version_no", name="uq_rule_version_tenant"),
-    )
+    __table_args__ = (UniqueConstraint("tenant_id", "rule_id", "version_no", name="uq_rule_version_tenant"),)
 
 
 class RiskSegment(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
@@ -100,9 +96,7 @@ class RiskSegment(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, Base):
     end_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")  # PENDING/ACCEPTED/DISMISSED
 
-    __table_args__ = (
-        Index("ix_risk_seg_conv", "tenant_id", "conversation_id"),
-    )
+    __table_args__ = (Index("ix_risk_seg_conv", "tenant_id", "conversation_id"),)
 
 
 class Issue(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -199,6 +193,8 @@ class Rectification(UUIDPrimaryKeyMixin, TenantMixin, TimestampMixin, SoftDelete
     submit_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     confirmed_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    escalated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    escalation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     legacy_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     issue: Mapped[Issue] = relationship(lazy="selectin", foreign_keys=[issue_id])

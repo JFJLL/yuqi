@@ -48,8 +48,33 @@ const STATE_TONE: Record<string, PillTone> = {
   重试中: "amber",
   已启用: "green",
   优化中: "amber",
+  // v1 英文状态值
+  APPEALING: "violet",
+  APPEAL_APPROVED: "green",
+  APPEAL_REJECTED: "red",
+  PENDING: "amber",
+  DISMISSED: "red",
+  CONFIRMED: "green",
+  SUBMITTED: "blue",
+  OVERDUE: "red",
+  ESCALATED: "red",
+  CLOSED: "green",
 }
 
 export function stateTone(state: string): PillTone {
   return STATE_TONE[state] ?? "gray"
+}
+
+// v1 状态值 → 中文展示 (用于直接渲染英文状态字段的场合)
+export const STATE_LABELS: Record<string, string> = {
+  APPEALING: "申诉中",
+  APPEAL_APPROVED: "申诉通过",
+  APPEAL_REJECTED: "申诉驳回",
+  PENDING: "待复核",
+  DISMISSED: "已驳回",
+  CONFIRMED: "已完成",
+  SUBMITTED: "已提交",
+  OVERDUE: "已逾期",
+  ESCALATED: "已升级",
+  CLOSED: "已关闭",
 }

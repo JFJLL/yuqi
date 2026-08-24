@@ -16,6 +16,7 @@ from app.models.device import Device, DeviceBinding, DeviceBindingRequest
 from app.models.imports import ImportBatch, ImportItem
 from app.models.issue import Issue, Rectification, RiskRule, RiskRuleVersion, RiskSegment
 from app.models.migration import MigrationBatch, MigrationItem
+from app.models.notification import Notification
 from app.models.org import (
     Employee,
     OrganizationNode,
@@ -54,6 +55,7 @@ __all__ = [
     "RiskSegment",
     "MigrationBatch",
     "MigrationItem",
+    "Notification",
     "Employee",
     "OrganizationNode",
     "Position",

@@ -1,12 +1,10 @@
 import { FileText, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Pill, riskTone } from "@/components/dashboard/Pill"
+import { Pill, riskTone, STATE_LABELS } from "@/components/dashboard/Pill"
 import type { AppealCard } from "./AppealQueue"
 
 interface ReviewPanelProps {
   appeal: AppealCard | null
-  issueQuote: string
-  issueRisk: string
   reviewing: boolean
   onApprove: (appeal: AppealCard) => void
   onReject: (appeal: AppealCard) => void
@@ -16,14 +14,13 @@ interface ReviewPanelProps {
 
 export function ReviewPanel({
   appeal,
-  issueQuote,
-  issueRisk,
   reviewing,
   onApprove,
   onReject,
   onPreview,
   onViewContext,
 }: ReviewPanelProps) {
+  const pending = appeal?.appeal_status === "APPEALING"
   return (
     <section className="bg-card border border-border rounded-lg" style={{ boxShadow: "var(--elev-ring)" }}>
       <div className="min-h-[54px] px-4 py-3.5 border-b border-border">
@@ -43,18 +40,18 @@ export function ReviewPanel({
             <div className="border border-border rounded-lg p-3 bg-background grid gap-2">
               <div className="flex items-center justify-between gap-2.5">
                 <strong className="text-sm">
-                  {appeal.employeeName || "-"} · {appeal.issueType || "-"}
+                  {appeal.employee_name || "-"} · {appeal.issue_type || "-"}
                 </strong>
-                {issueRisk ? <Pill tone={riskTone(issueRisk)}>{issueRisk}风险</Pill> : null}
+                {appeal.risk ? <Pill tone={riskTone(appeal.risk)}>{appeal.risk}风险</Pill> : null}
               </div>
-              <span className="text-muted-foreground text-xs">{appeal.storeName || "-"}</span>
+              <span className="text-muted-foreground text-xs">{appeal.store_name || "-"}</span>
               <div className="border-l-[3px] border-primary bg-card rounded-r-md px-2.5 py-2 text-sm leading-relaxed text-foreground/90">
-                {issueQuote || "未关联命中文本"}
+                {appeal.quote || "未关联命中文本"}
               </div>
             </div>
             <div className="border border-border rounded-lg p-3 bg-background grid gap-2">
               <strong className="text-sm">员工说明</strong>
-              <span className="text-muted-foreground text-sm leading-relaxed">{appeal.reason}</span>
+              <span className="text-muted-foreground text-sm leading-relaxed">{appeal.appeal_reason}</span>
             </div>
             <div className="border border-border rounded-lg p-3 bg-background grid gap-2">
               <strong className="text-sm">复核记录</strong>
@@ -74,21 +71,23 @@ export function ReviewPanel({
               <Button
                 variant="outline"
                 className="border-[hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))] bg-[hsl(var(--destructive)/0.06)] hover:bg-[hsl(var(--destructive)/0.12)]"
-                disabled={reviewing || appeal.status !== "待复核"}
+                disabled={reviewing || !pending}
                 onClick={() => onReject(appeal)}
               >
                 驳回
               </Button>
               <Button
                 className="bg-[hsl(var(--success))] text-primary-foreground hover:bg-[hsl(var(--success)/0.9)]"
-                disabled={reviewing || appeal.status !== "待复核"}
+                disabled={reviewing || !pending}
                 onClick={() => onApprove(appeal)}
               >
                 通过
               </Button>
             </div>
-            {appeal.status !== "待复核" && (
-              <p className="m-0 text-xs text-muted-foreground text-right">该申诉已完成复核（{appeal.status}）。</p>
+            {!pending && (
+              <p className="m-0 text-xs text-muted-foreground text-right">
+                该申诉已完成复核（{STATE_LABELS[appeal.appeal_status] ?? appeal.appeal_status}）。
+              </p>
             )}
           </div>
         )}
