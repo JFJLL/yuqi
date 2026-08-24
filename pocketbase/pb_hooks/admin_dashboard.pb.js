@@ -180,6 +180,13 @@ routerAdd("GET", "/api/admin/dashboard/summary", function (e) {
 })
 
 routerAdd("POST", "/api/admin/seed", function (e) {
+  // 安全止血: demo seed 默认关闭, 仅当显式设置 YUQI_ALLOW_DEMO_SEED=1 且非生产环境时可用。
+  var allowSeed = String($os.getenv("YUQI_ALLOW_DEMO_SEED") || "") === "1"
+  var envName = String($os.getenv("YUQI_ENV") || "").toLowerCase()
+  if (envName === "production" || envName === "prod") allowSeed = false
+  if (!allowSeed) {
+    return e.json(403, { error: "demo_seed_disabled", message: "演示数据接口已关闭" })
+  }
   try {
     function wipe(collName) {
       var rows = []
