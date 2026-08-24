@@ -95,6 +95,12 @@ export default defineConfig({
         target: process.env.YUQI_ASR_DEV_GATEWAY_URL || 'http://127.0.0.1:18084',
         changeOrigin: true,
       },
+      // 本地 dev: 浏览器只访问 /__pb, 由 Vite 代理到本地 PocketBase (生产由 Nginx 代理, 均剥离前缀)
+      '/__pb': {
+        target: process.env.YUQI_PB_DEV_URL || 'http://127.0.0.1:7040',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/__pb/, ''),
+      },
     },
   },
   preview: {

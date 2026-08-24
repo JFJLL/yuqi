@@ -1,9 +1,8 @@
-import { NavLink, Outlet, useLocation } from "react-router-dom"
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   Activity,
   Badge,
   BarChart3,
-  Bell,
   Bot,
   Brain,
   ClipboardCheck,
@@ -11,8 +10,8 @@ import {
   FileText,
   GraduationCap,
   LayoutDashboard,
-  Link2,
   ListChecks,
+  LogOut,
   MessagesSquare,
   Pill,
   RefreshCw,
@@ -23,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { triggerSync } from "@/lib/admin"
+import { currentRole, currentUser, logout } from "@/lib/auth"
 
 export interface NavItem {
   path: string
@@ -56,8 +56,20 @@ export function useCurrentNav(): NavItem {
   return NAV_ITEMS.find((item) => item.path === pathname) ?? NAV_ITEMS[0]
 }
 
+// 按角色显示菜单: 管理类模块仅 SUPER_ADMIN/ADMIN; 其余角色隐藏设置/知识库/占位模块
+const ADMIN_ONLY_PATHS = new Set(["/knowledge", "/settings", "/drug-data", "/sales-ai", "/training"])
+
+export function visibleNavItems(): NavItem[] {
+  const role = currentRole()
+  const isAdmin = role === "SUPER_ADMIN" || role === "ADMIN"
+  return NAV_ITEMS.filter((item) => !ADMIN_ONLY_PATHS.has(item.path) || isAdmin)
+}
+
 export function AdminLayout() {
   const current = useCurrentNav()
+  const navigate = useNavigate()
+  const user = currentUser()
+  const role = currentRole()
 
   async function handleSync() {
     try {
@@ -66,6 +78,12 @@ export function AdminLayout() {
     } catch {
       toast.error("同步失败，请稍后重试")
     }
+  }
+
+  async function handleLogout() {
+    await logout()
+    toast.success("已退出登录")
+    navigate("/login", { replace: true })
   }
 
   return (
@@ -81,7 +99,7 @@ export function AdminLayout() {
           </div>
         </div>
         <nav className="grid gap-1 overflow-auto pr-0.5 max-md:grid-flow-col max-md:grid-cols-none max-md:w-max" aria-label="主导航">
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems().map((item) => {
             const Icon = item.icon
             return (
               <NavLink
@@ -115,12 +133,13 @@ export function AdminLayout() {
               <RefreshCw className="w-4 h-4" />
               同步数据
             </Button>
-            <Button size="sm" className="h-9 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
-              <Link2 className="w-4 h-4" />
-              绑定设备
-            </Button>
-            <Button variant="outline" size="icon" className="h-9 w-9" title="通知">
-              <Bell className="w-4 h-4" />
+            <div className="hidden sm:flex flex-col items-end leading-tight">
+              <span className="text-sm font-medium">{user?.display_name ?? user?.email ?? ""}</span>
+              <span className="text-xs text-muted-foreground">{role}</span>
+            </div>
+            <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={handleLogout}>
+              <LogOut className="w-4 h-4" />
+              退出
             </Button>
           </div>
         </header>

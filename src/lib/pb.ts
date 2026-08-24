@@ -1,6 +1,7 @@
 import PocketBase from "pocketbase"
 
 import { vibexAuthHeaders } from "./rhLogin"
+import { getSessionToken } from "./auth"
 
 // VibeX 把每个 app 部署在子路径下 (/app-preview/app-<32hex>/ 或 /p/app-<32hex>/)。
 // 这个正则提取该前缀; 本地直跑 dev (无前缀)时返回 null。
@@ -25,15 +26,24 @@ export function getBasename(): string {
 
 export const pb = new PocketBase(getPocketBaseUrl())
 
+// 禁用 SDK 自动取消: StrictMode 双跑 effect / 连续请求会互相 abort (如登录后 /me、员工首页)
+pb.autoCancellation(false)
+
 // B1 沙箱域(*.apps.vibex.cn)上访问者身份靠 X-Vibex-Scoped-Token 承载
 // (老域 vibexAuthHeaders() 返回空对象, 零影响)。挂在 SDK 层, 让所有
 // pb.collection(...) 请求自动携带, 业务代码不用感知。
 pb.beforeSend = (url, options) => {
+  const headers = { ...(options.headers || {}) }
   const extra = vibexAuthHeaders()
   if (Object.keys(extra).length > 0) {
-    options.headers = { ...(options.headers || {}), ...extra }
+    Object.assign(headers, extra)
   }
-  return { url, options }
+  // 会话自管: 注入一期业务 Token (SDK authStore 为空时也带上)
+  const token = getSessionToken()
+  if (token && !headers.Authorization) {
+    headers.Authorization = token
+  }
+  return { url, options: { ...options, headers } }
 }
 
 pb.authStore.onChange(() => {
