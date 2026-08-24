@@ -180,6 +180,30 @@ routerAdd("GET", "/api/admin/dashboard/summary", function (e) {
 })
 
 routerAdd("POST", "/api/admin/seed", function (e) {
+  // ---- 安全门 (阶段零) ----
+  // 1) 演示数据 seed 仅限开发/测试环境: 生产必须显式 ALLOW_DEMO_SEED=true 才放行,
+  //    默认 false 直接拒绝 (本路由会清空 7 张业务表, 绝不接受匿名/默认调用)。
+  // 2) 仅 PocketBase 超级管理员可调用。
+  // 3) 必须携带 X-Seed-Confirm: 1 二次确认头。
+  try {
+    if (String(process.env.ALLOW_DEMO_SEED || "") !== "true") {
+      return e.json(403, { error: "demo_seed_disabled", message: "演示数据 seed 仅允许在开发/测试环境执行 (需 ALLOW_DEMO_SEED=true)" })
+    }
+    var reqInfo = e.requestInfo()
+    var isSuperAdmin = false
+    try { isSuperAdmin = !!(reqInfo && reqInfo.admin && reqInfo.admin.id) } catch (_) { isSuperAdmin = false }
+    if (!isSuperAdmin) {
+      return e.json(401, { error: "superadmin_required", message: "仅超级管理员可执行演示数据 seed" })
+    }
+    var reqHeaders = reqInfo.headers || {}
+    var confirm = String(reqHeaders["x_seed_confirm"] || reqHeaders["X-Seed-Confirm"] || reqHeaders["x-seed-confirm"] || "")
+    if (confirm !== "1") {
+      return e.json(400, { error: "seed_confirmation_required", message: "必须携带 X-Seed-Confirm: 1 二次确认头" })
+    }
+  } catch (err) {
+    try { $app.logger().error("admin_seed_guard_error: " + String((err && err.message) || err)) } catch (_) {}
+    return e.json(403, { error: "seed_guard_failed", message: "演示 seed 安全校验失败, 已拒绝" })
+  }
   try {
     function wipe(collName) {
       var rows = []
