@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# 阶段零: 提交前运行密钥泄露检查 (可被 core.hooksPath 或提交命令绕过时仍建议在 CI 执行)
+if [ -f "$(git rev-parse --show-toplevel)/scripts/check-secrets.sh" ]; then
+  bash "$(git rev-parse --show-toplevel)/scripts/check-secrets.sh" --staged
+fi

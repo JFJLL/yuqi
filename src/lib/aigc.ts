@@ -687,7 +687,7 @@ export async function callAigcAndPoll(
 
   if (submitRes.status === 412 || submitRes.status === 401) {
     const text = await submitRes.text().catch(() => "")
-    let data: { error?: string; message?: string; detail?: { code?: string } | string } = {}
+    let data: { error?: string; message?: string; detail?: { code?: string } | string }
     try {
       data = JSON.parse(text || "{}") as typeof data
     } catch {
@@ -699,7 +699,7 @@ export async function callAigcAndPoll(
   }
   if (!submitRes.ok) {
     const text = await submitRes.text().catch(() => "")
-    let data: Partial<AigcSubmitResponse> | null = null
+    let data: Partial<AigcSubmitResponse> | null
     try {
       data = JSON.parse(text || "{}") as Partial<AigcSubmitResponse>
     } catch {

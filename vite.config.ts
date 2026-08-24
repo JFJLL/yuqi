@@ -13,6 +13,7 @@ import _traverse from '@babel/traverse'
 import MagicString from 'magic-string'
 
 // @babel/traverse 在不同 bundler 下 ESM/CJS interop 形态不一致, 兜底取 default.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const traverse = ((_traverse as any).default ?? _traverse) as typeof _traverse
 
 // rh-visual-edit: 独立 Vite plugin, 给每个 JSX 元素加 data-rh-src="<rel>:<line>:<col>".
@@ -26,6 +27,7 @@ function rhSourcePlugin() {
       const cleanId = id.split('?')[0]
       if (!/\.(jsx|tsx)$/.test(cleanId)) return null
       if (cleanId.includes('/node_modules/')) return null
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- babel AST 类型不可推导, 有意为之
       let ast: any
       try {
         ast = babelParse(code, {
@@ -41,11 +43,13 @@ function rhSourcePlugin() {
       const filename = rel.replace(/\\/g, '/')
       const ms = new MagicString(code)
       traverse(ast, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- babel traverse 回调类型不可推导
         JSXOpeningElement(p: any) {
           const node = p.node
           const loc = node.loc
           if (!loc) return
           const exists = node.attributes.some(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (a: any) => a.type === 'JSXAttribute' && a.name && a.name.name === 'data-rh-src',
           )
           if (exists) return

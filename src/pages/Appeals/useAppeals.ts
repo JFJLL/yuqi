@@ -85,7 +85,7 @@ export function useAppeals() {
   const selectedIssue = selected ? issueById.get(selected.issue) ?? null : null
   const selectedTranscript = selectedIssue ? transcripts.find((t) => t.id === selectedIssue.transcript) ?? null : null
 
-  async function review(appeal: AppealCard, approve: boolean) {
+  const review = useCallback(async (appeal: AppealCard, approve: boolean) => {
     setReviewing(true)
     try {
       await updateRecord("appeals", appeal.id, {
@@ -104,10 +104,10 @@ export function useAppeals() {
     } finally {
       setReviewing(false)
     }
-  }
+  }, [reload])
 
-  const handleApprove = useCallback((appeal: AppealCard) => review(appeal, true), [reviewing])
-  const handleReject = useCallback((appeal: AppealCard) => review(appeal, false), [reviewing])
+  const handleApprove = useCallback((appeal: AppealCard) => review(appeal, true), [review])
+  const handleReject = useCallback((appeal: AppealCard) => review(appeal, false), [review])
   const openContext = useCallback(() => setContextOpen(true), [])
   const closeContext = useCallback(() => setContextOpen(false), [])
 

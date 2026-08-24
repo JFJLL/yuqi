@@ -190,7 +190,9 @@ function loadCommonSpeakers(storeId: string): Record<string, string> {
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, string>
-  } catch {}
+  } catch {
+    // localStorage 数据损坏时忽略, 回退空别名表
+  }
   return {}
 }
 
@@ -200,7 +202,9 @@ function saveCommonSpeaker(storeId: string, speaker: string, alias: string) {
     if (alias) current[speaker] = alias
     else delete current[speaker]
     localStorage.setItem(commonSpeakersKey(storeId), JSON.stringify(current))
-  } catch {}
+  } catch {
+    // localStorage 写入失败(隐私模式/配额)时静默忽略
+  }
 }
 
 export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps) {
@@ -236,7 +240,7 @@ export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps)
     setSelectedSpeakers(new Set())
     setEditingSpeaker(null)
     setMarkPopover(null)
-  }, [record?.id, record?.segments_json, record?.speaker_aliases, record?.marks_json])
+  }, [record])
 
   // 覆盖常用发言人（localStorage）到展示别名（若记录本身无别名）
   const effectiveAliasMap = useMemo(() => {
@@ -246,7 +250,7 @@ export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps)
     // 空字符串的别名不覆盖
     for (const k of Object.keys(merged)) if (!merged[k]) delete merged[k]
     return merged
-  }, [aliasMap, record?.store])
+  }, [aliasMap, record])
 
   const segments = useMemo(() => editableSegments, [editableSegments])
   const turns = useMemo(() => groupSpeakerTurns(segments), [segments])
@@ -276,9 +280,6 @@ export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps)
   }
 
   // 标记判定：按 speaker+startMs 精确匹配
-  function isTurnMarked(turn: SpeakerTurn) {
-    return marks.some((m) => m.speaker === turn.speaker && m.start_ms === turn.startMs)
-  }
   function getTurnMark(turn: SpeakerTurn) {
     return marks.find((m) => m.speaker === turn.speaker && m.start_ms === turn.startMs) ?? null
   }
@@ -287,7 +288,7 @@ export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps)
   const filteredTurns = useMemo(() => {
     return turns.filter((turn) => {
       if (selectedSpeakers.size > 0 && !selectedSpeakers.has(turn.speaker)) return false
-      if (onlyMarked && !isTurnMarked(turn)) return false
+      if (onlyMarked && !marks.some((m) => m.speaker === turn.speaker && m.start_ms === turn.startMs)) return false
       return true
     })
   }, [turns, selectedSpeakers, onlyMarked, marks])
@@ -339,7 +340,7 @@ export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps)
       if (onlyMarked) {
         // 只要该句段所属 turn 被标记就保留
         const turn = turns.find((t) => t.startMs === seg.start_ms && t.speaker === spk)
-        if (turn && !isTurnMarked(turn)) return false
+        if (turn && !marks.some((m) => m.speaker === turn.speaker && m.start_ms === turn.startMs)) return false
         if (!turn) {
           // 回退：检查 marks 中是否有对应 segment
           const hasMark = marks.some((m) => m.speaker === spk && m.start_ms === seg.start_ms)
