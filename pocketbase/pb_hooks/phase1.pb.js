@@ -712,10 +712,10 @@ routerAdd("GET", "/api/yuqi/employee/home", (e) => {
       "tenant = {:t} && employee = {:e} && review_status = 'APPROVED' && employee_visibility = 'VISIBLE' && close_status = 'OPEN'",
       "-created", 200, 0, { t: tenantId, e: employeeId })
     const myRectifications = $app.findRecordsByFilter("rectifications",
-      "tenant = {:t} && employee = {:e} && status IN ('PENDING','NEEDS_REVISION','SUBMITTED')",
+      "tenant = {:t} && employee = {:e} && (status = 'PENDING' || status = 'NEEDS_REVISION' || status = 'SUBMITTED')",
       "-created", 200, 0, { t: tenantId, e: employeeId })
     const myAppeals = $app.findRecordsByFilter("appeals",
-      "tenant = {:t} && employee = {:e} && status IN ('PENDING','NEEDS_MORE_INFO')",
+      "tenant = {:t} && employee = {:e} && (status = 'PENDING' || status = 'NEEDS_MORE_INFO')",
       "-created", 200, 0, { t: tenantId, e: employeeId })
     const unread = $app.findRecordsByFilter("notifications", "user = {:u} && is_read = false", "", 200, 0, { u: ctx.user.id })
 

@@ -157,14 +157,14 @@ routerAdd("POST", "/api/yuqi/auth/employee/send-code", (e) => {
       if (sentAt) {
         const ms = new Date(String(sentAt).replace(" ", "T")).getTime()
         if (Date.now() - ms < 60 * 1000) {
-          throw new TooManyrequestsError("发送过于频繁，请 60 秒后再试")
+          throw new TooManyRequestsError("发送过于频繁，请 60 秒后再试")
         }
       }
     }
     // 每小时限次
     const hourAgo = AH.pbDate(new Date(Date.now() - 3600 * 1000))
     const hourly = $app.findRecordsByFilter("sms_codes", "mobile = {:m} && sent_at >= {:t}", "", 200, 0, { m: mobile, t: hourAgo })
-    if (hourly.length >= 5) throw new TooManyrequestsError("发送次数已达上限，请 1 小时后再试")
+    if (hourly.length >= 5) throw new TooManyRequestsError("发送次数已达上限，请 1 小时后再试")
 
     // 生产未配置真实短信服务时不发送固定码
     if (AH.isProduction()) {
@@ -181,6 +181,11 @@ routerAdd("POST", "/api/yuqi/auth/employee/send-code", (e) => {
       return c
     })()
 
+    // 旧验证码先作废 (sms_codes 有 mobile+status 唯一索引, 必须避免同时存在两条 ACTIVE)
+    try {
+      $app.db().newQuery("UPDATE `sms_codes` SET `status` = 'EXPIRED' WHERE `mobile` = {:m} AND `status` = 'ACTIVE'").bind({ m: mobile }).execute()
+    } catch (_) {}
+
     const coll = $app.findCollectionByNameOrId("sms_codes")
     const rec = new Record(coll)
     rec.set("tenant", tenantId)
@@ -192,11 +197,6 @@ routerAdd("POST", "/api/yuqi/auth/employee/send-code", (e) => {
     rec.set("request_ip", g.clientIp(e))
     rec.set("status", "ACTIVE")
     $app.save(rec)
-
-    // 旧验证码作废
-    try {
-      $app.db().newQuery("UPDATE `sms_codes` SET `status` = 'EXPIRED' WHERE `mobile` = {:m} AND `id` <> {:id} AND `status` = 'ACTIVE'").bind({ m: mobile, id: rec.id }).execute()
-    } catch (_) {}
 
     g.writeAudit(e, { kind: "service", tenantId }, "employee_sms_send", "sms_codes", rec.id, { mobile })
     return e.json(200, {
@@ -251,7 +251,7 @@ routerAdd("POST", "/api/yuqi/auth/employee/login", (e) => {
     }
 
     const failed = Number(codeRec.get("failed_attempts") || 0)
-    if (failed >= 5) throw new TooManyrequestsError("验证码错误次数过多，请重新获取")
+    if (failed >= 5) throw new TooManyRequestsError("验证码错误次数过多，请重新获取")
 
     const tenantForHash = String(codeRec.get("tenant") || "")
     const expectedHash = String(codeRec.get("code_hash") || "")

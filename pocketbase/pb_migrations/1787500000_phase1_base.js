@@ -207,7 +207,7 @@ function phase1Base(app) {
     changed = ensureField(c, { name: "updated", type: "autodate", onCreate: true, onUpdate: true }) || changed
     if (!c.indexes || c.indexes.length === 0) {
       try {
-        c.indexes = ["CREATE UNIQUE INDEX `idx_sms_codes_mobile_status` ON `sms_codes` (`mobile`, `status`)"]
+        c.indexes = ["CREATE UNIQUE INDEX `idx_sms_codes_mobile_active` ON `sms_codes` (`mobile`) WHERE `status` = 'ACTIVE'"]
         changed = true
       } catch (_) {}
     }
