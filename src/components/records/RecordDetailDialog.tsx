@@ -21,16 +21,20 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Pill, stateTone, type PillTone } from "@/components/dashboard/Pill"
-import { updateRecord } from "@/lib/admin"
-import type { TranscriptMark, TranscriptMarkColor, TranscriptRecord } from "@/lib/admin"
-import type { RecordRow } from "./RecordTable"
+import { updateTranscript, type RecordingDetail, type TranscriptMarkV1, type TranscriptSegmentV1 } from "@/lib/v1"
+
+export type DetailRecord = RecordingDetail & { employeeName: string; storeName: string }
+
+type TranscriptMarkColor = "red" | "yellow" | "blue" | "gray"
+
+type TranscriptMark = TranscriptMarkV1
+
+type TranscriptSegment = TranscriptSegmentV1
 
 interface RecordDetailDialogProps {
-  record: RecordRow | null
+  record: DetailRecord | null
   onClose: () => void
 }
-
-type TranscriptSegment = NonNullable<TranscriptRecord["segments_json"]>[number]
 
 interface SpeakerTurn {
   speaker: string
@@ -54,7 +58,7 @@ const SPEAKER_BADGE_CLASSES = [
   "border-muted bg-muted text-muted-foreground",
 ]
 
-const MARK_COLORS: Record<TranscriptMarkColor, { label: string; dot: string; chip: string; border: string }> = {
+const MARK_COLORS: Record<string, { label: string; dot: string; chip: string; border: string }> = {
   red: { label: "严重", dot: "bg-red-500", chip: "border-red-200 bg-red-50 text-red-700", border: "border-l-red-500" },
   yellow: { label: "待核实", dot: "bg-amber-400", chip: "border-amber-200 bg-amber-50 text-amber-700", border: "border-l-amber-400" },
   blue: { label: "优秀", dot: "bg-blue-500", chip: "border-blue-200 bg-blue-50 text-blue-700", border: "border-l-blue-500" },
@@ -245,7 +249,7 @@ export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps)
   // 覆盖常用发言人（localStorage）到展示别名（若记录本身无别名）
   const effectiveAliasMap = useMemo(() => {
     if (!record) return aliasMap
-    const common = loadCommonSpeakers(record.store)
+    const common = loadCommonSpeakers(record.store ?? "global")
     const merged: Record<string, string> = { ...common, ...aliasMap }
     // 空字符串的别名不覆盖
     for (const k of Object.keys(merged)) if (!merged[k]) delete merged[k]
@@ -356,7 +360,16 @@ export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps)
     if (!record) return
     setSaving(true)
     try {
-      await updateRecord("transcripts", record.id, patch)
+      // 服务端每次保存生成新文本版本; 未在 patch 中的部分沿用当前本地状态
+      const nextSegments = (patch.segments_json as TranscriptSegment[] | undefined) ?? editableSegments
+      await updateTranscript(record.id, {
+        segments: nextSegments.map((s) => ({ text: s.text, start_ms: s.start_ms, end_ms: s.end_ms, speaker: s.speaker })),
+        full_text: (patch.full_text as string | undefined) ?? record.full_text ?? "",
+        summary: (patch.summary as string | undefined) ?? record.summary ?? "",
+        marks: (patch.marks_json as TranscriptMark[] | undefined) ?? marks,
+        speaker_aliases: (patch.speaker_aliases as Record<string, string> | undefined) ?? aliasMap,
+        edit_reason: (patch.edit_reason as string | undefined) ?? null,
+      })
       toast.success("已保存")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "保存失败")
@@ -405,7 +418,7 @@ export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps)
     else delete next[editingSpeaker]
     setAliasMap(next)
     setEditingSpeaker(null)
-    if (saveAsCommon) saveCommonSpeaker(record.store, editingSpeaker, alias)
+    if (saveAsCommon) saveCommonSpeaker(record.store ?? "global", editingSpeaker, alias)
     try {
       await persistTranscript({ speaker_aliases: next })
       // 同步回 record 的引用，依赖外层刷新；本地先保持
@@ -418,7 +431,7 @@ export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps)
   function openMarkPopover(turn: SpeakerTurn) {
     const existing = getTurnMark(turn)
     setMarkPopover({ speaker: turn.speaker, startMs: turn.startMs })
-    setMarkColor(existing?.color ?? "red")
+    setMarkColor((existing?.color as TranscriptMarkColor) ?? "red")
     setMarkNote(existing?.note ?? "")
   }
 

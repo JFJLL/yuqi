@@ -54,3 +54,19 @@
 - 后端: ruff ✅ / mypy ✅ / pytest 48 passed ✅ / alembic upgrade+check ✅
 - 前端: lint ✅ / typecheck ✅ / test 13 passed ✅ / build ✅
 - PocketBase → PostgreSQL 迁移脚本: dry-run/commit/rollback 幂等测试 ✅
+
+## 阶段三：文件接入 / 对象存储 / 会话 / 文本版本 / ASR Provider — 已完成
+
+**产出**
+- [x] 模型 (迁移 0003): `audio_files` / `conversations` / `transcript_segments` / `text_versions` / `processing_jobs` (DATA_MIGRATION 三层拆分落地)
+- [x] 对象存储 Provider: 本地 FS (开发/测试) + S3/OSS 兼容 (boto3 懒加载, 线程池), 路径穿越防护, key 约定 `{tenant}/{audio_id}/{name}`
+- [x] ASR Provider: `MockAsrProvider` (内存确定性) / `HttpAsrProvider` (私有网关 Bearer 提交+轮询)
+- [x] 接入模块: 上传落库 → 创建 ASR 任务 → 队列 (内存同步/ARQ 双实现) → 会话+片段+版本落库; 重试/软删除
+- [x] API: `GET /recordings`(服务端分页+关键词/日期/门店/员工/质检/ASR 状态过滤+数据范围) / `GET /recordings/{id}` / `POST /recordings/upload`(multipart, 200MB 限制, 格式白名单) / retry / PATCH transcript(生成新文本版本) / versions / DELETE(软删除+审计) / summary(队列卡片服务端聚合)
+- [x] 内部 API (X-Service-Token): `POST /internal/ingest/audio`(OSS Scanner 幂等登记, 自动解析活跃绑定员工/门店) / `POST /internal/asr/callback`(网关推送转写结果)
+- [x] 前端迁移: 录音转写页服务端分页 + 详情对话框走 v1 API (编辑保存生成版本) + 上传走 v1 multipart + 软删除
+
+**门禁**
+- 后端: ruff ✅ / mypy ✅ / pytest 62 passed ✅ (新增 14: recordings 上传/详情/过滤/范围/权限/版本/重试/删除/内部端点 + providers) / alembic upgrade+check ✅
+- 前端: lint ✅ / typecheck ✅ / test 17 passed ✅ (新增 Records 页 4 项) / build ✅
+- ASR mock 全链路 (上传→转写→会话→版本) 有 API 测试覆盖; 生产 ASR/OSS 未连接 (无服务器权限)

@@ -13,13 +13,19 @@ from app.core.config import get_settings
 from app.core.logging import setup_logging
 
 # 任务函数注册表: 阶段三/四/六逐步加入
-#   - ingest_audio_from_oss
-#   - run_asr_job
-#   - run_risk_analysis
-#   - daily_oss_reconciliation
-#   - sla_escalation_scan
-#   - retention_cleanup
+#   - run_asr_job (阶段三)
+#   - run_risk_analysis (阶段四)
+#   - daily_oss_reconciliation / sla_escalation_scan / retention_cleanup (阶段六)
 WORKER_FUNCTIONS: dict[str, Callable[..., Any]] = {}
+
+
+def _register_builtin_functions() -> None:
+    from app.modules.ingestion.service import run_asr_job
+
+    WORKER_FUNCTIONS["run_asr_job"] = run_asr_job
+
+
+_register_builtin_functions()
 
 
 async def startup(ctx: dict) -> None:

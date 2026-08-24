@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button"
 import { Pill, stateTone, type PillTone } from "@/components/dashboard/Pill"
-import type { TranscriptRecord } from "@/lib/admin"
+import type { RecordingListItem } from "@/lib/v1"
 
-export interface RecordRow extends TranscriptRecord {
+export interface RecordRow extends RecordingListItem {
   employeeName: string
   storeName: string
 }
@@ -11,7 +11,7 @@ interface RecordTableProps {
   rows: RecordRow[]
   loading: boolean
   onView: (row: RecordRow) => void
-  onRetry?: (asrJobId: string) => void
+  onRetry?: (audioId: string) => void
   onDelete?: (row: RecordRow) => void
 }
 
@@ -86,8 +86,8 @@ export function RecordTable({ rows, loading, onView, onRetry, onDelete }: Record
                     <Button variant="link" className="h-auto p-0 text-primary font-semibold" onClick={() => onView(row)}>
                       查看文本
                     </Button>
-                    {row.asr_status === "failed" && row.asr_job && onRetry && (
-                      <Button variant="link" className="h-auto p-0 text-destructive font-semibold" onClick={() => onRetry(row.asr_job!)}>
+                    {row.asr_status === "failed" && onRetry && (
+                      <Button variant="link" className="h-auto p-0 text-destructive font-semibold" onClick={() => onRetry(row.id)}>
                         重试
                       </Button>
                     )}

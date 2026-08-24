@@ -1,6 +1,13 @@
 import { Download, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { Employee, Store } from "@/lib/admin"
+
+export interface NamedOption {
+  id: string
+  name: string
+}
+
+type Employee = NamedOption
+type Store = NamedOption
 
 export interface RecordFilterState {
   keyword: string

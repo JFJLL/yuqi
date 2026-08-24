@@ -57,10 +57,11 @@ export interface ApiInit extends RequestInit {
 
 export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> {
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     "X-Request-Id": await requestId(),
     ...(init.headers as Record<string, string> | undefined),
   }
+  // multipart 上传时由浏览器自动生成 boundary, 不得预设 Content-Type
+  if (!(init.body instanceof FormData)) headers["Content-Type"] = "application/json"
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`
 
   let resp = await fetch(`/api/v1${path}`, { ...init, headers, credentials: "include" })

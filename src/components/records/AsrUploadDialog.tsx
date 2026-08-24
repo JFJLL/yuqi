@@ -3,7 +3,15 @@ import { Upload } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import type { AsrSubmission } from "@/lib/asr"
-import type { Employee, Store } from "@/lib/admin"
+
+export interface NamedOption {
+  id: string
+  name: string
+  store?: string | null
+}
+
+type Employee = NamedOption
+type Store = NamedOption
 
 const ACCEPTED_AUDIO = ".wav,.mp3,.m4a,.flac,.ogg,.aac,.webm"
 const MAX_UPLOAD_BYTES = 200 * 1024 * 1024

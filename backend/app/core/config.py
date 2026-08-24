@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     # 演示数据
     allow_demo_seed: bool = False
 
+    # 内部服务令牌 (OSS Scanner / ASR 网关)
+    internal_service_token: str = "dev-internal-token"
+
     # 存储
     storage_provider: str = "local"  # local | aliyun_oss
     local_storage_dir: str = "./var/storage"
@@ -73,6 +76,13 @@ class Settings(BaseSettings):
     def _jwt_secret_not_default_in_prod(cls, v: str, info) -> str:
         if info.data.get("env") == "prod" and v in ("", "dev-only-insecure-secret-change-me"):
             raise ValueError("生产环境必须设置 JWT_SECRET")
+        return v
+
+    @field_validator("internal_service_token")
+    @classmethod
+    def _service_token_not_default_in_prod(cls, v: str, info) -> str:
+        if info.data.get("env") == "prod" and v in ("", "dev-internal-token"):
+            raise ValueError("生产环境必须设置 INTERNAL_SERVICE_TOKEN")
         return v
 
     @field_validator("sms_mock_fixed_code")

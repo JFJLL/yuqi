@@ -5,6 +5,7 @@ import { RecordTable } from "@/components/records/RecordTable"
 import { RecordDetailDialog } from "@/components/records/RecordDetailDialog"
 import { TaskQueueCards } from "@/components/records/TaskQueueCards"
 import { AsrUploadDialog } from "@/components/records/AsrUploadDialog"
+import { TablePagination } from "@/components/ui/table-pagination"
 import type { RecordsProps } from "./useRecords"
 
 // 录音转写视图：只消费 props，不自行调用数据逻辑。
@@ -12,7 +13,7 @@ export function RecordsPage({
   stores,
   employees,
   rows,
-  asrJobs,
+  summary,
   filters,
   loading,
   queue,
@@ -21,7 +22,10 @@ export function RecordsPage({
   submitting,
   deleting,
   deleteBusy,
+  page,
+  totalPages,
   setFilters,
+  setPage,
   setUploadOpen,
   openDetail,
   closeDetail,
@@ -64,12 +68,12 @@ export function RecordsPage({
             rows={rows}
             loading={loading}
             onView={openDetail}
-            onRetry={(jobId) => {
-              const job = asrJobs.find((item) => item.id === jobId)
-              if (job) void handleRetry(job)
-            }}
+            onRetry={(audioId) => void handleRetry(audioId)}
             onDelete={requestDelete}
           />
+          <div className="flex justify-end pt-3">
+            <TablePagination page={page} totalPages={totalPages} total={summary.total} onChange={setPage} />
+          </div>
         </div>
       </section>
       <TaskQueueCards

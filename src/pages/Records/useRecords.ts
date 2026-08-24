@@ -1,33 +1,44 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { retryAsrJob, submitAsrAudio, type AsrJob, type AsrSubmission } from "@/lib/asr"
+import { exportCsv } from "@/lib/admin"
 import {
-  deleteRecord,
-  exportCsv,
-  fetchList,
-  type Employee,
-  type Store,
-  type SyncLog,
-  type TranscriptRecord,
-} from "@/lib/admin"
+  deleteRecording,
+  fetchEmployees,
+  fetchRecordingDetail,
+  fetchRecordings,
+  fetchRecordingSummary,
+  fetchStores,
+  retryRecording,
+  type EmployeeItem,
+  type RecordingDetail,
+  type RecordingListItem,
+  type RecordingSummary,
+  type StoreItem,
+} from "@/lib/v1"
+import { uploadRecording } from "@/lib/v1"
+import type { AsrSubmission } from "@/lib/asr"
 import type { RecordFilterState } from "@/components/records/RecordFilters"
 import type { RecordRow } from "@/components/records/RecordTable"
 
+const PAGE_SIZE = 20
+
 interface RecordsData {
-  transcripts: TranscriptRecord[]
-  employees: Employee[]
-  stores: Store[]
-  syncLogs: SyncLog[]
-  asrJobs: AsrJob[]
+  rows: RecordingListItem[]
+  summary: RecordingSummary
 }
 
-// 录音转写页逻辑：转写记录、ASR 任务状态、上传提交与结果刷新。
+// 录音转写页逻辑: 服务端分页 + 筛选 + 上传/重试/软删除 + 详情拉取。
+export type ViewingRecord = RecordingDetail & { employeeName: string; storeName: string }
+
 export function useRecords() {
-  const [transcripts, setTranscripts] = useState<TranscriptRecord[]>([])
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [stores, setStores] = useState<Store[]>([])
-  const [syncLogs, setSyncLogs] = useState<SyncLog[]>([])
-  const [asrJobs, setAsrJobs] = useState<AsrJob[]>([])
+  const [rows, setRows] = useState<RecordingListItem[]>([])
+  const [employees, setEmployees] = useState<EmployeeItem[]>([])
+  const [stores, setStores] = useState<StoreItem[]>([])
+  const [summary, setSummary] = useState<RecordingSummary>({
+    total: 0, done_count: 0, pending_count: 0, failed_count: 0,
+    retryable_count: 0, merge_count: 0, resend_count: 0,
+  })
+  const [page, setPage] = useState(1)
   const [filters, setFilters] = useState<RecordFilterState>({
     keyword: "",
     date: "",
@@ -38,49 +49,65 @@ export function useRecords() {
   const [loading, setLoading] = useState(true)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [viewing, setViewing] = useState<RecordRow | null>(null)
+  const [viewing, setViewing] = useState<ViewingRecord | null>(null)
   const [deleting, setDeleting] = useState<RecordRow | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  const keywordTimer = useRef<number | null>(null)
 
-  const fetchData = useCallback(async (): Promise<RecordsData> => {
-    const [transcriptData, employeeData, storeData, logData, jobData] = await Promise.all([
-      fetchList<TranscriptRecord>("transcripts", { perPage: 500 }),
-      fetchList<Employee>("employees", { perPage: 200 }),
-      fetchList<Store>("stores", { perPage: 200 }),
-      fetchList<SyncLog>("sync_logs", { perPage: 500 }),
-      fetchList<AsrJob>("asr_jobs", { perPage: 200 }),
+  // 关键词防抖: 输入停止 400ms 后再发起服务端查询
+  const setFiltersDebounced = useCallback((next: RecordFilterState) => {
+    setFilters(next)
+    if (keywordTimer.current) window.clearTimeout(keywordTimer.current)
+    keywordTimer.current = window.setTimeout(() => setPage(1), 400)
+  }, [])
+
+  const fetchData = useCallback(async (pageNum: number, filterState: RecordFilterState): Promise<RecordsData> => {
+    const [listData, summaryData] = await Promise.all([
+      fetchRecordings({
+        page: pageNum,
+        page_size: PAGE_SIZE,
+        keyword: filterState.keyword.trim() || undefined,
+        date: filterState.date || undefined,
+        store_id: filterState.storeId || undefined,
+        employee_id: filterState.employeeId || undefined,
+        qc_result: filterState.qcResult || undefined,
+      }),
+      fetchRecordingSummary(),
     ])
-    return {
-      transcripts: transcriptData.items ?? [],
-      employees: employeeData.items ?? [],
-      stores: storeData.items ?? [],
-      syncLogs: logData.items ?? [],
-      asrJobs: jobData.items ?? [],
-    }
+    return { rows: listData.items, summary: summaryData }
   }, [])
 
-  const applyData = useCallback((data: RecordsData) => {
-    setTranscripts(data.transcripts)
-    setEmployees(data.employees)
-    setStores(data.stores)
-    setSyncLogs(data.syncLogs)
-    setAsrJobs(data.asrJobs)
-  }, [])
-
-  const refreshRecords = useCallback(async (showError = false) => {
+  const refresh = useCallback(async (showError = false) => {
     try {
-      applyData(await fetchData())
+      const data = await fetchData(page, filters)
+      setRows(data.rows)
+      setSummary(data.summary)
     } catch {
       if (showError) toast.error("转写数据刷新失败，请稍后重试")
       throw new Error("转写数据刷新失败")
     }
-  }, [applyData, fetchData])
+  }, [fetchData, page, filters])
 
+  // 首次加载 + 员工/门店下拉数据
   useEffect(() => {
     let cancelled = false
-    fetchData()
+    Promise.all([
+      fetchEmployees({ page_size: 200 }),
+      fetchStores({ page_size: 200 }),
+    ])
+      .then(([empData, storeData]) => {
+        if (!cancelled) {
+          setEmployees(empData.items.map((e) => ({ ...e, store: e.store_id })))
+          setStores(storeData.items)
+        }
+      })
+      .catch(() => undefined)
+    fetchData(1, filters)
       .then((data) => {
-        if (!cancelled) applyData(data)
+        if (!cancelled) {
+          setRows(data.rows)
+          setSummary(data.summary)
+        }
       })
       .catch(() => {
         if (!cancelled) toast.error("转写数据加载失败，请稍后重试")
@@ -91,66 +118,77 @@ export function useRecords() {
     return () => {
       cancelled = true
     }
-  }, [applyData, fetchData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const activeJobCount = useMemo(
-    () => asrJobs.filter((job) => job.status === "queued" || job.status === "running").length,
-    [asrJobs],
-  )
-
+  // 翻页/筛选变化时刷新列表
   useEffect(() => {
-    if (activeJobCount === 0) return
+    fetchData(page, filters)
+      .then((data) => {
+        setRows(data.rows)
+        setSummary(data.summary)
+      })
+      .catch(() => toast.error("转写数据刷新失败，请稍后重试"))
+  }, [page, filters, fetchData])
+
+  // 有排队任务时每 5s 轮询
+  useEffect(() => {
+    if (summary.pending_count === 0) return
     const timer = window.setInterval(() => {
-      void refreshRecords(false).catch(() => undefined)
+      void refresh(false).catch(() => undefined)
     }, 5000)
     return () => window.clearInterval(timer)
-  }, [activeJobCount, refreshRecords])
+  }, [summary.pending_count, refresh])
 
-  const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees])
-  const storeById = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores])
-
-  const rows: RecordRow[] = useMemo(() => {
-    const keyword = filters.keyword.trim().toLowerCase()
-    return transcripts
-      .map((item) => ({
+  const rowsMapped: RecordRow[] = useMemo(
+    () =>
+      rows.map((item) => ({
         ...item,
-        employeeName: employeeById.get(item.employee)?.name ?? "",
-        storeName: storeById.get(item.store)?.name ?? "",
-      }))
-      .filter((row) => {
-        if (filters.storeId && row.store !== filters.storeId) return false
-        if (filters.employeeId && row.employee !== filters.employeeId) return false
-        if (filters.qcResult && row.qc_result !== filters.qcResult) return false
-        if (filters.date && !(row.occurred_at ?? "").startsWith(filters.date)) return false
-        if (keyword) {
-          const text = `${row.summary}${row.full_text}${row.employeeName}${row.storeName}${row.audio_name ?? ""}`.toLowerCase()
-          if (!text.includes(keyword)) return false
-        }
-        return true
+        employeeName: item.employee_name ?? "",
+        storeName: item.store_name ?? "",
+      })),
+    [rows],
+  )
+
+  const queue = useMemo(
+    () => ({
+      doneCount: summary.done_count,
+      pendingCount: summary.pending_count,
+      failedCount: summary.failed_count,
+      mergeCount: summary.merge_count,
+      resendCount: summary.resend_count,
+    }),
+    [summary],
+  )
+
+  const openDetail = useCallback(async (row: RecordRow) => {
+    try {
+      const detail = await fetchRecordingDetail(row.id)
+      setViewing({
+        ...detail,
+        employeeName: detail.employee_name ?? "",
+        storeName: detail.store_name ?? "",
       })
-      .sort((a, b) => (b.occurred_at ?? "").localeCompare(a.occurred_at ?? ""))
-  }, [transcripts, filters, employeeById, storeById])
-
-  const queue = useMemo(() => {
-    const pushLogs = syncLogs.filter((log) => log.type === "转写推送")
-    return {
-      doneCount: transcripts.filter((item) => !item.asr_status || item.asr_status === "succeeded").length,
-      pendingCount: activeJobCount,
-      failedCount: asrJobs.filter((job) => job.status === "failed").length,
-      mergeCount: syncLogs.filter((log) => log.type === "合并录音").length,
-      resendCount: syncLogs.filter((log) => log.type === "文本同步" && log.status !== "成功").length + pushLogs.filter((log) => log.status === "重试中").length,
+    } catch {
+      toast.error("转写详情加载失败，请稍后重试")
     }
-  }, [activeJobCount, asrJobs, syncLogs, transcripts])
-
-  const openDetail = useCallback((row: RecordRow) => setViewing(row), [])
+  }, [])
   const closeDetail = useCallback(() => setViewing(null), [])
 
   const handleSubmitAudio = useCallback(async (input: AsrSubmission) => {
     setSubmitting(true)
     try {
-      await submitAsrAudio(input)
-      toast.success("音频已提交，后台将持续同步转写结果")
-      await refreshRecords(true)
+      const form = new FormData()
+      form.append("file", input.file)
+      if (input.device) form.append("device_code", input.device)
+      if (input.employee) form.append("employee_id", input.employee)
+      if (input.store) form.append("store_id", input.store)
+      if (input.occurred_at) form.append("occurred_at", input.occurred_at)
+      if (input.hotwords) form.append("hotwords", input.hotwords)
+      form.append("language", input.language ?? "zh-CN")
+      await uploadRecording(form)
+      toast.success("音频已提交，转写完成后自动同步")
+      await refresh(true)
     } catch (error) {
       const message = error instanceof Error ? error.message : "音频提交失败，请稍后重试"
       toast.error(message)
@@ -158,17 +196,17 @@ export function useRecords() {
     } finally {
       setSubmitting(false)
     }
-  }, [refreshRecords])
+  }, [refresh])
 
-  const handleRetry = useCallback(async (job: AsrJob) => {
+  const handleRetry = useCallback(async (audioId: string) => {
     try {
-      await retryAsrJob(job.id)
+      await retryRecording(audioId)
       toast.success("已重新加入转写队列")
-      await refreshRecords(true)
+      await refresh(true)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "转写重试失败")
     }
-  }, [refreshRecords])
+  }, [refresh])
 
   const requestDelete = useCallback((row: RecordRow) => setDeleting(row), [])
   const cancelDelete = useCallback(() => {
@@ -180,48 +218,44 @@ export function useRecords() {
     if (!row || deleteBusy) return
     setDeleteBusy(true)
     try {
-      // 先清理关联的 ASR 任务，再删转写记录；audio_files 登记保留，避免 OSS 自动采集把同一条重新拉回来。
-      if (row.asr_job) {
-        await deleteRecord("asr_jobs", row.asr_job).catch(() => undefined)
-      }
-      await deleteRecord("transcripts", row.id)
+      await deleteRecording(row.id)
       toast.success("已删除该条转写记录")
       setDeleting(null)
-      await refreshRecords(true)
+      await refresh(true)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "删除失败，请稍后重试")
     } finally {
       setDeleteBusy(false)
     }
-  }, [deleting, deleteBusy, refreshRecords])
+  }, [deleting, deleteBusy, refresh])
 
   function handleExport() {
-    if (rows.length === 0) {
+    if (rowsMapped.length === 0) {
       toast.error("当前没有可导出的记录")
       return
     }
     exportCsv(
       "录音转写记录.csv",
       ["时间", "员工", "门店", "设备码", "文件名", "文本摘要", "ASR 状态", "质检"],
-      rows.map((row) => [
+      rowsMapped.map((row) => [
         row.occurred_at,
         row.employeeName,
         row.storeName,
-        row.device,
-        row.audio_name ?? "",
+        String(row.device ?? ""),
+        String(row.audio_name ?? ""),
         row.summary,
         row.asr_status || "-",
         row.qc_result,
       ]),
     )
-    toast.success(`已导出 ${rows.length} 条记录`)
+    toast.success(`已导出 ${rowsMapped.length} 条记录`)
   }
 
   return {
     stores,
     employees,
-    rows,
-    asrJobs,
+    rows: rowsMapped,
+    summary,
     filters,
     loading,
     queue,
@@ -230,7 +264,10 @@ export function useRecords() {
     submitting,
     deleting,
     deleteBusy,
-    setFilters,
+    page,
+    totalPages: Math.max(1, Math.ceil(summary.total / PAGE_SIZE)),
+    setFilters: setFiltersDebounced,
+    setPage,
     setUploadOpen,
     openDetail,
     closeDetail,

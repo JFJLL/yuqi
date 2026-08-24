@@ -22,6 +22,13 @@ from app.models.org import (
     RecordingConsent,
     Store,
 )
+from app.models.recording import (
+    AudioFile,
+    Conversation,
+    ProcessingJob,
+    TextVersion,
+    TranscriptSegment,
+)
 
 __all__ = [
     "AuditLog",
@@ -46,4 +53,9 @@ __all__ = [
     "Position",
     "RecordingConsent",
     "Store",
+    "AudioFile",
+    "Conversation",
+    "ProcessingJob",
+    "TextVersion",
+    "TranscriptSegment",
 ]

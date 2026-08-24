@@ -153,6 +153,127 @@ export const fetchDeviceEvents = (params: {
   event_type?: string
 } = {}) => apiFetch<Page<DeviceEventItem>>(`/device-events${qs(params)}`)
 
+// ---- 录音/转写 (阶段三) ----
+export interface RecordingListItem {
+  id: string
+  occurred_at: string
+  employee: string | null
+  store: string | null
+  employee_name: string | null
+  store_name: string | null
+  device: string | null
+  source: string
+  audio_name: string | null
+  summary: string
+  qc_result: string
+  asr_status: string
+  asr_job: string | null
+  file_size: number | null
+}
+
+export interface TranscriptSegmentV1 {
+  text: string
+  start_ms: number | null
+  end_ms: number | null
+  speaker: string
+}
+
+export interface TranscriptMarkV1 {
+  speaker: string
+  start_ms: number | null
+  end_ms: number | null
+  color: string
+  note: string
+  created_at: string | null
+}
+
+export interface RecordingDetail {
+  id: string
+  audio_file_id: string
+  device: string | null
+  employee: string | null
+  store: string | null
+  employee_name: string | null
+  store_name: string | null
+  summary: string
+  full_text: string
+  segments_json: TranscriptSegmentV1[] | null
+  asr_job: string | null
+  asr_status: string
+  model: string | null
+  audio_name: string | null
+  source: string
+  qc_result: string
+  occurred_at: string | null
+  speaker_aliases: Record<string, string> | null
+  marks_json: TranscriptMarkV1[] | null
+  current_version: number
+  file_size: number | null
+}
+
+export interface RecordingSummary {
+  total: number
+  done_count: number
+  pending_count: number
+  failed_count: number
+  retryable_count: number
+  merge_count: number
+  resend_count: number
+}
+
+export interface TextVersionV1 {
+  id: string
+  version_no: number
+  full_text: string
+  summary: string
+  segments_json: TranscriptSegmentV1[] | null
+  marks_json: TranscriptMarkV1[] | null
+  speaker_aliases: Record<string, string> | null
+  source: string
+  edited_by: string | null
+  created_at: string
+}
+
+export const fetchRecordings = (params: {
+  page?: number
+  page_size?: number
+  keyword?: string
+  date?: string
+  store_id?: string
+  employee_id?: string
+  qc_result?: string
+  asr_status?: string
+} = {}) => apiFetch<Page<RecordingListItem>>(`/recordings${qs(params)}`)
+
+export const fetchRecordingSummary = () => apiFetch<RecordingSummary>("/recordings/summary")
+
+export const fetchRecordingDetail = (id: string) => apiFetch<RecordingDetail>(`/recordings/${id}`)
+
+export const uploadRecording = (form: FormData) =>
+  apiFetch<{ id: string; asr_job: string; status: string }>("/recordings/upload", {
+    method: "POST",
+    body: form,
+  })
+
+export const retryRecording = (id: string) =>
+  apiFetch<{ id: string; asr_job: string; status: string }>(`/recordings/${id}/retry`, { method: "POST" })
+
+export const updateTranscript = (id: string, body: {
+  segments: TranscriptSegmentV1[]
+  full_text: string
+  summary: string
+  marks: TranscriptMarkV1[]
+  speaker_aliases: Record<string, string>
+  edit_reason?: string | null
+}) => apiFetch<{ ok: boolean; version: number }>(`/recordings/${id}/transcript`, {
+  method: "PATCH",
+  body: JSON.stringify(body),
+})
+
+export const fetchRecordVersions = (id: string) => apiFetch<TextVersionV1[]>(`/recordings/${id}/versions`)
+
+export const deleteRecording = (id: string) => apiFetch<{ ok: boolean }>(`/recordings/${id}`, { method: "DELETE" })
+
 // ---- 通用分页工具 ----
 export function totalPages(total: number, pageSize: number): number {
   return Math.max(1, Math.ceil(total / pageSize))

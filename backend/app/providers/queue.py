@@ -28,7 +28,11 @@ class TaskQueue:
 
 @dataclass
 class InMemoryTaskQueue(TaskQueue):
-    """同步执行的测试/开发队列: 真实调用 job 函数, 保留入队语义."""
+    """同步执行的测试/开发队列: 真实调用 job 函数, 保留入队语义.
+
+    约定: `job_id` 作为 kwargs 一并透传给任务函数 (与 ARQ 行为一致),
+    保证 Worker 与内存队列对任务函数的签名要求相同。
+    """
 
     functions: dict[str, JobFunc]
     _running: list[asyncio.Task] = field(default_factory=list)
@@ -40,7 +44,7 @@ class InMemoryTaskQueue(TaskQueue):
             return None
         # 直接 await 保证测试确定性; 捕获异常避免吞掉任务失败
         try:
-            await fn(**kwargs)
+            await fn(**kwargs, job_id=job_id)
         except Exception:  # noqa: BLE001
             logger.exception("queue_job_failed", job=job_name, job_id=job_id)
             raise
@@ -64,3 +68,22 @@ class ArqTaskQueue(TaskQueue):
             return job_id
         finally:
             await pool.aclose()
+
+
+def default_worker_functions() -> dict[str, JobFunc]:
+    """注册业务任务函数 (与 app.workers.worker.WORKER_FUNCTIONS 保持同步)."""
+    from app.modules.ingestion.service import run_asr_job
+
+    return {
+        "run_asr_job": run_asr_job,
+    }
+
+
+def get_task_queue(settings: Any) -> TaskQueue:
+    """按配置返回队列: Redis 启用 → ARQ; 否则内存同步队列 (测试/开发确定性)."""
+    functions = default_worker_functions()
+    if settings.redis_enabled and not str(settings.database_url).startswith("sqlite"):
+        from arq.connections import RedisSettings
+
+        return ArqTaskQueue(RedisSettings.from_dsn(settings.redis_url), functions)
+    return InMemoryTaskQueue(functions)
