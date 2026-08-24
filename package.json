@@ -6,8 +6,15 @@
   "scripts": {
     "dev": "vite",
     "asr:gateway": "node server/asr-gateway.mjs",
+    "worker": "node server/business-worker.mjs",
+    "seed": "node scripts/seed-phase1-demo.mjs",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
     "lint": "eslint .",
+    "lint:secrets": "node scripts/check-secrets.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "node --test tests/integration/",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -80,6 +87,7 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitest": "^4.1.11"
   }
 }

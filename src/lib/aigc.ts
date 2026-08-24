@@ -699,7 +699,7 @@ export async function callAigcAndPoll(
   }
   if (!submitRes.ok) {
     const text = await submitRes.text().catch(() => "")
-    let data: Partial<AigcSubmitResponse> | null = null
+    let data: Partial<AigcSubmitResponse> | null
     try {
       data = JSON.parse(text || "{}") as Partial<AigcSubmitResponse>
     } catch {
