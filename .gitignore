@@ -51,3 +51,6 @@ coverage/
 tests/tmp/
 tests/.tmp/
 *.tsbuildinfo
+
+# PocketBase 二进制 (不在仓库中提交)
+pocketbase/pocketbase*
