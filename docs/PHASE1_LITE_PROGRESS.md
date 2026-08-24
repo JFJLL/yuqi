@@ -36,7 +36,7 @@
 - [ ] 阶段 5: RuleRiskAnalyzer
 - [ ] 阶段 6: 管理端复核/申诉/整改闭环 (后端路由已就绪, 待前端接入)
 - [ ] 阶段 7: 员工移动端
-- [ ] 阶段 8: 报表/审计/保留
+- [x] 阶段 8: 报表/审计/保留 (服务端聚合报表 + 受限导出 + 审计视图, 本机验证通过)
 - [ ] 阶段 9: PM2/Nginx 部署脚本
 - [ ] 种子数据 scripts/seed-phase1-demo.mjs
 - [ ] 测试: 单测 + 集成 25 场景
@@ -84,6 +84,21 @@
   + 2 个 risk_segments (含 start_ms/end_ms 时间锚点), 初始 review=PENDING + employee_visibility=HIDDEN;
   令牌复用/缺失/篡改均 403。
 
+## 阶段 8 验证记录 (2026-08-24)
+
+- GET /api/reports/overview: 服务端聚合 (录音/转写/会话/疑似问题/风险分布/最终有效/误报/
+  申诉通过率/整改完成率/门店排行/员工分布/设备在线率/ASR 成功率/分析任务成功率/逾期整改),
+  全部带 tenant+时间范围+数据范围; 浏览器不拉全量;
+- GET /api/reports/export/issues: CSV 导出, 头信息含租户名称/操作人/操作账号/导出时间/数据范围/
+  请求ID + “系统识别结果仅为疑似风险，最终判断由授权管理人员完成。”说明; 写 audit_logs(report_export);
+- GET /api/yuqi/transcripts/{id}/view: 完整转写查看 (ADMIN/COMPLIANCE/REGION_MANAGER/STORE_MANAGER+范围),
+  写 audit_logs(transcript_view);
+- GET /api/yuqi/audio/{id}/play: 音频访问 (tenant 隔离, audio_files 无 store/employee 字段),
+  写 audit_logs(audio_play);
+- 实测: 报表数字与种子数据一致 (4 issues: 2 最终有效/1 误报/1 待复核; 申诉通过率 50%;
+  整改完成率 50%; 设备在线率 50%; 分析成功率 75%); 店长报表 scope=STORE;
+  未登录 401; 员工角色 403; 导出含操作人信息; 转写查看/音频播放审计落库。
+
 ## 提交历史 (按序)
 
 - chore: establish lightweight phase one baseline
@@ -92,3 +107,5 @@
 - (阶段 1-2) feat: add phase one workflow routes (review/appeal/rectification/device/employee)
 - (阶段 1-2) fix: lock collection api rules and harden legacy hooks
 - (阶段 3+5) feat: add processing jobs, node business worker and rule based risk analysis
+- chore: add asr mock transcript fixture and ignore python caches
+- (阶段 8) feat: add server side reports scoped export and audit views
