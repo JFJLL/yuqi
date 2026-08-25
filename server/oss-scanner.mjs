@@ -19,6 +19,8 @@ import https from "node:https"
 import { Transform } from "node:stream"
 
 const POCKETBASE_URL = trimTrailingSlash(process.env.POCKETBASE_URL || "http://127.0.0.1:7040")
+// 内部服务身份: 写 PocketBase 必须携带 (与 PB 侧 YUQI_SERVICE_TOKEN 一致, 不提交 Git)
+const YUQI_SERVICE_TOKEN = process.env.YUQI_SERVICE_TOKEN || ""
 const ASR_BASE_URL = trimTrailingSlash(process.env.ASR_BASE_URL || "")
 const ASR_SERVICE_TOKEN = process.env.ASR_SERVICE_TOKEN || ""
 // Endpoint 兼容带/不带 https:// 前缀的写法，统一剥掉协议头再拼 Bucket 虚拟主机。
@@ -149,7 +151,10 @@ function requestRaw(urlString, { method = "GET", headers = {} } = {}) {
 async function pbRequest(path, { method = "GET", body } = {}) {
   const response = await requestBuffer(`${POCKETBASE_URL}${path}`, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : {},
+    headers: {
+      ...(body ? { "Content-Type": "application/json" } : {}),
+      "X-Yuqi-Service-Token": YUQI_SERVICE_TOKEN,
+    },
     body: body ? JSON.stringify(body) : undefined,
   })
   if (response.status < 200 || response.status >= 300) {

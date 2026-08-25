@@ -1,0 +1,8 @@
+{
+  "full_text": "这个药包治百病，保证好，帮你刷医保没问题。\n那给我多买几盒囤一点。\n好的，您稍等，我帮您拿。",
+  "segments": [
+    { "text": "这个药包治百病，保证好，帮你刷医保没问题。", "start_ms": 1000, "end_ms": 5000, "speaker": "店员", "confidence": 0.98 },
+    { "text": "那给我多买几盒囤一点。", "start_ms": 6000, "end_ms": 8000, "speaker": "顾客", "confidence": 0.96 },
+    { "text": "好的，您稍等，我帮您拿。", "start_ms": 9000, "end_ms": 12000, "speaker": "店员", "confidence": 0.97 }
+  ]
+}

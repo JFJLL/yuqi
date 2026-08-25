@@ -190,7 +190,9 @@ function loadCommonSpeakers(storeId: string): Record<string, string> {
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, string>
-  } catch {}
+  } catch {
+    // localStorage 数据损坏时忽略, 退回空映射
+  }
   return {}
 }
 
@@ -200,7 +202,9 @@ function saveCommonSpeaker(storeId: string, speaker: string, alias: string) {
     if (alias) current[speaker] = alias
     else delete current[speaker]
     localStorage.setItem(commonSpeakersKey(storeId), JSON.stringify(current))
-  } catch {}
+  } catch {
+    // localStorage 不可用(隐私模式/配额)时忽略
+  }
 }
 
 export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps) {

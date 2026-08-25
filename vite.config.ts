@@ -5,6 +5,7 @@
 //   - 加 alias / 改 server 配置: 修对应字段
 //   - 加别的 plugin: 在 plugins 数组里追加, 但 rhSourcePlugin() 必须在第 0 位 (enforce: 'pre' 保证它在 react/oxc 之前跑)
 //   - 不要删 rhSourcePlugin 那段函数定义, 也不要删 @babel/parser / @babel/traverse / magic-string 这三个 import
+/* eslint-disable @typescript-eslint/no-explicit-any -- rhSourcePlugin 为 vendored rh-visual-edit 源码工具, Babel AST 按 any 处理与上游一致 */
 import path from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -42,10 +43,13 @@ function rhSourcePlugin() {
       const ms = new MagicString(code)
       traverse(ast, {
         JSXOpeningElement(p: any) {
+          // rh-visual-edit 上游实现, Babel AST 节点按 any 处理(与上游一致)。
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Babel AST node
           const node = p.node
           const loc = node.loc
           if (!loc) return
           const exists = node.attributes.some(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Babel AST attribute
             (a: any) => a.type === 'JSXAttribute' && a.name && a.name.name === 'data-rh-src',
           )
           if (exists) return
@@ -90,6 +94,12 @@ export default defineConfig({
       '/__asr': {
         target: process.env.YUQI_ASR_DEV_GATEWAY_URL || 'http://127.0.0.1:18084',
         changeOrigin: true,
+      },
+      // 本地 dev: 浏览器只访问 /__pb, 由 Vite 代理到本地 PocketBase (生产由 Nginx 代理, 均剥离前缀)
+      '/__pb': {
+        target: process.env.YUQI_PB_DEV_URL || 'http://127.0.0.1:7040',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/__pb/, ''),
       },
     },
   },

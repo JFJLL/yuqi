@@ -33,7 +33,18 @@ onBootstrap(function (e) {
       addField({ name: 'enabled', type: 'bool' })
       addField({ name: "created", type: "autodate", onCreate: true })
       addField({ name: "updated", type: "autodate", onCreate: true, onUpdate: true })
-      if (changed) {
+            var rulesChanged = false
+      try {
+        if (existing.listRule !== null || existing.viewRule !== null || existing.createRule !== null || existing.updateRule !== null || existing.deleteRule !== null) {
+          existing.listRule = null
+          existing.viewRule = null
+          existing.createRule = null
+          existing.updateRule = null
+          existing.deleteRule = null
+          rulesChanged = true
+        }
+      } catch (_) {}
+if (changed || rulesChanged) {
         $app.save(existing)
         try { $app.logger().info("compliance_rules collection upgraded") } catch (_) {}
       }
@@ -60,136 +71,5 @@ onBootstrap(function (e) {
 })
 
 // GET /api/compliance_rules?page=1&perPage=50&sort=-created&risk=...
-routerAdd("GET", "/api/compliance_rules", function (e) {
-  function ensureCollLocal() {
-    try { return $app.findCollectionByNameOrId("compliance_rules") } catch (_) {}
-    var col = new Collection({
-      type: "base",
-      name: "compliance_rules",
-      listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
-      fields: [
-          { name: 'name', type: 'text', required: true, max: 80 },
-          { name: 'risk', type: 'text', max: 10 },
-          { name: 'description', type: 'text', max: 300 },
-          { name: 'enabled', type: 'bool' },
-        { name: "created", type: "autodate", onCreate: true },
-        { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
-      ],
-    })
-    $app.save(col)
-    return $app.findCollectionByNameOrId("compliance_rules")
-  }
-  try {
-    ensureCollLocal()
-    var info = e.requestInfo()
-    var query = info.query || {}
-    var page = parseInt(String(query.page || "1"), 10) || 1
-    var perPage = parseInt(String(query.perPage || "50"), 10) || 50
-    if (perPage > 200) perPage = 200
-    var sort = String(query.sort || "-created")
-    var filterParts = []
-    var params = {}
-    if (query.risk !== undefined && query.risk !== "") {
-      filterParts.push("risk = {:risk}")
-      params.risk = String(query.risk)
-    }
-    var filter = filterParts.length > 0 ? filterParts.join(" && ") : ""
-    var records = filter
-      ? $app.findRecordsByFilter("compliance_rules", filter, sort, perPage, (page - 1) * perPage, params)
-      : $app.findRecordsByFilter("compliance_rules", "", sort, perPage, (page - 1) * perPage)
-    var items = []
-    for (var i = 0; i < records.length; i++) {
-      items.push(records[i].publicExport())
-    }
-    return e.json(200, { items: items, page: page, perPage: perPage, totalItems: items.length })
-  } catch (err) {
-    var msg = String(err && err.message || err)
-    try { $app.logger().error("compliance_rules list: " + msg) } catch (_) {}
-    return e.json(500, { error: "list_failed", message: msg, fingerprint: msg.substring(0, 80) })
-  }
-})
-// GET /api/compliance_rules/{id}
-routerAdd("GET", "/api/compliance_rules/{id}", function (e) {
-  try {
-    var id = e.request.pathValue("id")
-    if (!id) return e.json(400, { error: "id_required" })
-    var rec = null
-    try { rec = $app.findRecordById("compliance_rules", id) } catch (_) { rec = null }
-    if (!rec) return e.json(404, { error: "not_found" })
-    return e.json(200, rec.publicExport())
-  } catch (err) {
-    var msg = String(err && err.message || err)
-    return e.json(500, { error: "get_failed", message: msg, fingerprint: msg.substring(0, 80) })
-  }
-})
-// POST /api/compliance_rules  body 字段: name, risk, description, enabled
-routerAdd("POST", "/api/compliance_rules", function (e) {
-  function ensureCollLocal() {
-    try { return $app.findCollectionByNameOrId("compliance_rules") } catch (_) {}
-    var col = new Collection({
-      type: "base",
-      name: "compliance_rules",
-      listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
-      fields: [
-          { name: 'name', type: 'text', required: true, max: 80 },
-          { name: 'risk', type: 'text', max: 10 },
-          { name: 'description', type: 'text', max: 300 },
-          { name: 'enabled', type: 'bool' },
-        { name: "created", type: "autodate", onCreate: true },
-        { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
-      ],
-    })
-    $app.save(col)
-    return $app.findCollectionByNameOrId("compliance_rules")
-  }
-  try {
-    var coll = ensureCollLocal()
-    var body = e.requestInfo().body || {}
-    var rec = new Record(coll)
-    rec.set("name", body.name === undefined || body.name === null ? "" : String(body.name))
-    rec.set("risk", body.risk === undefined || body.risk === null ? "" : String(body.risk))
-    rec.set("description", body.description === undefined || body.description === null ? "" : String(body.description))
-    rec.set("enabled", !!body.enabled)
-    $app.save(rec)
-    return e.json(200, rec.publicExport())
-  } catch (err) {
-    var msg = String(err && err.message || err)
-    try { $app.logger().error("compliance_rules create: " + msg) } catch (_) {}
-    return e.json(500, { error: "create_failed", message: msg, fingerprint: msg.substring(0, 80) })
-  }
-})
-// PATCH /api/compliance_rules/{id}  body 字段同 POST, 只更新 body 里出现的字段
-routerAdd("PATCH", "/api/compliance_rules/{id}", function (e) {
-  try {
-    var id = e.request.pathValue("id")
-    if (!id) return e.json(400, { error: "id_required" })
-    var rec = null
-    try { rec = $app.findRecordById("compliance_rules", id) } catch (_) { rec = null }
-    if (!rec) return e.json(404, { error: "not_found" })
-    var body = e.requestInfo().body || {}
-    if ("name" in body) rec.set("name", body.name === undefined || body.name === null ? "" : String(body.name))
-    if ("risk" in body) rec.set("risk", body.risk === undefined || body.risk === null ? "" : String(body.risk))
-    if ("description" in body) rec.set("description", body.description === undefined || body.description === null ? "" : String(body.description))
-    if ("enabled" in body) rec.set("enabled", !!body.enabled)
-    $app.save(rec)
-    return e.json(200, rec.publicExport())
-  } catch (err) {
-    var msg = String(err && err.message || err)
-    return e.json(500, { error: "update_failed", message: msg, fingerprint: msg.substring(0, 80) })
-  }
-})
-// DELETE /api/compliance_rules/{id}
-routerAdd("DELETE", "/api/compliance_rules/{id}", function (e) {
-  try {
-    var id = e.request.pathValue("id")
-    if (!id) return e.json(400, { error: "id_required" })
-    var rec = null
-    try { rec = $app.findRecordById("compliance_rules", id) } catch (_) { rec = null }
-    if (!rec) return e.json(404, { error: "not_found" })
-    $app.delete(rec)
-    return e.json(200, { ok: true })
-  } catch (err) {
-    var msg = String(err && err.message || err)
-    return e.json(500, { error: "delete_failed", message: msg, fingerprint: msg.substring(0, 80) })
-  }
-})
+
+// 匿名 CRUD 路由已由 pocketbase/pb_hooks/business.pb.js 统一守卫路由替代。
