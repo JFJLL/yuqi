@@ -622,40 +622,17 @@ describe("一期轻量闭环 · 25 项核心场景集成测试", () => {
     assert.equal(resB2.data.duplicate, true, "租户B重复插入必须返回 duplicate: true")
     assert.equal(resB2.data.item.id, idB, "租户B重复插入必须返回租户B自己的记录ID")
   })
-  // 9. 真实 ASR 重复结果导入幂等
-  it("9. 真实 ASR 重复结果导入幂等 (调用真实 importSucceededJob 两次, 6 类记录均 +0 严格幂等)", async () => {
+  // 9. ASR 导入原子性与下游持久化故障恢复
+  it("9. ASR 导入原子性与下游持久化故障恢复 (下游失败不写完成标记, 恢复重试补齐数据且严格幂等)", async () => {
     process.env.POCKETBASE_URL = server.url
     process.env.YUQI_PB_URL = server.url
     process.env.YUQI_SERVICE_TOKEN = env.serviceToken
     process.env.YUQI_ASR_MOCK = "1"
 
-    const trRes = await server.req("POST", "/api/transcripts", {
-      device: "DEV-001",
-      employee: env.employees.zhang,
-      store: env.stores.storeA,
-      asr_status: "queued",
-      full_text: "",
-    }, { "X-Yuqi-Service-Token": env.serviceToken })
-    assert.equal(trRes.status, 200)
-    const trId = trRes.data.id
-
-    const remoteJobId = "mock-idem-job-" + Date.now()
-    const asrJobRes = await server.req("POST", "/api/asr_jobs", {
-      remote_job_id: remoteJobId,
-      transcript: trId,
-      status: "queued",
-      device: "DEV-001",
-      employee: env.employees.zhang,
-      store: env.stores.storeA,
-      audio_name: "test-idem.mp3",
-    }, { "X-Yuqi-Service-Token": env.serviceToken })
-    assert.equal(asrJobRes.status, 200)
-    const asrJob = asrJobRes.data
-
     // 辅助计数函数: 统计 6 类核心表数量 (使用 Admin 凭证)
     async function getCounts() {
       const getC = async (coll) => {
-        const res = await server.req("GET", "/api/" + coll + "?perPage=1", null, {
+        const res = await server.req("GET", "/api/" + coll + "?perPage=500", null, {
           Authorization: "Bearer " + env.tokens.admin,
         })
         return Number(res.data && res.data.totalItems !== undefined ? res.data.totalItems : ((res.data && res.data.items && res.data.items.length) || 0))
@@ -670,53 +647,212 @@ describe("一期轻量闭环 · 25 项核心场景集成测试", () => {
       }
     }
 
-    // 第一次调用真实网关成功导入函数 importSucceededJob
-    await importSucceededJob(asrJob, { original_filename: "test-idem.mp3" })
+    const initCounts = await getCounts()
 
-    // 运行 Business Worker 处理入队的 RISK_ANALYSIS 任务
-    await runOnce()
+    // ----------------------------------------------------
+    // Test A: 下游持久化失败时不能提交 result_imported_at
+    // ----------------------------------------------------
+    const trRes1 = await server.req("POST", "/api/transcripts", {
+      device: "DEV-001",
+      employee: env.employees.zhang,
+      store: env.stores.storeA,
+      asr_status: "queued",
+      full_text: "",
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    assert.equal(trRes1.status, 200)
+    const trId1 = trRes1.data.id
 
-    // 记录第一次导入并分析完成后的 6 类表总记录数
-    const c1 = await getCounts()
-    assert.ok(c1.transcripts >= 1, "transcripts 应至少有 1 条记录")
-    assert.ok(c1.sessions >= 1, "sessions 应至少有 1 条记录")
-    assert.ok(c1.segments >= 1, "transcript_segments 应至少有 1 条记录")
-    assert.ok(c1.jobs >= 1, "processing_jobs 应至少有 1 条记录")
-    assert.ok(c1.risks >= 1, "risk_segments 应至少有 1 条记录")
-    assert.ok(c1.issues >= 1, "issues 应至少有 1 条记录")
+    const remoteJobId1 = "mock-atomic-job-1-" + Date.now()
+    const asrJobRes1 = await server.req("POST", "/api/asr_jobs", {
+      remote_job_id: remoteJobId1,
+      transcript: trId1,
+      status: "queued",
+      device: "DEV-001",
+      employee: env.employees.zhang,
+      store: env.stores.storeA,
+      audio_name: "test-atomic-1.mp3",
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    assert.equal(asrJobRes1.status, 200)
+    const asrJob1 = asrJobRes1.data
 
-    // 从 PocketBase 重新读取同一个 asr_job (此时 result_imported_at 已回填)
-    const refreshedRes = await server.req("GET", "/api/asr_jobs/" + asrJob.id, null, {
+    // 注入下游失败: persist 阶段抛出异常
+    let injectedThrown = false
+    try {
+      await importSucceededJob(asrJob1, { original_filename: "test-atomic-1.mp3" }, {
+        persistSessionAndSegments: async () => {
+          throw new Error("injected downstream failure")
+        },
+      })
+    } catch (err) {
+      injectedThrown = true
+      assert.ok(err.message.includes("injected downstream failure"), "异常必须向上抛出不能吞掉")
+    }
+    assert.ok(injectedThrown, "下游失败时 importSucceededJob 必须抛出异常")
+
+    // 重新从 PocketBase 获取最新 asr_job 状态
+    const failedJobRes1 = await server.req("GET", "/api/asr_jobs/" + asrJob1.id, null, {
       Authorization: "Bearer " + env.tokens.admin,
     })
-    const refreshedJob = refreshedRes.data
-    assert.ok(refreshedJob.result_imported_at, "首次导入后 result_imported_at 应已被设置")
+    const failedJob1 = failedJobRes1.data
+    assert.equal(failedJob1.result_imported_at, "", "下游失败时 result_imported_at 必须保持为空")
+    assert.equal(failedJob1.status, "queued", "下游失败时 status 必须置为 queued 以便下次 poll 自动重试")
+    assert.equal(failedJob1.error_code, "downstream_persist_failed", "error_code 必须标明下游持久化失败")
+    assert.ok(failedJob1.error_message.includes("injected downstream failure"), "error_message 包含脱敏错误信息")
 
-    // 第二次调用真实网关成功导入函数 importSucceededJob (模拟网关再次收到相同成功结果)
-    await importSucceededJob(refreshedJob, { original_filename: "test-idem.mp3" })
+    // 验证未产生 session 与 processing_jobs
+    const intermediateCounts = await getCounts()
+    assert.equal(intermediateCounts.sessions, initCounts.sessions, "失败注入期间 sessions 数量不得增加")
+    assert.equal(intermediateCounts.jobs, initCounts.jobs, "失败注入期间 processing_jobs 数量不得增加")
+
+    // ----------------------------------------------------
+    // Test B: 故障恢复重试 (使用真实 persist 再次执行)
+    // ----------------------------------------------------
+    await importSucceededJob(failedJob1, { original_filename: "test-atomic-1.mp3" })
     await runOnce()
 
-    // 记录第二次调用后的 6 类表记录数 -> 严格断言 6 类记录数量全部 +0
-    const c2 = await getCounts()
-    assert.equal(c2.transcripts, c1.transcripts, "transcripts 数量严禁增加")
-    assert.equal(c2.sessions, c1.sessions, "sessions 数量严禁增加")
-    assert.equal(c2.segments, c1.segments, "transcript_segments 数量严禁增加")
-    assert.equal(c2.jobs, c1.jobs, "processing_jobs 数量严禁增加")
-    assert.equal(c2.risks, c1.risks, "risk_segments 数量严禁增加")
-    assert.equal(c2.issues, c1.issues, "issues 数量严禁增加")
+    // 重新获取恢复成功的 asr_job
+    const recoveredJobRes1 = await server.req("GET", "/api/asr_jobs/" + asrJob1.id, null, {
+      Authorization: "Bearer " + env.tokens.admin,
+    })
+    const recoveredJob1 = recoveredJobRes1.data
+    assert.equal(recoveredJob1.status, "succeeded", "恢复后 status 必须为 succeeded")
+    assert.ok(recoveredJob1.result_imported_at, "恢复后 result_imported_at 必须成功写入时间戳")
+    assert.equal(recoveredJob1.error_code, "", "恢复后 error_code 必须清空")
+    assert.equal(recoveredJob1.error_message, "", "恢复后 error_message 必须清空")
 
-    // 深度容灾幂等测试: 模拟崩溃导致 result_imported_at 丢失时重放导入
-    const crashedJob = Object.assign({}, refreshedJob, { result_imported_at: "" })
-    await importSucceededJob(crashedJob, { original_filename: "test-idem.mp3" })
+    const c1 = await getCounts()
+    assert.equal(c1.transcripts, initCounts.transcripts + 1)
+    assert.equal(c1.sessions, initCounts.sessions + 1)
+    assert.ok(c1.segments >= initCounts.segments + 3)
+    assert.equal(c1.jobs, initCounts.jobs + 1)
+    assert.ok(c1.risks >= initCounts.risks + 1)
+    assert.ok(c1.issues >= initCounts.issues + 1)
+
+    // ----------------------------------------------------
+    // Test C: 半完成故障与幂等恢复 (部分数据已写入时重试)
+    // ----------------------------------------------------
+    const trRes2 = await server.req("POST", "/api/transcripts", {
+      device: "DEV-001",
+      employee: env.employees.zhang,
+      store: env.stores.storeA,
+      asr_status: "queued",
+      full_text: "",
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    const trId2 = trRes2.data.id
+
+    const remoteJobId2 = "mock-atomic-job-2-" + Date.now()
+    const asrJobRes2 = await server.req("POST", "/api/asr_jobs", {
+      remote_job_id: remoteJobId2,
+      transcript: trId2,
+      status: "queued",
+      device: "DEV-001",
+      employee: env.employees.zhang,
+      store: env.stores.storeA,
+      audio_name: "test-atomic-2.mp3",
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    const asrJob2 = asrJobRes2.data
+
+    // 模拟半完成: 写入 session 和 sequence=1 分段, 然后在 enqueue 前抛错
+    let partialInjectedThrown = false
+    try {
+      await importSucceededJob(asrJob2, { original_filename: "test-atomic-2.mp3" }, {
+        persistSessionAndSegments: async (job, result) => {
+          const sessRes = await server.req("POST", "/api/sessions", {
+            transcript: job.transcript,
+            device_sn: job.device || "",
+            device: String(job.device || ""),
+            employee: job.employee || "",
+            store: job.store || "",
+            status: "TRANSCRIBED",
+            transcript_version: 1,
+            version: 1,
+          }, { "X-Yuqi-Service-Token": env.serviceToken })
+          const sessId = sessRes.data.id || sessRes.data.item.id
+          await server.req("POST", "/api/transcript_segments", {
+            session: sessId,
+            transcript: job.transcript,
+            version: 1,
+            sequence: 1,
+            start_ms: 1000,
+            end_ms: 5000,
+            speaker: "店员",
+            text: "这个药包治百病，保证好，帮你刷医保没问题。",
+            confidence: 1,
+          }, { "X-Yuqi-Service-Token": env.serviceToken })
+          throw new Error("injected crash before job enqueue")
+        },
+      })
+    } catch (err) {
+      partialInjectedThrown = true
+      assert.ok(err.message.includes("injected crash before job enqueue"))
+    }
+    assert.ok(partialInjectedThrown)
+
+    // 半完成故障后重新读取 asr_job
+    const partialJobRes = await server.req("GET", "/api/asr_jobs/" + asrJob2.id, null, {
+      Authorization: "Bearer " + env.tokens.admin,
+    })
+    const partialJob = partialJobRes.data
+    assert.equal(partialJob.result_imported_at, "")
+    assert.equal(partialJob.status, "queued")
+    assert.equal(partialJob.error_code, "downstream_persist_failed")
+
+    // 执行真实恢复
+    await importSucceededJob(partialJob, { original_filename: "test-atomic-2.mp3" })
     await runOnce()
 
-    const c3 = await getCounts()
-    assert.equal(c3.transcripts, c1.transcripts, "异常重放后 transcripts 数量严禁增加")
-    assert.equal(c3.sessions, c1.sessions, "异常重放后 sessions 数量严禁增加")
-    assert.equal(c3.segments, c1.segments, "异常重放后 transcript_segments 数量严禁增加")
-    assert.equal(c3.jobs, c1.jobs, "异常重放后 processing_jobs 数量严禁增加")
-    assert.equal(c3.risks, c1.risks, "异常重放后 risk_segments 数量严禁增加")
-    assert.equal(c3.issues, c1.issues, "异常重放后 issues 数量严禁增加")
+    // 验证半完成恢复后的 session 和分段不重复
+    const sessListRes = await server.req("GET", "/api/sessions?transcript=" + trId2, null, {
+      Authorization: "Bearer " + env.tokens.admin,
+    })
+    const sessItems = sessListRes.data.items || []
+    assert.equal(sessItems.length, 1, "半完成恢复后 session 必须唯一 (1条)")
+    const sess2Id = sessItems[0].id
+
+    const segListRes = await server.req("GET", "/api/transcript_segments?session=" + sess2Id, null, {
+      Authorization: "Bearer " + env.tokens.admin,
+    })
+    const segItems = segListRes.data.items || []
+    assert.equal(segItems.length, 3, "半完成恢复后 transcript_segments 必须为 3 条")
+    const seqs = segItems.map((x) => Number(x.sequence)).sort((a, b) => a - b)
+    assert.deepEqual(seqs, [1, 2, 3], "分段 sequence 必须是 [1, 2, 3] 且无重复")
+
+    // ----------------------------------------------------
+    // Test D: 已完成任务正常重放与崩溃标记丢失重放 (+0 严格断言)
+    // ----------------------------------------------------
+    const beforeReplayCounts = await getCounts()
+
+    // 重新读取已完成的 recoveredJob1 并再次执行 importSucceededJob
+    const job1FinalRes = await server.req("GET", "/api/asr_jobs/" + asrJob1.id, null, {
+      Authorization: "Bearer " + env.tokens.admin,
+    })
+    const job1Final = job1FinalRes.data
+    assert.ok(job1Final.result_imported_at)
+
+    const replayRes = await importSucceededJob(job1Final, { original_filename: "test-atomic-1.mp3" })
+    assert.equal(replayRes?.skipped, true, "带 result_imported_at 的重复调用必须安全跳过")
+    await runOnce()
+
+    const afterReplayCounts = await getCounts()
+    assert.equal(afterReplayCounts.transcripts, beforeReplayCounts.transcripts, "重放后 transcripts +0")
+    assert.equal(afterReplayCounts.sessions, beforeReplayCounts.sessions, "重放后 sessions +0")
+    assert.equal(afterReplayCounts.segments, beforeReplayCounts.segments, "重放后 transcript_segments +0")
+    assert.equal(afterReplayCounts.jobs, beforeReplayCounts.jobs, "重放后 processing_jobs +0")
+    assert.equal(afterReplayCounts.risks, beforeReplayCounts.risks, "重放后 risk_segments +0")
+    assert.equal(afterReplayCounts.issues, beforeReplayCounts.issues, "重放后 issues +0")
+
+    // 模拟极端崩溃: result_imported_at 丢失时重放导入
+    const crashedJob = Object.assign({}, job1Final, { result_imported_at: "" })
+    await importSucceededJob(crashedJob, { original_filename: "test-atomic-1.mp3" })
+    await runOnce()
+
+    const afterCrashReplayCounts = await getCounts()
+    assert.equal(afterCrashReplayCounts.transcripts, beforeReplayCounts.transcripts, "崩溃重放后 transcripts +0")
+    assert.equal(afterCrashReplayCounts.sessions, beforeReplayCounts.sessions, "崩溃重放后 sessions +0")
+    assert.equal(afterCrashReplayCounts.segments, beforeReplayCounts.segments, "崩溃重放后 transcript_segments +0")
+    assert.equal(afterCrashReplayCounts.jobs, beforeReplayCounts.jobs, "崩溃重放后 processing_jobs +0")
+    assert.equal(afterCrashReplayCounts.risks, beforeReplayCounts.risks, "崩溃重放后 risk_segments +0")
+    assert.equal(afterCrashReplayCounts.issues, beforeReplayCounts.issues, "崩溃重放后 issues +0")
   })
 
   // 10. 分析任务幂等
