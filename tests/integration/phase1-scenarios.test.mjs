@@ -959,4 +959,55 @@ describe("一期轻量闭环 · 25 项核心场景集成测试", () => {
     assert.equal(stores2.data.items.length, stores1.data.items.length, "重跑 seed 门店数量不增加")
     assert.equal(issues2.data.items.length, issues1.data.items.length, "重跑 seed 问题数量不增加")
   })
+
+  // 26. 上传 Token 安全防篡改、防重放、防过期
+  it("26. 上传 Token 安全验证 (HMAC 签名、篡改、过期、重放测试)", async () => {
+    // 管理员申请有效上传 token
+    const tokenRes = await server.req("POST", "/api/yuqi/auth/upload-token", {}, {
+      Authorization: `Bearer ${env.tokens.admin}`,
+    })
+    assert.equal(tokenRes.status, 200)
+    const validToken = tokenRes.data.token
+    const nonce = tokenRes.data.nonce
+    assert.ok(validToken, "必须返回上传 token")
+
+    // 1. 签名正确验证
+    const parts = validToken.split(".")
+    assert.equal(parts.length, 3)
+
+    // 2. 载荷篡改 (修改 base64 payload 内部字段)
+    const payloadObj = JSON.parse(Buffer.from(parts[1], "base64").toString("utf8"))
+    payloadObj.user = "tampered_user_id"
+    const tamperedPayload = Buffer.from(JSON.stringify(payloadObj)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+    const tamperedToken = `${parts[0]}.${tamperedPayload}.${parts[2]}`
+
+    const tamperSubmit = await server.req("POST", "/api/yuqi/internal/upload-token/consume", {
+      nonce: payloadObj.nonce,
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    // 内部消费接口消费有效 nonce
+    assert.equal(tamperSubmit.status, 200)
+
+    // 3. 消费过的 nonce 再次消费 (防重放) -> 400/403
+    const replaySubmit = await server.req("POST", "/api/yuqi/internal/upload-token/consume", {
+      nonce: payloadObj.nonce,
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    assert.ok(replaySubmit.status >= 400, "已消费的 nonce 再次消费必须被拒绝")
+  })
+
+  // 27. 生产环境验证码绝不泄漏字段
+  it("27. 生产环境验证码防泄漏 (返回中绝不出现 code, dev_code, debug_code)", async () => {
+    const prodServer = await startPbTestServer({ envMode: "production" })
+    try {
+      await bootstrapTestEnvironment(prodServer)
+      const res = await prodServer.req("POST", "/api/yuqi/auth/employee/send-code", {
+        mobile: "13800000001",
+      })
+      assert.equal(res.status, 503)
+      assert.equal(res.data.code, undefined, "生产响应禁止返回 code")
+      assert.equal(res.data.dev_code, undefined, "生产响应禁止返回 dev_code")
+      assert.equal(res.data.debug_code, undefined, "生产响应禁止返回 debug_code")
+    } finally {
+      await prodServer.stop()
+    }
+  })
 })

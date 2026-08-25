@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomUUID } from "node:crypto"
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto"
 import http from "node:http"
 import https from "node:https"
 import { Transform } from "node:stream"
@@ -13,7 +13,9 @@ const ASR_SERVICE_TOKEN = process.env.ASR_SERVICE_TOKEN || ""
 // 内部服务身份: 所有写 PocketBase 的请求必须携带 (与 PB 侧 YUQI_SERVICE_TOKEN 一致, 不提交 Git)
 const YUQI_SERVICE_TOKEN = process.env.YUQI_SERVICE_TOKEN || ""
 // 上传令牌密钥 (与 PB 侧 YUQI_UPLOAD_TOKEN_SECRET 一致) + Mock 模式开关
-const UPLOAD_TOKEN_SECRET = process.env.YUQI_UPLOAD_TOKEN_SECRET || ""
+function getUploadTokenSecret() {
+  return process.env.YUQI_UPLOAD_TOKEN_SECRET || ""
+}
 const ASR_MOCK = String(process.env.YUQI_ASR_MOCK || "") === "1"
 const ASR_INSECURE_UPLOAD = String(process.env.YUQI_ASR_INSECURE_UPLOAD || "") === "1"
 const MAX_UPLOAD_BYTES = numberEnv("YUQI_ASR_MAX_UPLOAD_MB", 200) * 1024 * 1024
@@ -133,18 +135,27 @@ async function pbRequest(path, { method = "GET", body } = {}) {
 
 // ---- 上传令牌 (短期、一次性) ----
 // 浏览器先登录向 PB 申请短期上传 Token, 网关验证签名/用途/有效期, 并由 PB 消费 nonce 防重放。
+function safeSignatureEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false
+  const bufA = Buffer.from(a, "utf8")
+  const bufB = Buffer.from(b, "utf8")
+  if (bufA.length !== bufB.length) return false
+  return timingSafeEqual(bufA, bufB)
+}
+
 function verifyUploadToken(token) {
-  if (!UPLOAD_TOKEN_SECRET) return { ok: false, reason: "上传令牌密钥未配置" }
+  const secret = getUploadTokenSecret()
+  if (!secret) return { ok: false, reason: "上传令牌密钥未配置" }
   const parts = String(token || "").split(".")
   if (parts.length !== 3) return { ok: false, reason: "令牌格式无效" }
   try {
     const dec = (p) => Buffer.from(p.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8")
     const payload = JSON.parse(dec(parts[1]))
-    const sig = createHmac("sha256", UPLOAD_TOKEN_SECRET)
+    const sig = createHmac("sha256", secret)
       .update(`${parts[0]}.${parts[1]}`)
       .digest("base64")
       .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
-    if (sig !== parts[2]) return { ok: false, reason: "令牌签名无效" }
+    if (!safeSignatureEqual(sig, parts[2])) return { ok: false, reason: "令牌签名无效" }
     if (payload.action !== "asr_upload") return { ok: false, reason: "令牌用途不符" }
     if (!payload.exp || Number(payload.exp) * 1000 < Date.now()) return { ok: false, reason: "令牌已过期" }
     return { ok: true, user: String(payload.user || ""), tenant: String(payload.tenant || ""), nonce: String(payload.nonce || "") }
@@ -651,7 +662,15 @@ async function handleRetry(res, jobId) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`)
   if (req.method === "GET" && url.pathname === "/health") {
-    json(res, 200, { status: asrConfigured() ? "ok" : "degraded", asr_configured: asrConfigured(), poll_in_flight: pollInFlight })
+    if (ASR_MOCK) {
+      json(res, 200, { status: "ok", mode: "mock", asr_configured: false, poll_in_flight: pollInFlight })
+      return
+    }
+    if (asrConfigured()) {
+      json(res, 200, { status: "ok", mode: "private", asr_configured: true, poll_in_flight: pollInFlight })
+      return
+    }
+    json(res, 200, { status: "degraded", mode: "unconfigured", asr_configured: false, poll_in_flight: pollInFlight })
     return
   }
   if (req.method === "POST" && url.pathname === "/api/asr/jobs") {
@@ -671,11 +690,16 @@ const server = http.createServer((req, res) => {
   json(res, 404, { error: "not_found" })
 })
 
-server.listen(PORT, HOST, () => {
-  gatewayStarted = true
-  console.log(`[asr-gateway] listening on http://${HOST}:${PORT}; ASR configured=${asrConfigured()}`)
-  void pollJobs()
-})
+const isMain = Boolean(process.argv[1] && (process.argv[1].endsWith("asr-gateway.mjs") || process.argv[1].endsWith("asr-gateway.js")))
+if (isMain && !process.env.VITEST) {
+  server.listen(PORT, HOST, () => {
+    gatewayStarted = true
+    console.log(`[asr-gateway] listening on http://${HOST}:${PORT}; ASR configured=${asrConfigured()}`)
+    void pollJobs()
+  })
+}
+
+export { verifyUploadToken, safeSignatureEqual, asrConfigured, server }
 
 server.on("error", (error) => {
   console.error(`[asr-gateway] server error: ${safeMessage(error)}`)
