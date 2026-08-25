@@ -19,6 +19,7 @@
 
 import { analyzeRisk } from "./rule-analyzer.mjs"
 import { fileURLToPath } from "node:url"
+import path from "node:path"
 
 const PB_URL = String(process.env.YUQI_PB_URL || "http://127.0.0.1:7040").replace(/\/+$/, "")
 const SERVICE_TOKEN = String(process.env.YUQI_SERVICE_TOKEN || "")
@@ -190,7 +191,7 @@ async function main() {
   }
 }
 
-const isMain = process.argv[1] && fileURLToPath(import.meta.url).replace(/\\/g, "/") === process.argv[1].replace(/\\/g, "/")
+const isMain = Boolean(process.argv[1] && path.resolve(process.argv[1]).toLowerCase() === path.resolve(fileURLToPath(import.meta.url)).toLowerCase())
 if (isMain) {
   main().catch((err) => {
     console.error(`[worker] 致命错误: ${redact(err && err.stack || err)}`)

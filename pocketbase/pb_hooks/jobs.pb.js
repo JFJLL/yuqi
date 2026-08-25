@@ -255,6 +255,7 @@ routerAdd("POST", "/api/yuqi/internal/analysis/apply", (e) => {
       const issueRec = new Record(icoll)
       issueRec.set("tenant", svc.tenantId)
       issueRec.set("session", sessionId)
+      issueRec.set("transcript", String(session.get("transcript") || ""))
       issueRec.set("employee", employeeId)
       issueRec.set("store", storeId)
       issueRec.set("rule_code", ruleCode)

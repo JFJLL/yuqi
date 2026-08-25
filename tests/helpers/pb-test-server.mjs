@@ -27,6 +27,7 @@ export async function startPbTestServer(options = {}) {
   const defaultSuperPass = ["Pass", "w0rd", "!123456"].join("")
   const superuserPassword = options.superuserPassword || defaultSuperPass
   const serviceToken = options.serviceToken || "test-service-token-secret-123456"
+  const uploadTokenSecret = options.uploadTokenSecret || "test-upload-token-secret-123456"
   const envMode = options.envMode || "test"
 
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "yuqi-pb-test-"))
@@ -50,7 +51,8 @@ export async function startPbTestServer(options = {}) {
      NODE_ENV: envMode,
      YUQI_SERVICE_TOKEN: serviceToken,
      YUQI_SERVICE_TENANT_CODE: "demo",
-      YUQI_DEV_FIXED_CODE: "123456",
+     YUQI_DEV_FIXED_CODE: "123456",
+     YUQI_UPLOAD_TOKEN_SECRET: uploadTokenSecret,
    },
  })
 
@@ -70,7 +72,8 @@ export async function startPbTestServer(options = {}) {
      NODE_ENV: envMode,
      YUQI_SERVICE_TOKEN: serviceToken,
      YUQI_SERVICE_TENANT_CODE: "demo",
-      YUQI_DEV_FIXED_CODE: "123456",
+     YUQI_DEV_FIXED_CODE: "123456",
+     YUQI_UPLOAD_TOKEN_SECRET: uploadTokenSecret,
    },
  })
 
