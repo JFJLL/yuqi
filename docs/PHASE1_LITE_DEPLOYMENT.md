@@ -10,6 +10,8 @@
 
 > **Phase 1.0.1 运维简化**：`processing_jobs` 业务任务消费循环（`RISK_ANALYSIS`、`SLA_SCAN`）默认内嵌于 `yuqi-asr-gateway` 进程中运行，默认生产拓扑精简为 3 个 PM2 进程。同时完整保留 `server/business-worker.mjs` 独立启动能力（可通过 `YUQI_EMBEDDED_WORKER=0` 及 `pnpm worker` 启动独立 Worker 扩容）。
 
+> **Phase 1.0.2 部署安全切换**：从旧版本四进程升级时，部署脚本将在新版 `yuqi-asr-gateway` 完成 Pre-cutover 健康检查并确认内嵌 Worker 正常运行后，再安全清理旧版遗留的 `yuqi-business-worker` 进程并执行 `pm2 save`，避免切换期间任务处理出现真空期。
+
 不新增 Python 进程。环境变量只来自服务器环境文件 (.env.production 等, 不入 Git)。
 
 ## 环境变量 (服务器)
