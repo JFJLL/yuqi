@@ -17,6 +17,7 @@
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import path from "node:path"
+import { BUILTIN_RULES } from "../server/rule-analyzer.mjs"
 
 const BASE = process.env.YUQI_PB_URL || "http://127.0.0.1:8090"
 const SUPER_EMAIL = process.env.YUQI_SUPERUSER_EMAIL || "admin@demo.local"
@@ -46,14 +47,14 @@ function rng(seed) {
 }
 
 const RISK_TEXT_POOL = [
-  "这个药你们直接吃就行，不用去医院开处方", // 处方药
-  "医保报销没问题，我帮你操作", // 医保话术
-  "这个药吃了三天包好，比医生开的都管用", // 夸大疗效
-  "抗生素你一天吃三次，一次吃四片", // 不合理用药
-  "这个保健品没禁忌，随便吃", // 禁忌症未询问
-  "多买两盒，这周有活动，一次买六盒划算", // 诱导超量
-  "你怎么这么麻烦，问那么多干什么", // 服务态度
-  "这个药具体怎么吃我记不清了，说明书你自己看吧", // 问诊信息不足
+  "这个药属于处方药，没处方也能买", // 处方药
+  "帮你刷医保，走医保没问题", // 医保话术
+  "这个药吃了包治百病，保证好", // 夸大疗效
+  "抗生素你一天吃三次，一次吃四片加倍吃", // 不合理用药
+  "这个药不用问，谁都能吃，没有禁忌", // 禁忌症未询问
+  "多买几盒囤一点，趁活动多买", // 诱导超量
+  "爱买不买，烦死了别烦我", // 服务态度
+  "不用问症状，直接拿药拿了就走", // 问诊信息不足
   "好的，那按你说的来", "谢谢", "我先考虑一下",
 ]
 const SAFE_TEXT_POOL = [
@@ -238,20 +239,10 @@ async function main() {
   }
 
   // 8 条内置规则 (对应 init-builtin 的 code)
-  const RULE_DEFS = [
-    { code: "PRESC", name: "处方药违规销售", category: "prescription", risk_level: "HIGH", match_type: "KEYWORD_ANY", pattern_json: { any: ["不用开处方", "直接吃就行", "处方药随便卖"] }, advice: "处方药必须凭执业医师处方销售", recommended_expression: "处方药需凭处方购买，我帮您确认一下" },
-    { code: "MEDICAL_INSURANCE", name: "医保话术违规", category: "insurance", risk_level: "HIGH", match_type: "KEYWORD_ANY", pattern_json: { any: ["医保报销没问题", "我帮你操作医保", "医保随便刷"] }, advice: "不得承诺医保报销", recommended_expression: "医保报销请以医保政策为准" },
-    { code: "EXAGGERATED_EFFICACY", name: "夸大疗效", category: "efficacy", risk_level: "HIGH", match_type: "KEYWORD_ANY", pattern_json: { any: ["三天包好", "包治", "比医生开的管用"] }, advice: "不得夸大药品疗效", recommended_expression: "请按说明书和医嘱使用" },
-    { code: "IRRATIONAL_DOSAGE", name: "不合理用药建议", category: "dosage", risk_level: "HIGH", match_type: "KEYWORD_ANY", pattern_json: { any: ["一次吃四片", "一天吃三次没事", "加倍吃"] }, advice: "不得自行调整用法用量", recommended_expression: "请按处方或说明书用量服用" },
-    { code: "NO_CONTRAINDICATION_CHECK", name: "禁忌症未询问", category: "contraindication", risk_level: "MEDIUM", match_type: "KEYWORD_ANY", pattern_json: { any: ["没禁忌", "什么人都能吃"] }, advice: "应询问过敏史与禁忌症", recommended_expression: "请问您有过敏史或正在服用的其他药物吗" },
-    { code: "INDUCED_OVER_PURCHASE", name: "诱导超量购买", category: "overpurchase", risk_level: "MEDIUM", match_type: "KEYWORD_ANY", pattern_json: { any: ["多买两盒", "一次买六盒", "买十盒划算"] }, advice: "不得诱导超量购买", recommended_expression: "建议按需购买" },
-    { code: "SERVICE_ATTITUDE", name: "服务态度问题", category: "service", risk_level: "LOW", match_type: "KEYWORD_ANY", pattern_json: { any: ["你怎么这么麻烦", "问那么多干什么", "爱买不买"] }, advice: "保持服务态度", recommended_expression: "我帮您详细解答" },
-    { code: "INSUFFICIENT_CONSULT", name: "问诊信息不足", category: "consult", risk_level: "LOW", match_type: "KEYWORD_ANY", pattern_json: { any: ["记不清了", "你自己看吧", "不清楚这个药"] }, advice: "应提供完整用药指导", recommended_expression: "这个药的使用方法是…" },
-  ]
   const rules = []
-  for (const rd of RULE_DEFS) {
+  for (const rd of BUILTIN_RULES) {
     rules.push(await findOrCreate("risk_rules", `code='${rd.code}'`, {
-      tenant: TENANT, ...rd, enabled: true, version: 1, status: "PUBLISHED", created_by: admin.id, updated_by: admin.id,
+      tenant: TENANT, ...rd, enabled: true, version: 1, status: "ACTIVE", created_by: admin.id, updated_by: admin.id,
     }))
   }
 
