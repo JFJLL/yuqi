@@ -1,15 +1,16 @@
 # 一期轻量闭环 · 部署 (DEPLOYMENT)
 
-## 目标进程 (仅以下 4 个)
+## 目标进程 (Phase 1.0.1 默认仅以下 3 个)
 
 | PM2 进程名 | 脚本 | 端口 |
 |---|---|---|
 | yuqi-pb | vibex-local/bin/linux/pocketbase serve | 127.0.0.1:7040 |
-| yuqi-asr-gateway | server/asr-gateway.mjs | 127.0.0.1:18084 |
+| yuqi-asr-gateway | server/asr-gateway.mjs (内嵌 Business Worker 循环) | 127.0.0.1:18084 |
 | yuqi-oss-scanner | server/oss-scanner.mjs | - (定时) |
-| yuqi-business-worker | server/business-worker.mjs | - (轮询) |
 
-不新增 Python 进程。环境变量只来自服务器环境文件 (deploy/asr-gateway.env 等, 不入 Git)。
+> **Phase 1.0.1 运维简化**：`processing_jobs` 业务任务消费循环（`RISK_ANALYSIS`、`SLA_SCAN`）默认内嵌于 `yuqi-asr-gateway` 进程中运行，默认生产拓扑精简为 3 个 PM2 进程。同时完整保留 `server/business-worker.mjs` 独立启动能力（可通过 `YUQI_EMBEDDED_WORKER=0` 及 `pnpm worker` 启动独立 Worker 扩容）。
+
+不新增 Python 进程。环境变量只来自服务器环境文件 (.env.production 等, 不入 Git)。
 
 ## 环境变量 (服务器)
 

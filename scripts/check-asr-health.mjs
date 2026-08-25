@@ -11,8 +11,19 @@ export function validateAsrHealth(healthData, env = "production") {
     return { ok: false, message: "ASR health 响应不是有效 JSON 对象" }
   }
 
-  const { status, mode, asr_configured } = healthData
+  const { status, mode, asr_configured, embedded_worker } = healthData
   const isProd = env === "production"
+
+  // 校验内嵌 Worker: 如果明确启用了 embedded_worker, 则 running 必须为 true
+  if (embedded_worker && typeof embedded_worker === "object") {
+    const { enabled, running } = embedded_worker
+    if (enabled === true && running !== true) {
+      return {
+        ok: false,
+        message: "ASR Gateway 的内嵌 Worker (embedded_worker) 未处于运行状态",
+      }
+    }
+  }
 
   if (isProd) {
     // 生产环境必须要求真实 private ASR 且配置完整

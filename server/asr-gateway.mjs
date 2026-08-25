@@ -4,6 +4,7 @@ import https from "node:https"
 import { Transform } from "node:stream"
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
+import { startWorkerLoop, stopWorkerLoop, isWorkerLoopRunning } from "./business-worker.mjs"
 
 const HOST = process.env.YUQI_ASR_GATEWAY_HOST || "127.0.0.1"
 const PORT = numberEnv("YUQI_ASR_GATEWAY_PORT", 18084)
@@ -34,6 +35,10 @@ function numberEnv(name, fallback) {
 
 function trimTrailingSlash(value) {
   return value.replace(/\/+$/, "")
+}
+
+function embeddedWorkerEnabled() {
+  return String(process.env.YUQI_EMBEDDED_WORKER ?? "1") !== "0"
 }
 
 function pbDate(now = new Date()) {
@@ -701,15 +706,32 @@ async function handleRetry(res, jobId) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`)
   if (req.method === "GET" && url.pathname === "/health") {
+    const embeddedWorker = {
+      enabled: embeddedWorkerEnabled(),
+      running: isWorkerLoopRunning(),
+    }
     if (ASR_MOCK) {
-      json(res, 200, { status: "ok", mode: "mock", asr_configured: false, poll_in_flight: pollInFlight })
+      json(res, 200, { status: "ok", mode: "mock", asr_configured: false, poll_in_flight: pollInFlight, embedded_worker: embeddedWorker })
       return
     }
     if (asrConfigured()) {
-      json(res, 200, { status: "ok", mode: "private", asr_configured: true, poll_in_flight: pollInFlight })
+      const isOk = !embeddedWorker.enabled || embeddedWorker.running
+      json(res, 200, {
+        status: isOk ? "ok" : "degraded",
+        mode: "private",
+        asr_configured: true,
+        poll_in_flight: pollInFlight,
+        embedded_worker: embeddedWorker,
+      })
       return
     }
-    json(res, 200, { status: "degraded", mode: "unconfigured", asr_configured: false, poll_in_flight: pollInFlight })
+    json(res, 200, {
+      status: "degraded",
+      mode: "unconfigured",
+      asr_configured: false,
+      poll_in_flight: pollInFlight,
+      embedded_worker: embeddedWorker,
+    })
     return
   }
   if (req.method === "POST" && url.pathname === "/api/asr/jobs") {
@@ -731,14 +753,36 @@ const server = http.createServer((req, res) => {
 
 const isMain = Boolean(process.env.pm_id !== undefined || (process.argv[1] && (process.argv[1].endsWith("asr-gateway.mjs") || process.argv[1].endsWith("asr-gateway.js"))))
 if (isMain && !process.env.VITEST) {
+  const serviceToken = getServiceToken()
+  if (!serviceToken) {
+    console.error("[asr-gateway] 缺少 YUQI_SERVICE_TOKEN, 退出")
+    process.exit(1)
+  }
   server.listen(PORT, HOST, () => {
     gatewayStarted = true
     console.log(`[asr-gateway] listening on http://${HOST}:${PORT}; ASR configured=${asrConfigured()}`)
     void pollJobs()
+    if (embeddedWorkerEnabled()) {
+      startWorkerLoop().catch((err) => {
+        console.error(`[asr-gateway] business worker loop failed: ${safeMessage(err)}`)
+      })
+      console.log("[asr-gateway] business worker loop started")
+    } else {
+      console.log("[asr-gateway] embedded worker disabled (YUQI_EMBEDDED_WORKER=0)")
+    }
   })
 }
 
-export { verifyUploadToken, safeSignatureEqual, asrConfigured, server, importSucceededJob, persistSessionAndSegments, pbRequest }
+export {
+  verifyUploadToken,
+  safeSignatureEqual,
+  asrConfigured,
+  server,
+  importSucceededJob,
+  persistSessionAndSegments,
+  pbRequest,
+  embeddedWorkerEnabled,
+}
 
 server.on("error", (error) => {
   console.error(`[asr-gateway] server error: ${safeMessage(error)}`)
@@ -750,6 +794,9 @@ interval.unref()
 
 function shutdown() {
   clearInterval(interval)
+  try {
+    stopWorkerLoop()
+  } catch (_) {}
   server.close(() => process.exit(0))
   setTimeout(() => process.exit(0), 10_000).unref()
 }

@@ -24,7 +24,6 @@ describe("一期轻量闭环 · 真实进程级自动端到端验收 (Subprocess
   let pbServer
   let env
   let gatewayProcess
-  let workerProcess
   let asrPort
 
   before(async () => {
@@ -32,7 +31,7 @@ describe("一期轻量闭环 · 真实进程级自动端到端验收 (Subprocess
     pbServer = await startPbTestServer({ envMode: "test" })
     env = await bootstrapTestEnvironment(pbServer)
 
-    // 2. 启动真实 ASR Gateway 进程 (Mock 模式)
+    // 2. 启动真实 ASR Gateway 进程 (Mock 模式 + 内嵌 Business Worker 循环)
     asrPort = await getFreePort()
     const gatewayEnv = {
       ...process.env,
@@ -46,6 +45,8 @@ describe("一期轻量闭环 · 真实进程级自动端到端验收 (Subprocess
       YUQI_SERVICE_TOKEN: env.serviceToken,
       YUQI_SERVICE_TENANT_CODE: "demo",
       YUQI_UPLOAD_TOKEN_SECRET: "test-upload-token-secret-123456",
+      YUQI_EMBEDDED_WORKER: "1",
+      YUQI_WORKER_POLL_MS: "300",
     }
     delete gatewayEnv.VITEST
 
@@ -55,39 +56,21 @@ describe("一期轻量闭环 · 真实进程级自动端到端验收 (Subprocess
       stdio: "pipe",
     })
 
-    // 等待 ASR Gateway 健康
+    // 等待 ASR Gateway 健康且 embedded worker 处于 running 状态
     await waitFor(async () => {
       const res = await fetch(`http://127.0.0.1:${asrPort}/health`)
       if (res.status === 200) {
         const data = await res.json()
-        return data.status === "ok" && data.mode === "mock"
+        return data.status === "ok" && data.mode === "mock" && data.embedded_worker?.running === true
       }
       return false
     }, 15000)
 
-    // 3. 启动真实 Business Worker 进程
-    const workerEnv = {
-      ...process.env,
-      YUQI_ENV: "test",
-      NODE_ENV: "test",
-      YUQI_PB_URL: pbServer.url,
-      YUQI_SERVICE_TOKEN: env.serviceToken,
-      YUQI_WORKER_POLL_MS: "300",
-      YUQI_WORKER_ID: "subprocess-e2e-worker",
-    }
-    delete workerEnv.VITEST
-
-    workerProcess = spawn("node", ["server/business-worker.mjs"], {
-      cwd: root,
-      env: workerEnv,
-      stdio: "pipe",
-    })
+    console.log(`    [E2E] ASR Gateway PID: ${gatewayProcess.pid}`)
+    console.log("    [E2E] Standalone Business Worker PID: NOT STARTED (无需独立进程，由 Gateway 内嵌消费)")
   })
 
   after(async () => {
-    if (workerProcess) {
-      workerProcess.kill()
-    }
     if (gatewayProcess) {
       gatewayProcess.kill()
     }
@@ -206,7 +189,16 @@ describe("一期轻量闭环 · 真实进程级自动端到端验收 (Subprocess
     assert.ok(issueList.length >= 1, "必须由 Worker 自动生成至少 1 个疑似问题")
     const targetIssue = issueList[0]
     const issueId = targetIssue.id
-    console.log(`    [E2E] 自动生成 issue: ${issueId} (rule=${targetIssue.rule_code}, risk=${targetIssue.risk_level})`)
+    console.log(`    [E2E] Issue: CREATED (${issueId}, rule=${targetIssue.rule_code}, risk=${targetIssue.risk_level})`)
+
+    // 验证对应的 processing_job 状态为 succeeded
+    const jobsRes = await pbServer.req("GET", `/api/collections/processing_jobs/records?filter=business_key='${targetIssue.session}'`, null, {
+      Authorization: env.tokens.superuser,
+    })
+    assert.equal(jobsRes.status, 200)
+    assert.ok(jobsRes.data.items.length > 0, "必须存在 processing_jobs 记录")
+    assert.equal(jobsRes.data.items[0].status, "SUCCEEDED", "processing_job 必须为 SUCCEEDED 状态")
+    console.log(`    [E2E] Processing Job: SUCCEEDED (${jobsRes.data.items[0].id})`)
 
     // 6. 验证端到端各层级数据一致性断言
     assert.equal(targetIssue.review_status, "PENDING", "初始 review_status 必须为 PENDING")

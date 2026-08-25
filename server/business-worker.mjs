@@ -1,4 +1,4 @@
-// server/business-worker.mjs — 一期业务 Worker (Node.js, PM2 进程名 yuqi-business-worker)
+// server/business-worker.mjs — 一期业务 Worker (Node.js, 支持独立运行与内嵌至 ASR Gateway 运行)
 //
 // 任务来源: PocketBase processing_jobs 表 (数据库任务表, 不使用 Redis)
 // 领取:     POST /api/yuqi/internal/jobs/claim  (原子领取 + 锁超时恢复)
@@ -14,22 +14,48 @@
 // 环境变量:
 //   YUQI_PB_URL            默认 http://127.0.0.1:7040
 //   YUQI_SERVICE_TOKEN     必填 (与 PB 侧 YUQI_SERVICE_TOKEN 一致, 不提交 Git)
-//   YUQI_WORKER_POLL_MS    轮询间隔, 默认 2000
+//   YUQI_WORKER_POLL_MS    轮询间隔, 默认 5000
 //   YUQI_WORKER_LOCK_MS    任务锁超时, 默认 300000 (5 分钟)
 
 import { analyzeRisk } from "./rule-analyzer.mjs"
 import { fileURLToPath } from "node:url"
 import path from "node:path"
 
-const PB_URL = String(process.env.YUQI_PB_URL || "http://127.0.0.1:7040").replace(/\/+$/, "")
-const SERVICE_TOKEN = String(process.env.YUQI_SERVICE_TOKEN || "")
-const WORKER_ID = String(process.env.YUQI_WORKER_ID || `worker-${process.pid}`)
-const POLL_MS = Number(process.env.YUQI_WORKER_POLL_MS || 2000)
-const LOCK_MS = Number(process.env.YUQI_WORKER_LOCK_MS || 300000)
+let workerLoopRunning = false
+let workerLoopStopRequested = false
+let workerLoopPromise = null
 
-if (!SERVICE_TOKEN && (process.env.pm_id !== undefined || (process.argv[1] && process.argv[1].endsWith("business-worker.mjs")))) {
-  console.error("[worker] 缺少 YUQI_SERVICE_TOKEN, 退出")
-  process.exit(1)
+function getPbUrl() {
+  return String(
+    process.env.YUQI_PB_URL ||
+    process.env.POCKETBASE_URL ||
+    "http://127.0.0.1:7040"
+  ).replace(/\/+$/, "")
+}
+
+function getServiceToken() {
+  return String(process.env.YUQI_SERVICE_TOKEN || "")
+}
+
+function isExecutedDirectly() {
+  if (!process.argv[1]) return false
+  try {
+    return path.resolve(process.argv[1]).toLowerCase() === path.resolve(fileURLToPath(import.meta.url)).toLowerCase()
+  } catch (_) {
+    return false
+  }
+}
+
+function isWorkerLoopRunning() {
+  return workerLoopRunning
+}
+
+function stopWorkerLoop() {
+  workerLoopStopRequested = true
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function redact(text) {
@@ -37,8 +63,8 @@ function redact(text) {
 }
 
 async function api(method, path, body) {
-  const pbUrl = String(process.env.YUQI_PB_URL || "http://127.0.0.1:7040").replace(/\/+$/, "")
-  const serviceToken = String(process.env.YUQI_SERVICE_TOKEN || "")
+  const pbUrl = getPbUrl()
+  const serviceToken = getServiceToken()
   const workerId = String(process.env.YUQI_WORKER_ID || `worker-${process.pid}`)
   const res = await fetch(`${pbUrl}${path}`, {
     method,
@@ -65,7 +91,9 @@ async function api(method, path, body) {
 }
 
 async function claim() {
-  const data = await api("POST", "/api/yuqi/internal/jobs/claim", { worker_id: WORKER_ID, lock_ms: LOCK_MS })
+  const workerId = String(process.env.YUQI_WORKER_ID || `worker-${process.pid}`)
+  const lockMs = Number(process.env.YUQI_WORKER_LOCK_MS || 300000)
+  const data = await api("POST", "/api/yuqi/internal/jobs/claim", { worker_id: workerId, lock_ms: lockMs })
   return data && data.claimed ? data.job : null
 }
 
@@ -157,9 +185,9 @@ async function runOnce() {
     job = await claim()
   } catch (err) {
     console.error(`[worker] claim 失败: ${redact(err.message)}`)
-    return
+    return false
   }
-  if (!job) return
+  if (!job) return false
 
   try {
     const result = await executeJob(job)
@@ -180,23 +208,73 @@ async function runOnce() {
       console.error(`[worker] 回写任务状态失败: ${redact(err2.message)}`)
     }
   }
+  return true
 }
 
-async function main() {
-  console.log(`[worker] 启动 worker=${WORKER_ID} pb=${PB_URL} poll=${POLL_MS}ms lock=${LOCK_MS}ms`)
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    await runOnce()
-    await new Promise((r) => setTimeout(r, POLL_MS))
+function startWorkerLoop(options = {}) {
+  if (workerLoopRunning) {
+    console.log("[worker] Worker loop 已在运行中，跳过重复启动")
+    return workerLoopPromise
   }
+
+  workerLoopRunning = true
+  workerLoopStopRequested = false
+
+  const pollMs = Number(options.pollMs || process.env.YUQI_WORKER_POLL_MS || 5000)
+  const lockMs = Number(options.lockMs || process.env.YUQI_WORKER_LOCK_MS || 300000)
+  const workerId = String(options.workerId || process.env.YUQI_WORKER_ID || `worker-${process.pid}`)
+  const pbUrl = getPbUrl()
+
+  console.log(`[worker] 启动 worker=${workerId} pb=${pbUrl} poll=${pollMs}ms lock=${lockMs}ms`)
+
+  workerLoopPromise = (async () => {
+    try {
+      while (!workerLoopStopRequested) {
+        let processed = false
+        try {
+          processed = await runOnce()
+        } catch (err) {
+          console.error(`[worker] runOnce 未捕获异常: ${redact(err && err.message || err)}`)
+        }
+        if (workerLoopStopRequested) break
+
+        // 有任务处理时快速排空 (200ms), 无任务时按 pollMs (默认 5s) 休眠
+        const delay = processed ? (options.drainDelayMs ?? 200) : pollMs
+        await sleep(delay)
+      }
+    } finally {
+      workerLoopRunning = false
+      workerLoopPromise = null
+      console.log("[worker] Worker loop 已安全退出")
+    }
+  })()
+
+  return workerLoopPromise
 }
 
-const isMain = Boolean(process.env.pm_id !== undefined || (process.argv[1] && path.resolve(process.argv[1]).toLowerCase() === path.resolve(fileURLToPath(import.meta.url)).toLowerCase()))
-if (isMain) {
-  main().catch((err) => {
+if (isExecutedDirectly()) {
+  const token = getServiceToken()
+  if (!token) {
+    console.error("[worker] 缺少 YUQI_SERVICE_TOKEN, 退出")
+    process.exit(1)
+  }
+  startWorkerLoop().catch((err) => {
     console.error(`[worker] 致命错误: ${redact(err && err.stack || err)}`)
     process.exit(1)
   })
 }
 
-export { executeJob, handleRiskAnalysis, handleSlaScan, runOnce, claim, api }
+export {
+  executeJob,
+  handleRiskAnalysis,
+  handleSlaScan,
+  runOnce,
+  claim,
+  api,
+  startWorkerLoop,
+  stopWorkerLoop,
+  isWorkerLoopRunning,
+  getPbUrl,
+  getServiceToken,
+  isExecutedDirectly,
+}

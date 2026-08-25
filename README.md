@@ -71,17 +71,20 @@ React 19 + TypeScript + Vite
             ↓
      processing_jobs
             ↓
- Node.js Business Worker
+    ASR Gateway
+  ├─ ASR HTTP Gateway
+  ├─ ASR Poller
+  └─ Embedded Business Worker (可扩容独立 Worker)
             ↓
- ASR Gateway / OSS Scanner
+       OSS Scanner
 ```
 
 - **前端**：React 19 + TypeScript + Vite + Tailwind CSS + Lucide Icons + 响应式员工 H5 布局。
 - **后端**：PocketBase v0.40.0 + JSVM Hooks 原生数据接口与权限守卫。
 - **存储**：PocketBase 内置 SQLite。
-- **任务队列**：`processing_jobs` 数据库任务表 + Node.js Business Worker（原子领取、指数退避、故障恢复）。
-- **转写网关**：Node.js 私有 ASR 网关（支持生产私有服务与测试 Mock 模式）。
-- **进程与部署**：PM2 管理、Nginx 反向代理、一键部署/备份/回滚脚本。
+ - **任务队列**：`processing_jobs` 数据库任务表 + 内嵌 Business Worker（支持独立 Worker 扩容、原子领取、指数退避、故障恢复）。
+ - **转写网关**：Node.js 私有 ASR 网关（同时承载 ASR HTTP 转发、ASR 任务轮询与内嵌业务任务消费循环）。
+ - **进程与部署**：PM2 管理（默认 3 进程：`yuqi-pb`、`yuqi-asr-gateway`、`yuqi-oss-scanner`）、Nginx 反向代理、一键部署/备份/回滚脚本。
 
 > **架构约束**：一期完全基于轻量原生栈，**不依赖** Python、FastAPI、PostgreSQL、Redis、RabbitMQ、Docker 或 Kubernetes。
 
@@ -141,16 +144,17 @@ Test-Path .\pocketbase\pocketbase.exe
 ```powershell
 $env:YUQI_ENV="test"
 $env:NODE_ENV="test"
-$env:YUQI_SERVICE_TOKEN="local-preview-service-token-2026"
+$env:YUQI_SERVICE_TOKEN="local-dev-token"
 $env:YUQI_SERVICE_TENANT_CODE="demo"
-$env:YUQI_UPLOAD_TOKEN_SECRET="local-preview-upload-secret-2026"
+$env:YUQI_UPLOAD_TOKEN_SECRET="local-dev-secret"
 $env:YUQI_DEV_FIXED_CODE="123456"
 
 $pbData="$env:TEMP\yuqi-preview-pb"
 New-Item -ItemType Directory -Force $pbData | Out-Null
 
 # 初始化本地 PocketBase 超级管理员
-.\pocketbase\pocketbase.exe superuser upsert admin@demo.local "YuqiLocal2026!" `
+$adminCred = "YuqiLocal2026!"
+.\pocketbase\pocketbase.exe superuser upsert admin@demo.local $adminCred `
   "--dir=$pbData" `
   "--hooksDir=.\pocketbase\pb_hooks" `
   "--migrationsDir=.\pocketbase\pb_migrations"
@@ -173,8 +177,9 @@ New-Item -ItemType Directory -Force $pbData | Out-Null
 $env:YUQI_ENV="test"
 $env:YUQI_PB_URL="http://127.0.0.1:7040"
 $env:YUQI_SUPERUSER_EMAIL="admin@demo.local"
-$env:YUQI_SUPERUSER_PASSWORD="YuqiLocal2026!"
-$env:YUQI_DEMO_ADMIN_PASSWORD="Passw0rd!"
+$demoCred = "Passw0rd-Local"
+$env:YUQI_SUPERUSER_PASSWORD = $adminCred
+$env:YUQI_DEMO_ADMIN_PASSWORD = $demoCred
 
 pnpm seed
 ```
@@ -258,26 +263,27 @@ pnpm dev
 
 若需体验从音频提交到 Mock 转写、自动入队、Worker 异步分析生成问题的完整动态过程：
 
-### 启动 Business Worker
-```powershell
-$env:YUQI_PB_URL="http://127.0.0.1:7040"
-$env:YUQI_SERVICE_TOKEN="local-preview-service-token-2026"
-$env:YUQI_WORKER_POLL_MS="1000"
-
-pnpm worker
-```
-
-### 启动 ASR Gateway (Mock 模式)
+### 8.1 默认模式：启动 ASR Gateway (内嵌 Business Worker 循环)
 ```powershell
 $env:YUQI_ENV="test"
 $env:POCKETBASE_URL="http://127.0.0.1:7040"
-$env:YUQI_SERVICE_TOKEN="local-preview-service-token-2026"
+$env:YUQI_SERVICE_TOKEN="local-dev-token"
 $env:YUQI_SERVICE_TENANT_CODE="demo"
-$env:YUQI_UPLOAD_TOKEN_SECRET="local-preview-upload-secret-2026"
+$env:YUQI_UPLOAD_TOKEN_SECRET="local-dev-secret"
 $env:YUQI_ASR_MOCK="1"
 $env:YUQI_ASR_GATEWAY_PORT="18084"
+$env:YUQI_EMBEDDED_WORKER="1"
 
 pnpm asr:gateway
+```
+
+### 8.2 独立模式：单独启动 Business Worker (扩容 / 独立调试)
+```powershell
+$env:YUQI_PB_URL="http://127.0.0.1:7040"
+$env:YUQI_SERVICE_TOKEN="local-dev-token"
+$env:YUQI_WORKER_POLL_MS="1000"
+
+pnpm worker
 ```
 
 ---
