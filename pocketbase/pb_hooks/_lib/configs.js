@@ -101,7 +101,54 @@ module.exports = {
   devices: {
     name: "devices",
     roles: { list: ORG_READ, view: ORG_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
-    scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
+    scope: {
+      storeField: "current_store",
+      storeType: "relation",
+      employeeField: "current_employee",
+      employeeType: "relation",
+      scopeFilterOverrides: {
+        ORG_TREE: (ctx) => {
+          const g2 = require(`${__hooks}/_lib/guards.js`)
+          const ids = g2.regionSubtreeIds(ctx.scope.orgNode)
+          if (ids.length === 0 || (ids.length === 1 && !ids[0])) return { filter: "id = {:none}", params: { none: "-" } }
+          const parts = []
+          const params = {}
+          for (let i = 0; i < ids.length; i++) {
+            parts.push("current_store.region = {:r" + i + "}")
+            params["r" + i] = ids[i]
+          }
+          return { filter: "(" + parts.join(" || ") + ")", params }
+        },
+        STORE: (ctx) => ({ filter: "current_store = {:sid}", params: { sid: ctx.scope.store } }),
+        SELF: (ctx) => ({ filter: "current_employee = {:eid}", params: { eid: ctx.scope.employee } }),
+      },
+      assertVisibleOverride: (e, ctx, rec) => {
+        const g2 = require(`${__hooks}/_lib/guards.js`)
+        const scope = ctx.scope || { type: "SELF" }
+        if (scope.type === "ALL") return
+        const curStore = String(rec.get("current_store") || "")
+        const curEmp = String(rec.get("current_employee") || "")
+        if (scope.type === "STORE") {
+          if (!curStore || curStore !== scope.store) throw new NotFoundError("记录不存在")
+          return
+        }
+        if (scope.type === "ORG_TREE") {
+          if (!curStore) throw new NotFoundError("记录不存在")
+          try {
+            const st = $app.findRecordById("stores", curStore)
+            const regId = String(st.get("region") || "")
+            const ids = g2.regionSubtreeIds(scope.orgNode)
+            if (!regId || ids.indexOf(regId) < 0) throw new NotFoundError("记录不存在")
+          } catch (_) {
+            throw new NotFoundError("记录不存在")
+          }
+          return
+        }
+        if (scope.type === "SELF") {
+          if (!curEmp || curEmp !== scope.employee) throw new NotFoundError("记录不存在")
+        }
+      },
+    },
     filters: ["device_no", "type", "status"],
     fields: {
       device_no: { type: "text", max: 60, required: true },
@@ -110,6 +157,8 @@ module.exports = {
       power: { type: "number" },
       texts_today: { type: "number" },
       last_online_at: { type: "date" },
+      current_store: { type: "relation" },
+      current_employee: { type: "relation" },
     },
     audit: { create: "device_create", update: "device_update", delete: "device_delete" },
   },
@@ -134,7 +183,7 @@ module.exports = {
 
   device_logs: {
     name: "device_logs",
-    roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
+    roles: { list: ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "AUDITOR"], view: ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "AUDITOR"], create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
     scope: {
       storeField: "device",
       storeType: "relation",
@@ -155,14 +204,64 @@ module.exports = {
 
  audio_files: {
    name: "audio_files",
-    roles: { list: ORG_READ, view: ORG_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN", "ADMIN"] },
-   scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
+    roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN", "ADMIN"] },
+    scope: {
+      storeField: "store",
+      storeType: "relation",
+      employeeField: "employee",
+      employeeType: "relation",
+      scopeFilterOverrides: {
+        ORG_TREE: (ctx) => {
+          const g2 = require(`${__hooks}/_lib/guards.js`)
+          const ids = g2.regionSubtreeIds(ctx.scope.orgNode)
+          if (ids.length === 0 || (ids.length === 1 && !ids[0])) return { filter: "id = {:none}", params: { none: "-" } }
+          const parts = []
+          const params = {}
+          for (let i = 0; i < ids.length; i++) {
+            parts.push("store.region = {:r" + i + "}")
+            params["r" + i] = ids[i]
+          }
+          return { filter: "(" + parts.join(" || ") + ")", params }
+        },
+        STORE: (ctx) => ({ filter: "store = {:sid}", params: { sid: ctx.scope.store } }),
+        SELF: (ctx) => ({ filter: "employee = {:eid}", params: { eid: ctx.scope.employee } }),
+      },
+      assertVisibleOverride: (e, ctx, rec) => {
+        const g2 = require(`${__hooks}/_lib/guards.js`)
+        const scope = ctx.scope || { type: "SELF" }
+        if (scope.type === "ALL") return
+        const storeId = String(rec.get("store") || "")
+        const empId = String(rec.get("employee") || "")
+        if (scope.type === "STORE") {
+          if (!storeId || storeId !== scope.store) throw new NotFoundError("记录不存在")
+          return
+        }
+        if (scope.type === "ORG_TREE") {
+          if (!storeId) throw new NotFoundError("记录不存在")
+          try {
+            const st = $app.findRecordById("stores", storeId)
+            const regId = String(st.get("region") || "")
+            const ids = g2.regionSubtreeIds(scope.orgNode)
+            if (!regId || ids.indexOf(regId) < 0) throw new NotFoundError("记录不存在")
+          } catch (_) {
+            throw new NotFoundError("记录不存在")
+          }
+          return
+        }
+        if (scope.type === "SELF") {
+          if (!empId || empId !== scope.employee) throw new NotFoundError("记录不存在")
+        }
+      },
+    },
    filters: ["object_key", "file_name", "device_sn", "status"],
    idempotentKey: "object_key",
     fields: {
       object_key: { type: "text", max: 400, required: true },
       file_name: { type: "text", max: 200 },
       device_sn: { type: "text", max: 60 },
+      store: { type: "relation" },
+      employee: { type: "relation" },
+      device: { type: "relation" },
       size: { type: "number" },
       oss_last_modified: { type: "date" },
       started_at: { type: "date" },
@@ -198,7 +297,62 @@ module.exports = {
  asr_jobs: {
     name: "asr_jobs",
     roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN", "ADMIN"] },
-    scope: { storeField: "store", storeType: "text", employeeField: "employee", employeeType: "text" },
+    scope: {
+      storeField: "store",
+      storeType: "relation",
+      employeeField: "employee",
+      employeeType: "relation",
+      scopeFilterOverrides: {
+        ORG_TREE: (ctx) => {
+          const g2 = require(`${__hooks}/_lib/guards.js`)
+          const ids = g2.regionSubtreeIds(ctx.scope.orgNode)
+          if (ids.length === 0 || (ids.length === 1 && !ids[0])) return { filter: "id = {:none}", params: { none: "-" } }
+          const parts = []
+          const params = {}
+          for (let i = 0; i < ids.length; i++) {
+            let storesInRegion = []
+            try {
+              storesInRegion = $app.findRecordsByFilter("stores", "region = {:r}", "", 500, 0, { r: ids[i] })
+            } catch (_) {}
+            for (let s = 0; s < storesInRegion.length; s++) {
+              const skey = "r_s_" + i + "_" + s
+              parts.push("store = {:" + skey + "}")
+              params[skey] = storesInRegion[s].id
+            }
+          }
+          if (parts.length === 0) return { filter: "id = {:none}", params: { none: "-" } }
+          return { filter: "(" + parts.join(" || ") + ")", params }
+        },
+        STORE: (ctx) => ({ filter: "store = {:sid}", params: { sid: ctx.scope.store } }),
+        SELF: (ctx) => ({ filter: "employee = {:eid}", params: { eid: ctx.scope.employee } }),
+      },
+      assertVisibleOverride: (e, ctx, rec) => {
+        const g2 = require(`${__hooks}/_lib/guards.js`)
+        const scope = ctx.scope || { type: "SELF" }
+        if (scope.type === "ALL") return
+        const storeId = String(rec.get("store") || "")
+        const empId = String(rec.get("employee") || "")
+        if (scope.type === "STORE") {
+          if (!storeId || storeId !== scope.store) throw new NotFoundError("记录不存在")
+          return
+        }
+        if (scope.type === "ORG_TREE") {
+          if (!storeId) throw new NotFoundError("记录不存在")
+          try {
+            const st = $app.findRecordById("stores", storeId)
+            const regId = String(st.get("region") || "")
+            const ids = g2.regionSubtreeIds(scope.orgNode)
+            if (!regId || ids.indexOf(regId) < 0) throw new NotFoundError("记录不存在")
+          } catch (_) {
+            throw new NotFoundError("记录不存在")
+          }
+          return
+        }
+        if (scope.type === "SELF") {
+          if (!empId || empId !== scope.employee) throw new NotFoundError("记录不存在")
+        }
+      },
+    },
     filters: ["remote_job_id", "transcript", "status", "device", "employee", "store", "audio_name"],
     filterMap: {
       active: (v) => (v === "1" ? { filter: "(status = {:a1} || status = {:a2})", params: { a1: "queued", a2: "running" } } : null),
@@ -380,7 +534,7 @@ module.exports = {
 
   sync_logs: {
     name: "sync_logs",
-    roles: { list: ORG_READ, view: ORG_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
+    roles: { list: ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "AUDITOR"], view: ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "AUDITOR"], create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
     scope: { storeField: "store", storeType: "text", employeeField: "store", employeeType: "text" },
     filters: ["type", "object", "store", "status"],
     fields: {
@@ -396,7 +550,7 @@ module.exports = {
 
   app_settings: {
     name: "app_settings",
-    roles: { list: ["SUPER_ADMIN", "ADMIN"], view: ["SUPER_ADMIN", "ADMIN"], create: ["SUPER_ADMIN", "ADMIN"], update: ["SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
+    roles: { list: ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"], view: ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"], create: ["SUPER_ADMIN", "ADMIN"], update: ["SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
     scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
     filters: ["key"],
     fields: {

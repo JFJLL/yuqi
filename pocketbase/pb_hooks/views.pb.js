@@ -50,8 +50,7 @@ routerAdd("GET", "/api/yuqi/audio/{id}/play", (e) => {
     const id = e.request.pathValue("id")
     const rec = H.findRecord("audio_files", id)
     if (!rec) throw new NotFoundError("音频记录不存在")
-    // audio_files 无 store/employee 字段, 数据范围按租户隔离 (设备归属见 device_bindings)
-    if (String(rec.get("tenant") || "") !== ctx.tenantId) throw new NotFoundError("音频记录不存在")
+    g.assertVisible(e, ctx, rec, { storeField: "store", employeeField: "employee" })
 
     g.writeAudit(e, ctx, "audio_play", "audio_files", id, { object_key: String(rec.get("object_key") || "").slice(0, 200) })
 

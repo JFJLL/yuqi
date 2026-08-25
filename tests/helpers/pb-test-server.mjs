@@ -318,9 +318,10 @@ export async function bootstrapTestEnvironment(server) {
   const userEmpZhangId = await createAppUser("emp_zhang", "张三", "EMPLOYEE", { employee: emp1Id, scopeType: "SELF" })
   const userEmpLiId = await createAppUser("emp_li", "李四", "EMPLOYEE", { employee: emp2Id, scopeType: "SELF" })
   const userInactiveId = await createAppUser("user_inactive", "赵六", "EMPLOYEE", { employee: empInactiveId, status: "INACTIVE", scopeType: "SELF" })
+  const userAuditorId = await createAppUser("auditor", "审计员", "AUDITOR", { scopeType: "ALL" })
   const userAdminOtherId = await createAppUser("admin_other", "其他租户管理员", "ADMIN", { tenant: otherTenantId, scopeType: "ALL" })
 
- // 8. Log in each user to get their Bearer token
+  // 8. Log in each user to get their Bearer token
  async function loginUser(username, password = "Passw0rd!") {
     const identity = username.includes("@") ? username : `${username}@demo.local`
     const res = await req("POST", "/api/yuqi/auth/login", { username: identity, password })
@@ -339,6 +340,7 @@ export async function bootstrapTestEnvironment(server) {
     sm_b: await loginUser("sm_b"),
     emp_zhang: await loginUser("emp_zhang"),
     emp_li: await loginUser("emp_li"),
+    auditor: await loginUser("auditor"),
     admin_other: await loginUser("admin_other"),
   }
 
@@ -375,6 +377,7 @@ export async function bootstrapTestEnvironment(server) {
       sm_b: userSmBId,
       emp_zhang: userEmpZhangId,
       emp_li: userEmpLiId,
+      auditor: userAuditorId,
       user_inactive: userInactiveId,
       admin_other: userAdminOtherId,
     },

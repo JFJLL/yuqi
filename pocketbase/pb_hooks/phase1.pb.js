@@ -593,6 +593,16 @@ routerAdd("POST", "/api/yuqi/device-bindings/{id}/approve", (e) => {
     binding.set("approved_at", H.pbDate())
     $app.save(binding)
 
+    try {
+      const devRec = $app.findRecordById("devices", deviceId)
+      if (devRec) {
+        devRec.set("current_store", storeId)
+        devRec.set("current_employee", employeeId)
+        devRec.set("status", "IN_USE")
+        $app.save(devRec)
+      }
+    } catch (_) {}
+
     const issueTenant = ctx.tenantId
     g.writeAudit(e, ctx, "binding_approve", "device_bindings", binding.id, {})
     try {
