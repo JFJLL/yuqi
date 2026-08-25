@@ -50,8 +50,8 @@ else
   echo "  [info] nginx 未找到, 跳过 nginx 校验与重载"
 fi
 
-# 5. 健康检查 (真实端点)
+# 5. 健康检查 (真实端点, 传递当前环境)
 sleep 3
-bash "${ROOT}/deploy/scripts/health-check.sh"
+ENV="${ENV_NAME}" bash "${ROOT}/deploy/scripts/health-check.sh"
 
 echo "== 部署完成 (${ENV_NAME}) =="
