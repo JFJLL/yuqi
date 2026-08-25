@@ -1,38 +1,54 @@
+import { lazy, Suspense } from "react"
 import { Route, Routes } from "react-router-dom"
 import { Toaster } from "sonner"
 import { AdminLayout } from "@/components/admin/AdminLayout"
 import { RequireAuth } from "@/components/admin/RequireAuth"
 import { ComingSoon } from "@/components/admin/ComingSoon"
-import { LoginPage } from "@/pages/LoginPage"
-import { ForbiddenPage } from "@/pages/ForbiddenPage"
-import { NotFoundPage } from "@/pages/NotFoundPage"
-import { DashboardRoute } from "@/pages/Dashboard"
-import { OrgRoute } from "@/pages/Org"
-import { DevicesRoute } from "@/pages/Devices"
-import { DeviceOpsRoute } from "@/pages/DeviceOps"
-import { RecordsRoute } from "@/pages/Records"
-import { InspectionRoute } from "@/pages/Inspection"
-import { KnowledgeRoute } from "@/pages/Knowledge"
-import { TasksRoute } from "@/pages/Tasks"
-import { AppealsRoute } from "@/pages/Appeals"
-import { ReportsRoute } from "@/pages/Reports"
-import { LogsRoute } from "@/pages/Logs"
-import { SettingsRoute } from "@/pages/Settings"
-import { EmployeeLayout } from "@/employee/EmployeeLayout"
-import { EmployeeLogin } from "@/employee/EmployeeLogin"
-import { EmployeeHome } from "@/employee/EmployeeHome"
-import { EmployeeIssues } from "@/employee/EmployeeIssues"
-import { EmployeeIssueDetail } from "@/employee/EmployeeIssueDetail"
-import { EmployeeAppeals } from "@/employee/EmployeeAppeals"
-import { EmployeeRectifications } from "@/employee/EmployeeRectifications"
-import { EmployeeNotifications } from "@/employee/EmployeeNotifications"
-import { EmployeeDevice } from "@/employee/EmployeeDevice"
-import { EmployeeProfilePage } from "@/employee/EmployeeProfile"
-import { EmployeeConsent } from "@/employee/EmployeeConsent"
+
+// 路由级代码分割 (Route-level Code Splitting), 提升首屏加载速度
+const LoginPage = lazy(() => import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage })))
+const ForbiddenPage = lazy(() => import("@/pages/ForbiddenPage").then((m) => ({ default: m.ForbiddenPage })))
+const NotFoundPage = lazy(() => import("@/pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })))
+const DashboardRoute = lazy(() => import("@/pages/Dashboard").then((m) => ({ default: m.DashboardRoute })))
+const OrgRoute = lazy(() => import("@/pages/Org").then((m) => ({ default: m.OrgRoute })))
+const DevicesRoute = lazy(() => import("@/pages/Devices").then((m) => ({ default: m.DevicesRoute })))
+const DeviceOpsRoute = lazy(() => import("@/pages/DeviceOps").then((m) => ({ default: m.DeviceOpsRoute })))
+const RecordsRoute = lazy(() => import("@/pages/Records").then((m) => ({ default: m.RecordsRoute })))
+const InspectionRoute = lazy(() => import("@/pages/Inspection").then((m) => ({ default: m.InspectionRoute })))
+const KnowledgeRoute = lazy(() => import("@/pages/Knowledge").then((m) => ({ default: m.KnowledgeRoute })))
+const TasksRoute = lazy(() => import("@/pages/Tasks").then((m) => ({ default: m.TasksRoute })))
+const AppealsRoute = lazy(() => import("@/pages/Appeals").then((m) => ({ default: m.AppealsRoute })))
+const ReportsRoute = lazy(() => import("@/pages/Reports").then((m) => ({ default: m.ReportsRoute })))
+const LogsRoute = lazy(() => import("@/pages/Logs").then((m) => ({ default: m.LogsRoute })))
+const SettingsRoute = lazy(() => import("@/pages/Settings").then((m) => ({ default: m.SettingsRoute })))
+
+const EmployeeLayout = lazy(() => import("@/employee/EmployeeLayout").then((m) => ({ default: m.EmployeeLayout })))
+const EmployeeLogin = lazy(() => import("@/employee/EmployeeLogin").then((m) => ({ default: m.EmployeeLogin })))
+const EmployeeHome = lazy(() => import("@/employee/EmployeeHome").then((m) => ({ default: m.EmployeeHome })))
+const EmployeeIssues = lazy(() => import("@/employee/EmployeeIssues").then((m) => ({ default: m.EmployeeIssues })))
+const EmployeeIssueDetail = lazy(() => import("@/employee/EmployeeIssueDetail").then((m) => ({ default: m.EmployeeIssueDetail })))
+const EmployeeAppeals = lazy(() => import("@/employee/EmployeeAppeals").then((m) => ({ default: m.EmployeeAppeals })))
+const EmployeeRectifications = lazy(() => import("@/employee/EmployeeRectifications").then((m) => ({ default: m.EmployeeRectifications })))
+const EmployeeNotifications = lazy(() => import("@/employee/EmployeeNotifications").then((m) => ({ default: m.EmployeeNotifications })))
+const EmployeeDevice = lazy(() => import("@/employee/EmployeeDevice").then((m) => ({ default: m.EmployeeDevice })))
+const EmployeeProfilePage = lazy(() => import("@/employee/EmployeeProfile").then((m) => ({ default: m.EmployeeProfilePage })))
+const EmployeeConsent = lazy(() => import("@/employee/EmployeeConsent").then((m) => ({ default: m.EmployeeConsent })))
+
+function PageLoading() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center text-xs text-muted-foreground">
+      <div className="flex items-center gap-2">
+        <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        <span>加载中…</span>
+      </div>
+    </div>
+  )
+}
 
 function App() {
   return (
     <>
+      <Suspense fallback={<PageLoading />}>
       <Routes>
         {/* 管理端登录 */}
         <Route path="/login" element={<LoginPage />} />
@@ -75,6 +91,7 @@ function App() {
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      </Suspense>
       <Toaster richColors position="bottom-right" />
     </>
   )
