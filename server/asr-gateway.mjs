@@ -117,12 +117,26 @@ function requestBuffer(urlString, { method = "GET", headers = {}, body } = {}) {
   })
 }
 
+function getPocketbaseUrl() {
+  return trimTrailingSlash(process.env.POCKETBASE_URL || POCKETBASE_URL || "http://127.0.0.1:7040")
+}
+
+function getServiceToken() {
+  return process.env.YUQI_SERVICE_TOKEN || YUQI_SERVICE_TOKEN || ""
+}
+
+function isAsrMock() {
+  return String(process.env.YUQI_ASR_MOCK !== undefined ? process.env.YUQI_ASR_MOCK : (ASR_MOCK ? "1" : "0")) === "1"
+}
+
 async function pbRequest(path, { method = "GET", body } = {}) {
-  const response = await requestBuffer(`${POCKETBASE_URL}${path}`, {
+  const pbUrl = getPocketbaseUrl()
+  const token = getServiceToken()
+  const response = await requestBuffer(`${pbUrl}${path}`, {
     method,
     headers: {
       ...(body ? { "Content-Type": "application/json" } : {}),
-      "X-Yuqi-Service-Token": YUQI_SERVICE_TOKEN,
+      "X-Yuqi-Service-Token": token,
     },
     body: body ? JSON.stringify(body) : undefined,
   })
@@ -408,7 +422,7 @@ function normalizeResult(payload) {
 async function importSucceededJob(job, remoteState) {
   if (job.result_imported_at) return
   let result = null
-  if (ASR_MOCK) {
+  if (isAsrMock()) {
     result = loadMockResult()
   } else {
     const payload = await asrJson(`/v1/jobs/${encodeURIComponent(job.remote_job_id)}/result`)
@@ -699,7 +713,7 @@ if (isMain && !process.env.VITEST) {
   })
 }
 
-export { verifyUploadToken, safeSignatureEqual, asrConfigured, server }
+export { verifyUploadToken, safeSignatureEqual, asrConfigured, server, importSucceededJob, persistSessionAndSegments, pbRequest }
 
 server.on("error", (error) => {
   console.error(`[asr-gateway] server error: ${safeMessage(error)}`)
