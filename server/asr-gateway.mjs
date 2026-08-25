@@ -729,7 +729,7 @@ const server = http.createServer((req, res) => {
   json(res, 404, { error: "not_found" })
 })
 
-const isMain = Boolean(process.argv[1] && (process.argv[1].endsWith("asr-gateway.mjs") || process.argv[1].endsWith("asr-gateway.js")))
+const isMain = Boolean(process.env.pm_id !== undefined || (process.argv[1] && (process.argv[1].endsWith("asr-gateway.mjs") || process.argv[1].endsWith("asr-gateway.js"))))
 if (isMain && !process.env.VITEST) {
   server.listen(PORT, HOST, () => {
     gatewayStarted = true

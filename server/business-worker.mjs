@@ -27,7 +27,7 @@ const WORKER_ID = String(process.env.YUQI_WORKER_ID || `worker-${process.pid}`)
 const POLL_MS = Number(process.env.YUQI_WORKER_POLL_MS || 2000)
 const LOCK_MS = Number(process.env.YUQI_WORKER_LOCK_MS || 300000)
 
-if (!SERVICE_TOKEN && process.argv[1] && process.argv[1].endsWith("business-worker.mjs")) {
+if (!SERVICE_TOKEN && (process.env.pm_id !== undefined || (process.argv[1] && process.argv[1].endsWith("business-worker.mjs")))) {
   console.error("[worker] 缺少 YUQI_SERVICE_TOKEN, 退出")
   process.exit(1)
 }
@@ -191,7 +191,7 @@ async function main() {
   }
 }
 
-const isMain = Boolean(process.argv[1] && path.resolve(process.argv[1]).toLowerCase() === path.resolve(fileURLToPath(import.meta.url)).toLowerCase())
+const isMain = Boolean(process.env.pm_id !== undefined || (process.argv[1] && path.resolve(process.argv[1]).toLowerCase() === path.resolve(fileURLToPath(import.meta.url)).toLowerCase()))
 if (isMain) {
   main().catch((err) => {
     console.error(`[worker] 致命错误: ${redact(err && err.stack || err)}`)
