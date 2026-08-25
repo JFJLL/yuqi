@@ -339,3 +339,36 @@ routerAdd("POST", "/api/yuqi/upload-token", (e) => {
     return e.json(status >= 400 && status <= 599 ? status : 500, { error: "upload_token_failed", message: String((err && err.message) || "令牌签发失败") })
   }
 })
+
+routerAdd("POST", "/api/yuqi/auth/upload-token", (e) => {
+  try {
+    const g = require(`${__hooks}/_lib/guards.js`)
+    const AH = require(`${__hooks}/_lib/auth-helpers.js`)
+    const ctx = g.requireAuth(e)
+    g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"])
+    const secret = String($os.getenv("YUQI_UPLOAD_TOKEN_SECRET") || "")
+    if (!secret) throw new InternalServerError("上传令牌密钥未配置")
+    const nonce = $security.randomString(24)
+    const now = new Date()
+    const payload = {
+      user: ctx.user.id,
+      tenant: ctx.tenantId,
+      nonce,
+      action: "asr_upload",
+    }
+    const token = $security.createJWT(payload, secret, 600)
+    const coll = $app.findCollectionByNameOrId("upload_tokens")
+    const rec = new Record(coll)
+    rec.set("tenant", ctx.tenantId)
+    rec.set("user", ctx.user.id)
+    rec.set("nonce", nonce)
+    rec.set("action", "asr_upload")
+    rec.set("expires_at", AH.pbDate(new Date(now.getTime() + 600 * 1000)))
+    $app.save(rec)
+    g.writeAudit(e, ctx, "upload_token_issue", "upload_tokens", rec.id, {})
+    return e.json(200, { token, expires_in: 600, nonce })
+  } catch (err) {
+    const status = Number(err && err.status) || 500
+    return e.json(status >= 400 && status <= 599 ? status : 500, { error: "upload_token_failed", message: String((err && err.message) || "令牌签发失败") })
+  }
+})

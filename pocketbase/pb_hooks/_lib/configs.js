@@ -593,7 +593,7 @@ module.exports = {
    audit: { create: "session_create", update: "session_update", delete: "session_delete" },
  },
 
- transcript_segments: {
+  transcript_segments: {
     name: "transcript_segments",
     roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
     scope: {
@@ -601,7 +601,65 @@ module.exports = {
       storeType: "relation",
       employeeField: "session",
       employeeType: "relation",
-      scopeFilterOverrides: { ORG_TREE: (ctx) => ({ filter: "tenant = {:t}", params: { t: ctx.tenantId } }) },
+      scopeFilterOverrides: {
+        ORG_TREE: (ctx) => {
+          const g2 = require(`${__hooks}/_lib/guards.js`)
+          const ids = g2.regionSubtreeIds(ctx.scope.orgNode)
+          if (ids.length === 0 || (ids.length === 1 && !ids[0])) return { filter: "id = {:none}", params: { none: "-" } }
+          const parts = []
+          const params = {}
+          for (let i = 0; i < ids.length; i++) {
+            let storesInRegion = []
+            try {
+              storesInRegion = $app.findRecordsByFilter("stores", "region = {:r}", "", 500, 0, { r: ids[i] })
+            } catch (_) {}
+            for (let s = 0; s < storesInRegion.length; s++) {
+              const skey = "r_s_" + i + "_" + s
+              parts.push("session.store = {:" + skey + "}")
+              params[skey] = storesInRegion[s].id
+            }
+          }
+          if (parts.length === 0) return { filter: "id = {:none}", params: { none: "-" } }
+          return { filter: "(" + parts.join(" || ") + ")", params }
+        },
+        STORE: (ctx) => ({ filter: "session.store = {:sid}", params: { sid: ctx.scope.store } }),
+        SELF: (ctx) => ({ filter: "session.employee = {:eid}", params: { eid: ctx.scope.employee } }),
+      },
+      assertVisibleOverride: (e, ctx, rec) => {
+        const g2 = require(`${__hooks}/_lib/guards.js`)
+        const scope = ctx.scope || { type: "SELF" }
+        if (scope.type === "ALL") return
+        const sessionId = String(rec.get("session") || "")
+        if (!sessionId) throw new NotFoundError("记录不存在")
+        let sess = null
+        try {
+          sess = $app.findRecordById("sessions", sessionId)
+        } catch (_) {
+          sess = null
+        }
+        if (!sess) throw new NotFoundError("记录不存在")
+        const storeId = String(sess.get("store") || "")
+        const empId = String(sess.get("employee") || "")
+        if (scope.type === "STORE") {
+          if (!storeId || storeId !== scope.store) throw new NotFoundError("记录不存在")
+          return
+        }
+        if (scope.type === "ORG_TREE") {
+          if (!storeId) throw new NotFoundError("记录不存在")
+          try {
+            const st = $app.findRecordById("stores", storeId)
+            const regId = String(st.get("region") || "")
+            const ids = g2.regionSubtreeIds(scope.orgNode)
+            if (!regId || ids.indexOf(regId) < 0) throw new NotFoundError("记录不存在")
+          } catch (_) {
+            throw new NotFoundError("记录不存在")
+          }
+          return
+        }
+        if (scope.type === "SELF") {
+          if (!empId || empId !== scope.employee) throw new NotFoundError("记录不存在")
+        }
+      },
     },
     filters: ["session", "transcript", "version"],
     fields: {
@@ -661,7 +719,65 @@ module.exports = {
       storeType: "relation",
       employeeField: "session",
       employeeType: "relation",
-      scopeFilterOverrides: { ORG_TREE: (ctx) => ({ filter: "tenant = {:t}", params: { t: ctx.tenantId } }) },
+      scopeFilterOverrides: {
+        ORG_TREE: (ctx) => {
+          const g2 = require(`${__hooks}/_lib/guards.js`)
+          const ids = g2.regionSubtreeIds(ctx.scope.orgNode)
+          if (ids.length === 0 || (ids.length === 1 && !ids[0])) return { filter: "id = {:none}", params: { none: "-" } }
+          const parts = []
+          const params = {}
+          for (let i = 0; i < ids.length; i++) {
+            let storesInRegion = []
+            try {
+              storesInRegion = $app.findRecordsByFilter("stores", "region = {:r}", "", 500, 0, { r: ids[i] })
+            } catch (_) {}
+            for (let s = 0; s < storesInRegion.length; s++) {
+              const skey = "r_s_" + i + "_" + s
+              parts.push("session.store = {:" + skey + "}")
+              params[skey] = storesInRegion[s].id
+            }
+          }
+          if (parts.length === 0) return { filter: "id = {:none}", params: { none: "-" } }
+          return { filter: "(" + parts.join(" || ") + ")", params }
+        },
+        STORE: (ctx) => ({ filter: "session.store = {:sid}", params: { sid: ctx.scope.store } }),
+        SELF: (ctx) => ({ filter: "session.employee = {:eid}", params: { eid: ctx.scope.employee } }),
+      },
+      assertVisibleOverride: (e, ctx, rec) => {
+        const g2 = require(`${__hooks}/_lib/guards.js`)
+        const scope = ctx.scope || { type: "SELF" }
+        if (scope.type === "ALL") return
+        const sessionId = String(rec.get("session") || "")
+        if (!sessionId) throw new NotFoundError("记录不存在")
+        let sess = null
+        try {
+          sess = $app.findRecordById("sessions", sessionId)
+        } catch (_) {
+          sess = null
+        }
+        if (!sess) throw new NotFoundError("记录不存在")
+        const storeId = String(sess.get("store") || "")
+        const empId = String(sess.get("employee") || "")
+        if (scope.type === "STORE") {
+          if (!storeId || storeId !== scope.store) throw new NotFoundError("记录不存在")
+          return
+        }
+        if (scope.type === "ORG_TREE") {
+          if (!storeId) throw new NotFoundError("记录不存在")
+          try {
+            const st = $app.findRecordById("stores", storeId)
+            const regId = String(st.get("region") || "")
+            const ids = g2.regionSubtreeIds(scope.orgNode)
+            if (!regId || ids.indexOf(regId) < 0) throw new NotFoundError("记录不存在")
+          } catch (_) {
+            throw new NotFoundError("记录不存在")
+          }
+          return
+        }
+        if (scope.type === "SELF") {
+          if (!empId || empId !== scope.employee) throw new NotFoundError("记录不存在")
+        }
+      },
     },
     filters: ["session", "transcript", "rule", "rule_code", "analysis_version", "transcript_version"],
     fields: {
