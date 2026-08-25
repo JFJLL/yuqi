@@ -1,11 +1,10 @@
 // PM2 ecosystem for yuqi (https://yuqi.red-magic.cn)
 //
-// 进程配置:
-//   - yuqi-pb              : PocketBase 数据库与 API, 127.0.0.1:7040
-//   - yuqi-asr-gateway     : ASR 上传转发与后台轮询, 127.0.0.1:18084
-//   - yuqi-oss-scanner     : OSS 录音定时扫描与自动提交 ASR
-//   - yuqi-business-worker : 一期后台任务 (RISK_ANALYSIS 等, 数据库任务表轮询)
-//   (前端网页已改为 Nginx 直接托管 dist/ 静态目录)
+// 进程配置 (Phase 1.0.1 默认精简为 3 个进程):
+//   - yuqi-pb          : PocketBase 数据库与 API, 127.0.0.1:7040
+//   - yuqi-asr-gateway : ASR HTTP 上传/转写网关 + ASR Poller + 内嵌 Business Worker 循环, 127.0.0.1:18084
+//   - yuqi-oss-scanner : OSS 录音定时扫描与自动提交 ASR
+//   (注: processing_jobs 业务消费循环默认内嵌于 yuqi-asr-gateway 运行; 如需单独扩容可另行运行 pnpm worker)
 //
 // 用法:
 //   pnpm install && pnpm build
@@ -42,6 +41,9 @@ module.exports = {
       max_memory_restart: '250M',
       autorestart: true,
       // 请在云服务器的 PM2 环境或 systemd EnvironmentFile 中设置，勿提交真实值：
+      // YUQI_EMBEDDED_WORKER=1
+      // YUQI_WORKER_POLL_MS=5000
+      // YUQI_WORKER_LOCK_MS=300000
       // ASR_BASE_URL=http://127.0.0.1:18082
       // ASR_SERVICE_TOKEN=<long-random-token>
       // POCKETBASE_URL=http://127.0.0.1:7040
@@ -60,19 +62,6 @@ module.exports = {
       // OSS_PREFIX=audio/
       // OSS_ACCESS_KEY_ID=<...>
       // OSS_ACCESS_KEY_SECRET=<...>
-    },
-    {
-      name: 'yuqi-business-worker',
-      script: path.join(ROOT, 'server', 'business-worker.mjs'),
-      interpreter: 'node',
-      cwd: ROOT,
-      max_memory_restart: '250M',
-      autorestart: true,
-      // 依赖内部服务身份连接 PocketBase, 环境变量由服务器环境文件提供 (勿提交真实值):
-      // YUQI_PB_URL=http://127.0.0.1:7040
-      // YUQI_SERVICE_TOKEN=<与 PocketBase 环境一致的内部服务 Token>
-      // YUQI_SERVICE_TENANT_CODE=demo
-      // YUQI_POLL_INTERVAL_MS=3000
     },
   ],
 }

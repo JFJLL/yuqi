@@ -36,7 +36,7 @@ fi
 
 # PM2 进程状态检查 (必须处于 online 状态)
 if command -v pm2 >/dev/null 2>&1; then
-  for proc in yuqi-pb yuqi-asr-gateway yuqi-oss-scanner yuqi-business-worker; do
+  for proc in yuqi-pb yuqi-asr-gateway yuqi-oss-scanner; do
     status="$(pm2 jlist 2>/dev/null | node -e "
       let d=''; process.stdin.on('data', c => d += c).on('end', () => {
         try {

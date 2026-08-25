@@ -39,6 +39,14 @@ if command -v pm2 >/dev/null 2>&1; then
   else
     pm2 start ecosystem.config.cjs --update-env
   fi
+
+  # 清理旧版遗留的独立 yuqi-business-worker (Phase 1.0.1 已合并入 yuqi-asr-gateway 进程)
+  if pm2 describe yuqi-business-worker >/dev/null 2>&1; then
+    echo "  [info] 发现遗留的独立 yuqi-business-worker 进程, 正在清理..."
+    pm2 stop yuqi-business-worker >/dev/null 2>&1 || true
+    pm2 delete yuqi-business-worker >/dev/null 2>&1 || true
+  fi
+
   pm2 save
 fi
 
