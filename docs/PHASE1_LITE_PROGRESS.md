@@ -40,7 +40,7 @@
 - [x] 阶段 9: PM2/Nginx 部署脚本 (ecosystem.config.cjs, deploy/scripts/*, nginx 配置)
 - [x] 种子数据 scripts/seed-phase1-demo.mjs (1 租户, 3 门店, 12 员工, 10 设备, 200+ 会话/音频, 1500+ 分段, 60+ 问题, 幂等安全)
 - [x] 测试: 单测 18 项 + 集成 25 场景 + 2 条 E2E 完整贯通链路全数通过
-- [x] 最终报告 (PHASE1_LITE_FINAL_REPORT.md, 状态: NOT READY)
+- [x] 最终报告 (PHASE1_LITE_FINAL_REPORT.md, 状态: MERGE CANDIDATE)
 
 ## 阶段 1-2 后端验证记录 (2026-08-24)
 
@@ -109,22 +109,28 @@
 - (阶段 3+5) feat: add processing jobs, node business worker and rule based risk analysis
 - chore: add asr mock transcript fixture and ignore python caches
 - (阶段 8) feat: add server side reports scoped export and audit views
+- (验收补漏 1) fix: correct builtin risk rule semantics
+- (验收补漏 2) fix: enforce scoped access for legacy operational data
+- (验收补漏 3) fix: scope audio idempotency by tenant
+- (验收补漏 4) fix: harden upload token verification and asr mock health
+- (验收补漏 5) fix: make lightweight deploy scripts first-run safe
+- (验收补漏 6) test: add real asr and worker process e2e
 
 ## Final Acceptance Gap Fix (验收补漏跟踪)
 
-状态: NOT READY (验收补漏进行中)
+状态: MERGE CANDIDATE (验收补漏全部完成并通过全量门禁)
 修复前 HEAD: `1459bed59cdf6587f97ae86d2f8c3f24153afb17`
 
 ### P0 / P1 缺口修复清单
 
 | 缺口分类 | 问题描述 | 根因分析 | 涉及文件 | 测试与验证 | 状态 |
 |---|---|---|---|---|---|
-| P0 规则语义与唯一定义 | BUILTIN_RULES 中 COMBINATION 规则错误将同义词放入 all 导致无法命中; 多处分散维护规则定义 | COMBINATION all 需全部命中; 规则定义分散在 4 处 | shared/phase1-risk-rules.json, server/rule-analyzer.mjs, pocketbase/pb_hooks/_lib/rule-validate.js, scripts/generate-phase1-rules.mjs | server/rule-analyzer.test.mjs (56+ cases) + 规则一致性测试 | 进行中 |
-| P0 数据范围隔离 | 区域经理/店长对 audio_files/devices/asr_jobs 等无门店字段集合全量可见; 日志与设置权限过宽 | configs.js 中 tenantOnlyOverrides 对 ORG_TREE/STORE 退化为租户全量 | pocketbase/pb_hooks/_lib/configs.js, pocketbase/pb_hooks/_lib/guards.js, phase1.pb.js | tests/integration/phase1-scenarios.test.mjs 数据范围矩阵测试 | 待修复 |
-| P0 多租户音频幂等 | audio_files 使用全局 UNIQUE(object_key) 且 CRUD 幂等未带 tenant | 索引未加 tenant, 统一 CRUD 幂等查询缺少 tenant 上下文 | pocketbase/pb_migrations/1787500007_phase1_scope_and_audio_idempotency.js, pocketbase/pb_hooks/_lib/crud.js | 多租户同 object_key 隔离测试 | 待修复 |
-| P0 真实进程 E2E | 既有 E2E 测试手工调用 handleRiskAnalysis() 代替真实 Worker | 缺少真实子进程级自动贯通测试 | tests/integration/phase1-subprocess-e2e.test.mjs | 启动真实 PB + Gateway + Worker 子进程 E2E 验收 | 待修复 |
-| P0 ASR 重复成功幂等 | 场景 9 仅测试普通 PATCH 未真实模拟 ASR 成功重复导入 | 缺少真实 ASR 重复导入不增 session/segments/job/issues 测试 | tests/integration/phase1-scenarios.test.mjs | 真实重放 ASR 成功导入断言 5 类记录不增加 | 待修复 |
-| P1 上传 Token 安全 | verifyUploadToken 使用普通字符串比较 HMAC | 存在时序侧信道风险 | server/asr-gateway.mjs | timingSafeEqual + 篡改/重放/过期测试 | 待修复 |
-| P1 ASR Mock 健康状态 | YUQI_ASR_MOCK=1 且未配置 ASR_BASE_URL 时 /health 返回 degraded | /health 未区分 mock 模式 | server/asr-gateway.mjs | /health 单元与端点测试 | 待修复 |
-| P0 部署脚本首次运行安全 | check-env.sh 在端口未监听时报错退出导致死锁; 环境文件硬编码; PM2 reload 初次失败 | 预检逻辑错误将未运行视为失败; PM2 未判断进程是否存在 | deploy/scripts/check-env.sh, deploy/scripts/deploy.sh, deploy/scripts/health-check.sh | tests/deploy/deploy-scripts.test.mjs (bash -n + 场景测试) | 待修复 |
-| P1 生产验证码泄漏防御 | 验证 YUQI_ENV=production 时 send-code 绝不返回验证码 | 防止测试 helper 依赖 dev code | tests/integration/phase1-scenarios.test.mjs | 生产环境短信未配置 503 与无验证码断言 | 待修复 |
+| P0 规则语义与唯一定义 | BUILTIN_RULES 中 COMBINATION 规则错误将同义词放入 all 导致无法命中; 多处分散维护规则定义 | COMBINATION all 需全部命中; 规则定义分散在 4 处 | shared/phase1-risk-rules.json, server/rule-analyzer.mjs, pocketbase/pb_hooks/_lib/rule-validate.js, scripts/generate-phase1-rules.mjs | server/rule-analyzer.test.mjs (56+ cases) + 规则一致性测试 | 已修复 (PASS) |
+| P0 数据范围隔离 | 区域经理/店长对 audio_files/devices/asr_jobs 等无门店字段集合全量可见; 日志与设置权限过宽 | configs.js 中 tenantOnlyOverrides 对 ORG_TREE/STORE 退化为租户全量 | pocketbase/pb_hooks/_lib/configs.js, pocketbase/pb_hooks/_lib/guards.js, phase1.pb.js | tests/integration/phase1-scenarios.test.mjs 数据范围矩阵测试 | 已修复 (PASS) |
+| P0 多租户音频幂等 | audio_files 使用全局 UNIQUE(object_key) 且 CRUD 幂等未带 tenant | 索引未加 tenant, 统一 CRUD 幂等查询缺少 tenant 上下文 | pocketbase/pb_migrations/1787500007_phase1_scope_and_audio_idempotency.js, pocketbase/pb_hooks/_lib/crud.js | 多租户同 object_key 隔离测试 | 已修复 (PASS) |
+| P0 真实进程 E2E | 既有 E2E 测试手工调用 handleRiskAnalysis() 代替真实 Worker | 缺少真实子进程级自动贯通测试 | tests/e2e/phase1-subprocess-e2e.test.mjs | 启动真实 PB + Gateway + Worker 子进程 E2E 验收 | 已修复 (PASS) |
+| P0 ASR 重复成功幂等 | 场景 9 仅测试普通 PATCH 未真实模拟 ASR 成功重复导入 | 缺少真实 ASR 重复导入不增 session/segments/job/issues 测试 | tests/integration/phase1-scenarios.test.mjs | 真实重放 ASR 成功导入断言 5 类记录不增加 | 已修复 (PASS) |
+| P1 上传 Token 安全 | verifyUploadToken 使用普通字符串比较 HMAC | 存在时序侧信道风险 | server/asr-gateway.mjs | timingSafeEqual + 篡改/重放/过期测试 | 已修复 (PASS) |
+| P1 ASR Mock 健康状态 | YUQI_ASR_MOCK=1 且未配置 ASR_BASE_URL 时 /health 返回 degraded | /health 未区分 mock 模式 | server/asr-gateway.mjs | /health 单元与端点测试 | 已修复 (PASS) |
+| P0 部署脚本首次运行安全 | check-env.sh 在端口未监听时报错退出导致死锁; 环境文件硬编码; PM2 reload 初次失败 | 预检逻辑错误将未运行视为失败; PM2 未判断进程是否存在 | deploy/scripts/check-env.sh, deploy/scripts/deploy.sh, deploy/scripts/health-check.sh | tests/deploy/deploy-scripts.test.mjs (bash -n + 场景测试) | 已修复 (PASS) |
+| P1 生产验证码泄漏防御 | 验证 YUQI_ENV=production 时 send-code 绝不返回验证码 | 防止测试 helper 依赖 dev code | tests/integration/phase1-scenarios.test.mjs | 生产环境短信未配置 503 与无验证码断言 | 已修复 (PASS) |

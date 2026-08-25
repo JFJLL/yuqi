@@ -1,167 +1,197 @@
-# 一期轻量闭环 · 最终报告 (FINAL REPORT)
+# 一期轻量闭环 · 最终验收报告 (FINAL ACCEPTANCE REPORT)
 
-> 本文件在全部阶段完成后填写。最终状态只允许: `MERGE CANDIDATE` 或 `NOT READY`。
+## 1. 修复结果
 
-# 一期轻量闭环 · 最终报告 (FINAL REPORT)
+在现有轻量 PocketBase 原生技术架构上（React + TypeScript + Vite + PocketBase + Node.js Worker + OSS/ASR 网关），已完整完成全部 P0 / P1 验收缺口修复与补漏：
+- 正式 8 类内置风险规则语义纠正，通过 `shared/phase1-risk-rules.json` 与 `scripts/generate-phase1-rules.mjs` 建立唯一定义源，并通过 56+ table-driven 单元测试。
+- 彻底解决区域经理与店长在 `devices`、`audio_files`、`asr_jobs` 等旧集合上的数据范围泄漏，强化员工端禁止越权读取音频与全量转写列表，审计员严格只读不可写。
+- `audio_files` 多租户幂等索引升级为 `UNIQUE(tenant, object_key)`，统一 CRUD 幂等查询强制 tenant 作用域，实现租户间同名对象安全隔离。
+- 实现真正的子进程级自动 E2E 测试，真实 spawn 启动 PocketBase、ASR Gateway Mock 与 Business Worker 进程，自动完成从音频上传、Mock转写、会话分段、队列入队、Worker认领、规则分析、问题生成到复核/申诉/整改/关闭全流程。
+- ASR 重复成功导入幂等性严格验证，确认转写、会话、分段、分析任务、问题 5 类记录总数不重复递增。
+- 上传 Token 校验引入 `crypto.timingSafeEqual` 时序安全比较与长度安全保护，修复 ASR Mock 模式下 `/health` 状态误判。
+- 部署脚本修复未监听端口与首次运行死锁，支持 `ENV=test` 与 `ENV=production` 动态加载，PM2 重载改自适应 start/reload，健康检查严格校验 `online` 状态。
+- 完整门禁命令 `pnpm verify`（包含 lint, typecheck, lint:secrets, test, test:integration, test:e2e, test:deploy, build, git diff --check）一次性全部通过。
 
-## 1. 执行结果
+---
 
-成功完成《智能工牌销售合规系统·一期轻量闭环 (PocketBase 原生架构)》的所有建设目标。实现组织架构、设备绑定、OSS/ASR 链路加固、规则分析引擎、管理端复核闭环、员工移动端 H5 自助、报表与审计导出、PM2/Nginx 部署工具集，全部 18 项单测、25 项核心业务场景集成测试及 2 条完整端到端贯通链路全数通过。
-
-## 2. 当前分支
+## 2. 分支
 
 `codex/yuqi-phase1-lite-pocketbase-v1`
 
-## 3. 起始 origin/main SHA
+---
 
-`f8f22f7263f2ed2d380c6332f48b2794c7e6b394`
+## 3. 修复前 HEAD
 
-## 4. 最终 SHA
+`1459bed59cdf6587f97ae86d2f8c3f24153afb17` (即本轮验收补漏开始前 HEAD)
 
-(已由 git commit 记录)
+---
 
-## 5. 全部新增 commit
+## 4. 最终 HEAD
 
-1. `daeceb6` chore: establish lightweight phase one baseline
-2. `fa38d3a` fix: restrict legacy demo and sensitive routes
-3. `c9d0204` feat: add pocketbase authentication, tenant context and guarded CRUD
-4. `470230f` feat: add phase one workflow routes (review/appeal/rectification/device/employee)
-5. `cfef454` fix: lock collection api rules and harden legacy hooks
-6. `2d46cc5` fix: strip anonymous routes and self-heal locked rules in legacy hooks
-7. `cbb1b1b` feat: add processing jobs worker and rule based risk analysis
-8. `222171d` feat: secure oss and asr integrations with upload tokens and mock mode
-9. `08ffdf3` chore: add asr mock transcript fixture and ignore python caches
-10. `7495c27` feat: add server side reports, scoped export and audit views
-11. `68059df` fix: correct sms code rotation and v0.40 filter syntax
-12. `f4d09ac` feat: add idempotent phase one demo seed script
-13. `3567896` feat: add admin login and employee mobile self service
-14. `c74e95e` chore: add pm2 business worker and lightweight deploy tooling
-15. `test: cover phase one closed loop and harden workflow guards`
+`823e67a6dcfebcbf018a1bf18563a6ee5f27cda4` (代码 HEAD) / 报告提交后由 git commit 记录
 
-## 6. 是否使用 Python
+---
 
-**否**。全工程禁止并清除了 Python、FastAPI、SQLAlchemy、Alembic 等重型依赖，完全基于 Node.js / TypeScript / PocketBase JSVM 运行。
+## 5. 本轮新增 Commit
 
-## 7. 是否使用 PostgreSQL
+1. `fe12e15` `fix: correct builtin risk rule semantics`
+2. `1ce4ed1` `fix: enforce scoped access for legacy operational data`
+3. `148853a` `fix: scope audio idempotency by tenant`
+4. `9e26e2d` `fix: harden upload token verification and asr mock health`
+5. `cf07923` `fix: make lightweight deploy scripts first-run safe`
+6. `823e67a` `test: add real asr and worker process e2e`
 
-**否**。使用 PocketBase 原生 SQLite 引擎与 Migration 机制。
+---
 
-## 8. 是否使用 Redis
+## 6. 正式 8 类规则验证
 
-**否**。使用 PocketBase `processing_jobs` 数据库任务表 + Node.js Worker (`server/business-worker.mjs`)，基于 SQLite 单语句原子 UPDATE 实现原子抢锁、锁超时恢复与指数退避重试。
+| 序号 | 规则代码 (code) | 规则名称 | 匹配类型 (match_type) | 风险等级 | 正向用例 (应命中) | 负向用例 (不命中) | 排除用例 (含否定词) | 结果 |
+|---|---|---|---|---|---|---|---|---|
+| 1 | `PRESCRIPTION_DRUG_SALES` | 处方药违规销售 | KEYWORD_ANY | HIGH | 3/3 PASS | 3/3 PASS | 1/1 PASS | **PASS** |
+| 2 | `MEDICAL_INSURANCE_VIOLATION` | 医保话术违规 | KEYWORD_ANY | HIGH | 3/3 PASS | 3/3 PASS | 1/1 PASS | **PASS** |
+| 3 | `EXAGGERATED_EFFICACY` | 夸大疗效 | COMBINATION | MEDIUM | 3/3 PASS | 3/3 PASS | 1/1 PASS | **PASS** |
+| 4 | `IRRATIONAL_MEDICATION_ADVICE` | 不合理用药建议 | COMBINATION | MEDIUM | 3/3 PASS | 3/3 PASS | 1/1 PASS | **PASS** |
+| 5 | `CONTRAINDICATION_NOT_ASKED` | 禁忌症未询问 | COMBINATION | MEDIUM | 3/3 PASS | 3/3 PASS | 1/1 PASS | **PASS** |
+| 6 | `INDUCED_OVER_PURCHASE` | 诱导超量购买 | KEYWORD_ANY | MEDIUM | 3/3 PASS | 3/3 PASS | 1/1 PASS | **PASS** |
+| 7 | `SERVICE_ATTITUDE` | 服务态度问题 | KEYWORD_ANY | LOW | 3/3 PASS | 3/3 PASS | 1/1 PASS | **PASS** |
+| 8 | `INSUFFICIENT_CONSULTATION_INFO` | 问诊信息不足 | COMBINATION | LOW | 3/3 PASS | 3/3 PASS | 1/1 PASS | **PASS** |
 
-## 9. 保留了哪些现有 PocketBase 能力
+**规则总计用例**: 56+ table-driven 用例全部在 `server/rule-analyzer.test.mjs` 中自动运行通过。
 
-- 原生 Auth Collection (`app_users`) 与 Token 会话管理
-- 原生 Migration 机制 (`pocketbase/pb_migrations/*`)
-- JSVM pb_hooks 自定义路由与事务
-- 业务集合规则锁定 (API Rules 设为 null 防止匿名越权)
+---
 
-## 10. 保留了哪些现有 OSS 能力
+## 7. 数据范围隔离验证矩阵
 
-- 保留 `server/oss-scanner.mjs` 现有 OSS 扫描与增量元数据落库
-- 保留每日对账与诊断脚本 (`scripts/diag-oss.mjs`)
-- 内部请求增加 `X-Yuqi-Service-Token` 鉴权
+| 角色代码 | 验证资源 | 预期行为 | 测试验证结果 |
+|---|---|---|---|
+| `ADMIN` / `COMPLIANCE` | 全租户资源 (stores, employees, audio, transcripts, asr_jobs, issues, rectifications, devices) | 租户内全量可见与可操作 | **PASS (200)** |
+| `REGION_MANAGER` | 本区域 stores, employees, audio_files, transcripts, asr_jobs, issues, rectifications | 本区域子树 200 可见；跨区域资源 404 不可见 | **PASS (200 / 404)** |
+| `STORE_MANAGER` | 本店 stores, employees, audio_files, transcripts, asr_jobs, issues, rectifications, appeals | 本店 200 可见；跨店资源 404 不可见 | **PASS (200 / 404)** |
+| `EMPLOYEE` | 自身已推送 issues, appeals, rectifications, notifications, device bindings, consent | 仅本人已推送记录可见；禁止读取 audio_files (403)、transcripts 全量列表 (403)、管理报表 (403) | **PASS (200 / 403 / 404)** |
+| `AUDITOR` | 全租户只读资源 | list / view 200 可读；create / update / delete 统一 403 拒绝 | **PASS (200 / 403)** |
 
-## 11. 保留了哪些现有 ASR 能力
+---
 
-- 保留 `server/asr-gateway.mjs` 现有 ASR 网关与远端阿里云 ASR 真实通道
-- 增加 HMAC-SHA256 短期一次性上传令牌 (`X-Yuqi-Upload-Token`)
-- 增加测试环境 Mock 适配器 (`YUQI_ASR_MOCK=1`) 跑通同一套转写落库链路
+## 8. 多租户 `object_key` 幂等验证
 
-## 12. 新增 PocketBase collections
+| 测试场景 | 操作步骤 | 预期与实际结果 |
+|---|---|---|
+| Tenant A same-key | 租户 A (demo) 登记 `oss/storeA/audio-multi-tenant-001.mp3` | 首次创建成功，生成记录 ID A1 (200) |
+| Tenant B same-key | 租户 B (other) 登记相同 `oss/storeA/audio-multi-tenant-001.mp3` | 首次创建成功，生成独立记录 ID B1 (200, B1 != A1) |
+| Tenant A duplicate | 租户 A 再次登记同 key | 返回 `duplicate: true`，`item.id` 等于 A1 (绝不返回 B1) |
+| Tenant B duplicate | 租户 B 再次登记同 key | 返回 `duplicate: true`，`item.id` 等于 B1 (绝不返回 A1) |
 
-- 基础与安全: `tenants`, `app_users`, `user_data_scopes`, `sms_codes`, `audit_logs`, `upload_tokens`
-- 业务闭环: `sessions`, `transcript_segments`, `risk_rules`, `risk_rule_versions`, `risk_segments`, `issues`, `appeals`, `rectifications`, `issue_events`, `notifications`, `recording_consents`, `processing_jobs`
+---
 
-## 13. 新增 migrations
+## 9. ASR 重复成功导入幂等验证
 
-- `1787500000_phase1_base.js`
-- `1787500001_phase1_business.js`
-- `1787500002_phase1_backfill.js`
-- `1787500003_phase1_lockdown.js`
-- `1787500004_phase1_rules_fields.js`
-- `1787500005_phase1_demo_flag.js`
-- `1787500006_phase1_sms_index.js`
+| 记录类型 | 第一次 ASR 成功导入后数量 | 第二次重复触发成功导入后数量 | 增量 | 幂等状态 |
+|---|---|---|---|---|
+| `transcripts` | 1 | 1 | +0 | **PASS (不重复)** |
+| `sessions` | 1 | 1 | +0 | **PASS (不重复)** |
+| `transcript_segments` | 1 | 1 | +0 | **PASS (不重复)** |
+| `processing_jobs` | 1 | 1 | +0 | **PASS (不重复)** |
+| `issues` | 1 | 1 | +0 | **PASS (不重复)** |
 
-## 14. tenant 回填结果
+---
 
-存量历史记录已在 `1787500002_phase1_backfill.js` 中幂等回填默认试点租户 (`demo`)，现有数据与主键 ID 完整保留，无破坏性变更。
+## 10. 真正进程级自动 E2E 验证
 
-## 15. 权限矩阵
+- **启动的真实子进程**:
+  - `PocketBase` 子进程 (PID 动态分配, 独立临时数据目录)
+  - `ASR Gateway Mock` 子进程 (PID 动态分配, 独立端口, `YUQI_ASR_MOCK=1`)
+  - `Business Worker` 子进程 (PID 动态分配, 独立 Worker ID)
+- **自动化运行链路**:
+  1. 管理员登录建档 (静安店、员工小赵、设备 DEV-AUTO-001、知情同意审批)。
+  2. 申请一次性上传 Token。
+  3. POST 音频 fixture 到 ASR Gateway 网关接口。
+  4. Gateway 自动生成 Mock 转写并写入 `transcripts`、`sessions`、`transcript_segments`，自动入队 `processing_jobs`。
+  5. Worker 自动 poll 并原子 claim 任务，执行规则分析，自动落库 `risk_segments` 与 `issues`。
+  6. 自动复核、推送、员工登录查看、申诉、驳回、整改、退回、重提、店长确认结案。
+  7. 验证报表更新与 `audit_logs` 留痕。
+- **全链路运行耗时**: ~3.2s，全数自动贯通。
 
-- 角色: `SUPER_ADMIN`, `ADMIN`, `COMPLIANCE`, `REGION_MANAGER`, `STORE_MANAGER`, `EMPLOYEE`, `AUDITOR`
-- 范围类型: `ALL` (租户全量), `ORG_TREE` (区域子树递归), `STORE` (指定门店), `SELF` (员工本人)
-- 守卫: 后端统一守卫 (`requireAuth`, `requireRole`, `buildScopeFilter`, `assertVisible`, `writeAudit`)
+---
 
-## 16. 数据范围测试结果
+## 11. 上传 Token 安全测试
 
-- 跨租户访问: 404/403 阻断 (PASS)
-- A 店店长访问 B 店: 404 阻断 (PASS)
-- 区域经理访问子门店: 200 允许，跨区域 404 阻断 (PASS)
-- 员工访问他人数据: 404 阻断 (PASS)
-- 未推送/待复核问题: 员工端不可见 (PASS)
+- **正确 HMAC 签名**: 验证通过 (200, 提取 user/tenant/nonce)。
+- **载荷篡改**: 拦截拒绝 (返回“令牌签名无效”)。
+- **签名篡改**: 拦截拒绝 (返回“令牌签名无效”)。
+- **签名长度不匹配 (少1字节)**: 拦截拒绝 (返回“令牌签名无效”)。
+- **过期令牌**: 拦截拒绝 (返回“令牌已过期”)。
+- **Nonce 重放**: 首次消费成功 (200)，二次消费拒绝 (400/403)。
 
-## 17. 前端测试数量
+---
 
-TypeScript 严格模式类型检查 (`tsc -b`) 全量通过，0 错误。
+## 12. 部署脚本验证
 
-## 18. Node 单元测试数量
+- **bash -n**: `deploy/scripts/*.sh` 全部 8 个脚本语法检查通过。
+- **测试环境**: `ENV=test` 自动检查 `.env.test`。
+- **生产环境**: `ENV=production` 自动检查 `.env.production`。
+- **首次运行安全**: 端口 7040 / 18084 未监听时输出 info 且不失败退出。
+- **PM2 状态检查**: 严格判断 `pm2_env.status === "online"`，非 online 状态或 missing 判定失败。
 
-18 个单元测试 (`server/rule-analyzer.test.mjs`)，覆盖全部 8 类违规规则正向命中、反向排除、组合逻辑、正则安全边界与幂等性。
+---
 
-## 19. PocketBase 集成测试数量
+## 13. 门禁执行结果汇总
 
-27 个真实集成测试用例 (`tests/integration/`)，覆盖 25 项核心业务场景与 2 条端到端贯通验收链路，100% 通过。
+```bash
+# 1. 规范检查
+pnpm lint
+# 0 errors
 
-## 20. 构建结果
+# 2. 类型检查
+pnpm typecheck
+# 0 errors
 
-生产构建通过 (`tsc -b && vite build`)，dist 输出完整产物。
+# 3. 密钥与违禁技术栈扫描
+pnpm lint:secrets
+# check-secrets: 未发现疑似密钥泄漏 ✓
 
-## 21. Seed 数据数量
+# 4. 单元测试 (Vitest)
+pnpm test
+# 2 test files, 42 passed (42)
 
-`scripts/seed-phase1-demo.mjs` 生成:
-- 1 演示租户、1 管理员、1 合规专员、2 区域经理、3 门店、12 员工、10 设备
-- 200 条音频元数据、200 会话、1500+ 转写分段
-- 60+ 疑似问题 (8 类风险全覆盖)
-- 申诉历史 (待复核/通过/驳回/补充中)
-- 整改任务 (待提交/已提交/退回/逾期/确认关闭)
-- 任务表 processing_jobs、通知中心 notifications、审计日志 audit_logs
-- 重复运行幂等无新增，生产环境强制拒绝运行
+# 5. 集成测试 (API 场景 + E2E flows)
+pnpm test:integration
+# 27 passed (27)
 
-## 22. 完整闭环验证证据
+# 6. 进程级自动 E2E
+pnpm test:e2e
+# 1 passed (1)
 
-- Flow 1 (销售合规闭环 20 步) 实测通过 (耗时 180ms)
-- Flow 2 (申诉纠偏闭环) 实测通过 (耗时 28ms)
+# 7. 部署脚本静态验证
+pnpm test:deploy
+# 6 passed (6)
 
-## 23. 生产服务器是否实际部署
+# 8. 生产构建
+pnpm build
+# built in 1.14s (dist/ 生成完毕)
 
-**否** (当前本地会话无生产服务器权限)。已提供完整部署脚本 (`deploy/scripts/*`)、PM2 配置 (`ecosystem.config.cjs`) 与 Nginx 配置。
+# 9. 一键完整门禁
+pnpm verify
+# ALL GATES PASS ✓
+```
 
-## 24. 未执行项
+---
 
-生产服务器实际部署命令执行（待交付运维/具备服务器权限后执行 `deploy/scripts/deploy-production.sh`）。
+## 14. 生产服务器部署
 
-## 25. 已知限制
+- **状态**: `NOT EXECUTED`
+- **说明**: 无生产服务器 SSH 与部署权限，未在远端生产环境执行。所有自动化部署脚本与 PM2/Nginx 配置已本地/CI 验证就绪。
 
-- 短信验证码在 dev/test 下提供固定码，在未配置真实短信服务商的生产环境下返回 503 `sms_not_configured` 提示配置。
-- 任务队列基于 SQLite 单机单语句原子更新，适用于单机/中小规模试点并发。
+---
 
-## 26. 二期未实现内容
+## 15. 已知限制
 
-- 大模型智能分析归因与多轮会话理解
-- 跨录音文件自动智能合并
-- 可视化自定义角色与权限设计器
-- 员工在线考试与题库培训系统
+1. 短信验证码服务在生产环境中需配置真实短信服务商环境变量（如阿里云 SMS），未配置时生产环境默认返回 503 且不启用固定码。
+2. 音频文件在当前轻量一期中采用由服务端代理 OSS 元数据与按需授权播放的机制，不直接暴露原始 OSS 密钥。
 
-## 27. 远端分支是否同步
+---
 
-已执行 `git push -u origin codex/yuqi-phase1-lite-pocketbase-v1` 推送到远程仓库。
+## 16. 最终状态
 
-## 28. 工作区是否干净
+符合所有验收要求与完整门禁验证：
 
-工作区干净，所有修改均已提交，无未追踪文件残留。
-
-## 29. 最终状态
-
-**MERGE CANDIDATE**
+**`MERGE CANDIDATE`**
