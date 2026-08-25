@@ -6,16 +6,31 @@
 
 import { readFileSync } from "node:fs"
 
-export function validateAsrHealth(healthData, env = "production") {
+export function validateAsrHealth(healthData, env = "production", options = {}) {
   if (!healthData || typeof healthData !== "object") {
     return { ok: false, message: "ASR health 响应不是有效 JSON 对象" }
   }
 
   const { status, mode, asr_configured, embedded_worker } = healthData
   const isProd = env === "production"
+  const requireEmbedded = Boolean(options.requireEmbeddedWorker)
 
-  // 校验内嵌 Worker: 如果明确启用了 embedded_worker, 则 running 必须为 true
-  if (embedded_worker && typeof embedded_worker === "object") {
+  // 严格要求内嵌 Worker (例如部署切量时验证)
+  if (requireEmbedded) {
+    if (!embedded_worker || typeof embedded_worker !== "object") {
+      return {
+        ok: false,
+        message: "ASR Gateway 响应缺少 embedded_worker 字段 (可能是旧版本网关未包含内嵌 Worker)",
+      }
+    }
+    if (embedded_worker.enabled !== true || embedded_worker.running !== true) {
+      return {
+        ok: false,
+        message: `ASR Gateway 的内嵌 Worker 未处于就绪状态 (enabled=${embedded_worker.enabled}, running=${embedded_worker.running})`,
+      }
+    }
+  } else if (embedded_worker && typeof embedded_worker === "object") {
+    // 未强制要求但已启用时，running 必须为 true
     const { enabled, running } = embedded_worker
     if (enabled === true && running !== true) {
       return {
@@ -63,14 +78,17 @@ export function validateAsrHealth(healthData, env = "production") {
 function parseArgs(args) {
   let env = process.env.ENV || "production"
   let jsonStr = ""
+  let requireEmbeddedWorker = String(process.env.REQUIRE_EMBEDDED_WORKER || "") === "1"
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--env" && args[i + 1]) {
       env = args[++i]
     } else if (args[i] === "--json" && args[i + 1]) {
       jsonStr = args[++i]
+    } else if (args[i] === "--require-embedded-worker") {
+      requireEmbeddedWorker = true
     }
   }
-  return { env, jsonStr }
+  return { env, jsonStr, requireEmbeddedWorker }
 }
 
 const isMain = Boolean(
@@ -79,7 +97,7 @@ const isMain = Boolean(
 )
 
 if (isMain) {
-  const { env, jsonStr } = parseArgs(process.argv.slice(2))
+  const { env, jsonStr, requireEmbeddedWorker } = parseArgs(process.argv.slice(2))
   let raw = jsonStr
   if (!raw) {
     try {
@@ -102,7 +120,7 @@ if (isMain) {
     process.exit(1)
   }
 
-  const result = validateAsrHealth(data, env)
+  const result = validateAsrHealth(data, env, { requireEmbeddedWorker: Boolean(requireEmbeddedWorker) })
   if (result.ok) {
     console.log(`[check-asr-health] [ok] ${result.message}`)
     process.exit(0)
