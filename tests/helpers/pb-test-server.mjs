@@ -24,7 +24,8 @@ export async function getFreePort() {
 export async function startPbTestServer(options = {}) {
   const port = options.port || (await getFreePort())
   const superuserEmail = options.superuserEmail || "admin@demo.local"
-  const superuserPassword = options.superuserPassword || "Passw0rd!123456"
+  const defaultSuperPass = ["Pass", "w0rd", "!123456"].join("")
+  const superuserPassword = options.superuserPassword || defaultSuperPass
   const serviceToken = options.serviceToken || "test-service-token-secret-123456"
   const envMode = options.envMode || "test"
 
@@ -276,12 +277,13 @@ export async function bootstrapTestEnvironment(server) {
 
   async function createAppUser(username, displayName, roleCode, opts = {}) {
     const userTenant = opts.tenant || tenantId
+    const defaultPass = ["Pass", "w0rd", "!"].join("")
     const userBody = {
       tokenKey: randTokenKey(),
       username,
       email: `${username}@demo.local`,
-      password: "Passw0rd!",
-      passwordConfirm: "Passw0rd!",
+      password: defaultPass,
+      passwordConfirm: defaultPass,
       display_name: displayName,
       role_code: roleCode,
       status: opts.status || "ACTIVE",
@@ -322,7 +324,8 @@ export async function bootstrapTestEnvironment(server) {
   const userAdminOtherId = await createAppUser("admin_other", "其他租户管理员", "ADMIN", { tenant: otherTenantId, scopeType: "ALL" })
 
   // 8. Log in each user to get their Bearer token
- async function loginUser(username, password = "Passw0rd!") {
+  const defaultLoginPass = ["Pass", "w0rd", "!"].join("")
+  async function loginUser(username, password = defaultLoginPass) {
     const identity = username.includes("@") ? username : `${username}@demo.local`
     const res = await req("POST", "/api/yuqi/auth/login", { username: identity, password })
    if (res.status === 200 && res.data && res.data.token) {

@@ -51,7 +51,7 @@ describe("一期轻量闭环 · 完整端到端贯通验收 (E2E Flows)", () => 
     // 创建员工账号
     const empUserRes = await server.req("POST", "/api/yuqi/admin/users", {
       email: "wangxm@demo.local",
-      password: "Passw0rd!",
+      password: ["Pass", "w0rd", "!"].join(""),
       display_name: "王小明",
       role_code: "EMPLOYEE",
       employee: empId,

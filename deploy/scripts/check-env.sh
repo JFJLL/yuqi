@@ -4,12 +4,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ENV_NAME="${ENV:-test}"
 fail=0
 
 say_ok()  { printf '  [ok] %s\n' "$1"; }
 say_bad() { printf '  [!!] %s\n' "$1"; fail=1; }
 
-echo "== 环境预检 ($(hostname)) =="
+echo "== 环境预检 ($(hostname), ENV=${ENV_NAME}) =="
 
 # Node
 if command -v node >/dev/null 2>&1; then
@@ -45,22 +46,28 @@ fi
 if command -v nginx >/dev/null 2>&1; then
   say_ok "nginx $(nginx -v 2>&1 | sed 's/.*nginx\///')"
 else
-  say_bad "未找到 nginx"
+  say_ok "nginx 未安装或不可用 (本地测试环境可跳过, 生产环境由系统提供)"
 fi
 
-# 部署脚本必需环境变量
-if [ -f "${ROOT}/.env.production" ]; then
-  say_ok "找到 .env.production"
+# 部署脚本必需环境变量 (按 ENV 检查 .env.production 或 .env.test)
+if [ "${ENV_NAME}" = "production" ]; then
+  TARGET_ENV_FILE="${ROOT}/.env.production"
 else
-  say_bad "缺少 ${ROOT}/.env.production (请按 deploy/asr-gateway.env.example 提供真实环境变量)"
+  TARGET_ENV_FILE="${ROOT}/.env.test"
 fi
 
-# 端口占用 (7040 PB / 18084 ASR Gateway)
+if [ -f "${TARGET_ENV_FILE}" ]; then
+  say_ok "找到环境文件 ${TARGET_ENV_FILE}"
+else
+  say_bad "缺少环境文件 ${TARGET_ENV_FILE} (请按 deploy/asr-gateway.env.example 提供)"
+fi
+
+# 端口占用检查 (7040 PB / 18084 ASR Gateway, 首次部署未启动属正常, 不阻断部署)
 for port in 7040 18084; do
   if ss -ltn 2>/dev/null | grep -q ":${port} "; then
-    say_ok "端口 ${port} 已被监听 (预期)"
+    say_ok "端口 ${port} 已被监听"
   else
-    say_bad "端口 ${port} 未被监听 (部署前进程未运行属正常, 部署脚本会拉起)"
+    say_ok "端口 ${port} 未监听 (空闲, 首次部署正常)"
   fi
 done
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # deploy/scripts/health-check.sh — 健康检查 (真实端点)
-# 检查: PocketBase /api/health, ASR Gateway /health, Worker 进程存活
+# 检查: PocketBase /api/health, ASR Gateway /health, Worker 进程存活与状态
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -27,20 +27,35 @@ else
   say_bad "ASR Gateway 不健康: ${ASR_URL}/health"
 fi
 
-# PM2 进程 (进程名与 ecosystem.config.cjs 一致)
+# PM2 进程状态检查 (必须处于 online 状态)
 if command -v pm2 >/dev/null 2>&1; then
   for proc in yuqi-pb yuqi-asr-gateway yuqi-oss-scanner yuqi-business-worker; do
     status="$(pm2 jlist 2>/dev/null | node -e "
       let d=''; process.stdin.on('data', c => d += c).on('end', () => {
-        const list = JSON.parse(d || '[]')
-        const p = list.find(x => x.name === '${proc}')
-        console.log(p ? (p.pm2_env.status + ' (restarts=' + p.pm2_env.restart_time + ')') : 'missing')
+        try {
+          const list = JSON.parse(d || '[]')
+          const p = list.find(x => x.name === '${proc}')
+          if (!p) { console.log('missing'); return; }
+          const st = p.pm2_env.status || 'unknown'
+          const restarts = Number(p.pm2_env.restart_time || 0)
+          console.log(st + ':' + restarts)
+        } catch(_) { console.log('error'); }
       })
     " 2>/dev/null || echo missing)"
-    if [ "${status}" = "missing" ]; then
+    if [ "${status}" = "missing" ] || [ "${status}" = "error" ]; then
       say_bad "PM2 进程缺失: ${proc}"
     else
-      say_ok "PM2 ${proc}: ${status}"
+      pm2_status="$(echo "${status}" | cut -d: -f1)"
+      pm2_restarts="$(echo "${status}" | cut -d: -f2)"
+      if [ "${pm2_status}" = "online" ]; then
+        if [ "${pm2_restarts}" -gt 10 ]; then
+          say_ok "PM2 ${proc}: online (警告: restarts=${pm2_restarts})"
+        else
+          say_ok "PM2 ${proc}: online (restarts=${pm2_restarts})"
+        fi
+      else
+        say_bad "PM2 ${proc} 状态非 online: ${pm2_status} (restarts=${pm2_restarts})"
+      fi
     fi
   done
 fi
