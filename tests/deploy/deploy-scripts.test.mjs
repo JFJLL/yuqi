@@ -62,6 +62,26 @@ describe("部署脚本静态分析与首次部署安全性", () => {
     assert.ok(content.includes("yuqi-business-worker") && content.includes("pm2 delete"), "必须包含对遗留独立 yuqi-business-worker 的清理逻辑")
   })
 
+  it("deploy.sh: 严格执行 Pre-cutover 校验 -> 清理旧 Worker -> pm2 save -> Final 健康检查时序", () => {
+    const content = readFileSync(path.join(scriptsDir, "deploy.sh"), "utf8")
+    const preHealthIndex = content.indexOf("Pre-cutover health check")
+    const legacyCleanupIndex = content.indexOf("pm2 delete yuqi-business-worker")
+    const pm2SaveIndex = content.indexOf("pm2 save")
+    const finalHealthIndex = content.indexOf("Final health check")
+
+    assert.ok(preHealthIndex > 0, "必须包含 Pre-cutover health check")
+    assert.ok(legacyCleanupIndex > 0, "必须包含 legacy worker cleanup")
+    assert.ok(pm2SaveIndex > 0, "必须包含 pm2 save")
+    assert.ok(finalHealthIndex > 0, "必须包含 Final health check")
+
+    assert.ok(preHealthIndex < legacyCleanupIndex, "Pre-cutover 必须在删除旧 Worker 之前执行")
+    assert.ok(legacyCleanupIndex < pm2SaveIndex, "删除旧 Worker 必须在 pm2 save 之前执行")
+    assert.ok(pm2SaveIndex < finalHealthIndex, "pm2 save 必须在 Final health check 之前执行")
+
+    // 验证生产环境禁止 YUQI_EMBEDDED_WORKER=0
+    assert.ok(content.includes('YUQI_EMBEDDED_WORKER:-1}" = "0"'), "生产环境必须禁止 YUQI_EMBEDDED_WORKER=0")
+  })
+
   it("ecosystem.config.cjs: 默认精简为 3 个 PM2 进程并保留 package.json worker 命令", () => {
     const ecoContent = readFileSync(path.join(root, "ecosystem.config.cjs"), "utf8")
     assert.ok(ecoContent.includes("name: 'yuqi-pb'"), "包含 yuqi-pb")
@@ -78,6 +98,7 @@ describe("部署脚本静态分析与首次部署安全性", () => {
     assert.ok(content.includes('pm2_status === "online"') || content.includes('pm2_status}" = "online"'), "必须判断 status 为 online")
     assert.ok(content.includes("say_bad") && content.includes("状态非 online"), "状态非 online 时必须 fail")
     assert.ok(content.includes("for proc in yuqi-pb yuqi-asr-gateway yuqi-oss-scanner;"), "默认健康检查校验 3 个核心服务进程")
+    assert.ok(content.includes("--require-embedded-worker"), "支持传递 --require-embedded-worker 参数")
   })
 
   it("health-check.sh 与 check-asr-health.mjs: 生产与测试环境 ASR 健康检查矩阵", () => {
@@ -112,5 +133,22 @@ describe("部署脚本静态分析与首次部署安全性", () => {
     // 8. 独立 Worker 模式: enabled=false -> 允许通过
     const workerDisabled = validateAsrHealth({ status: "ok", mode: "private", asr_configured: true, embedded_worker: { enabled: false, running: false } }, "production")
     assert.equal(workerDisabled.ok, true, "standalone 模式 (enabled=false) 允许通过")
+
+    // 9. 部署强制要求内嵌 Worker (requireEmbeddedWorker=true):
+    // 9.1 缺少 embedded_worker 字段 -> 必须判定失败
+    const missingField = validateAsrHealth({ status: "ok", mode: "private", asr_configured: true }, "production", { requireEmbeddedWorker: true })
+    assert.equal(missingField.ok, false, "强制要求内嵌 Worker 时若缺少该字段必须失败")
+
+    // 9.2 enabled=false -> 必须判定失败
+    const requireFailedDisabled = validateAsrHealth({ status: "ok", mode: "private", asr_configured: true, embedded_worker: { enabled: false, running: false } }, "production", { requireEmbeddedWorker: true })
+    assert.equal(requireFailedDisabled.ok, false, "强制要求内嵌 Worker 时若未开启必须失败")
+
+    // 9.3 enabled=true 但 running=false -> 必须判定失败
+    const requireFailedRunning = validateAsrHealth({ status: "ok", mode: "private", asr_configured: true, embedded_worker: { enabled: true, running: false } }, "production", { requireEmbeddedWorker: true })
+    assert.equal(requireFailedRunning.ok, false, "强制要求内嵌 Worker 时若未运行必须失败")
+
+    // 9.4 enabled=true 且 running=true -> 必须通过
+    const requireSuccess = validateAsrHealth({ status: "ok", mode: "private", asr_configured: true, embedded_worker: { enabled: true, running: true } }, "production", { requireEmbeddedWorker: true })
+    assert.equal(requireSuccess.ok, true, "强制要求内嵌 Worker 时若正常运行必须通过")
   })
 })

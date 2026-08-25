@@ -343,7 +343,7 @@ pnpm verify            # 一键全量门禁 (lint + typecheck + secrets + tests 
 ## 12. 生产部署说明
 
 - **部署入口**：`ENV=production bash deploy/scripts/deploy-production.sh`
-- **部署流程**：环境预检 → PocketBase 数据备份 (`pb_data`) → 前端构建 → PM2 进程热重载 → Nginx 配置检查与重载 → 端到端健康检查。
+ - **部署流程**：环境预检 → PocketBase 数据备份 (`pb_data`) → 前端构建 → PM2 进程热重载 → Pre-cutover 内嵌 Worker 就绪校验 → 安全清理遗留独立 Worker → Nginx 配置重载 → 最终端到端健康检查。
 - **生产 ASR 准入**：生产健康检查严格校验 `mode=private` 且 `asr_configured=true`，拒绝 `mock` 或 `degraded` 状态。
 
 > **当前交付状态**：

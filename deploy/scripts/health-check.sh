@@ -24,10 +24,14 @@ fi
 # ASR Gateway: 校验 JSON 内容，生产环境禁止 degraded/unconfigured/mock 假通过
 asr_health_raw="$(curl -sf -m 5 "${ASR_URL}/health" 2>/dev/null || echo "")"
 if [ -n "${asr_health_raw}" ]; then
-  if node "${ROOT}/scripts/check-asr-health.mjs" --env "${ENV_NAME}" --json "${asr_health_raw}" >/dev/null 2>&1; then
+  extra_args=()
+  if [ "${REQUIRE_EMBEDDED_WORKER:-0}" = "1" ]; then
+    extra_args+=(--require-embedded-worker)
+  fi
+  if node "${ROOT}/scripts/check-asr-health.mjs" --env "${ENV_NAME}" "${extra_args[@]}" --json "${asr_health_raw}" >/dev/null 2>&1; then
     say_ok "ASR Gateway ${ASR_URL}/health (${ENV_NAME} 模式校验通过)"
   else
-    asr_reason="$(node "${ROOT}/scripts/check-asr-health.mjs" --env "${ENV_NAME}" --json "${asr_health_raw}" 2>&1 || true)"
+    asr_reason="$(node "${ROOT}/scripts/check-asr-health.mjs" --env "${ENV_NAME}" "${extra_args[@]}" --json "${asr_health_raw}" 2>&1 || true)"
     say_bad "ASR Gateway 未达到 ${ENV_NAME} 健康要求: ${asr_reason}"
   fi
 else
