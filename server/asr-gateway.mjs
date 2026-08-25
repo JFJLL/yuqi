@@ -234,9 +234,10 @@ async function persistSessionAndSegments(job, result) {
   if (!session) {
     session = await pbRequest("/api/sessions", { method: "POST", body: sessionBody })
   } else {
-    session = await pbRequest(`/api/sessions/${encodeURIComponent(session.id)}`, { method: "PATCH", body: { status: "TRANSCRIBED" } })
+    const sId = session.id || session.item?.id
+    session = await pbRequest(`/api/sessions/${encodeURIComponent(sId)}`, { method: "PATCH", body: { status: "TRANSCRIBED" } })
   }
-  const sessionId = String(session.id || "")
+  const sessionId = String(session.id || session.item?.id || "")
 
   // 2. transcript_segments (幂等: 跳过已存在的 sequence)
   let existing = { items: [] }
@@ -419,8 +420,8 @@ function normalizeResult(payload) {
   return { fullText, segments, model: String(payload?.model || "") }
 }
 
-async function importSucceededJob(job, remoteState) {
-  if (job.result_imported_at) return
+async function importSucceededJob(job, remoteState = {}, deps = {}) {
+  if (job.result_imported_at) return { skipped: true, already_imported: true }
   let result = null
   if (isAsrMock()) {
     result = loadMockResult()
@@ -441,26 +442,50 @@ async function importSucceededJob(job, remoteState) {
       audio_name: job.audio_name || remoteState.original_filename || "",
     },
   })
-  await pbRequest(`/api/asr_jobs/${encodeURIComponent(job.id)}`, {
-    method: "PATCH",
-    body: {
-      status: "succeeded",
-      started_at: remoteState.started_at || job.started_at || "",
-      finished_at: remoteState.completed_at || pbDate(),
-      attempts: Number(remoteState.attempts || job.attempts || 0),
-      result_imported_at: pbDate(),
-      error_code: "",
-      error_message: "",
-    },
-  })
-  // 新链路: 会话 + 转写分段 + 自动风险分析任务
+  const persist = deps.persistSessionAndSegments || persistSessionAndSegments
   try {
-    const info = await persistSessionAndSegments(job, result)
-    console.log(`[asr-gateway] session ${info.sessionId} ready, segments written=${info.segments_written}, analysis enqueued`)
+    const info = await persist(job, result)
+    console.log(`[asr-gateway] session ${info?.sessionId} ready, segments written=${info?.segments_written}, analysis enqueued`)
+
+    await pbRequest(`/api/asr_jobs/${encodeURIComponent(job.id)}`, {
+      method: "PATCH",
+      body: {
+        status: "succeeded",
+        started_at: remoteState.started_at || job.started_at || "",
+        finished_at: remoteState.completed_at || pbDate(),
+        attempts: Number(remoteState.attempts || job.attempts || 0),
+        result_imported_at: pbDate(),
+        error_code: "",
+        error_message: "",
+      },
+    })
+
+    await writeSyncLog("ASR结果", job.id, job.store, "成功", `转写完成：${result.segments.length} 个分段`)
+    return { imported: true, sessionId: info?.sessionId, segments_written: info?.segments_written }
   } catch (error) {
-    console.error(`[asr-gateway] session/segments/enqueue failed: ${safeMessage(error)}`)
+    const safeErr = safeMessage(error, "下游业务数据持久化失败")
+    console.error(`[asr-gateway] session/segments/enqueue failed: ${safeErr}`)
+
+    try {
+      await pbRequest(`/api/asr_jobs/${encodeURIComponent(job.id)}`, {
+        method: "PATCH",
+        body: {
+          status: "queued",
+          error_code: "downstream_persist_failed",
+          error_message: safeErr,
+          result_imported_at: "",
+        },
+      })
+    } catch (patchErr) {
+      console.error(`[asr-gateway] failed to mark job ${job.id} as queued: ${safeMessage(patchErr)}`)
+    }
+
+    try {
+      await writeSyncLog("ASR结果导入", job.id, job.store, "失败", `下游持久化失败：${safeErr}`)
+    } catch (_) {}
+
+    throw error
   }
-  await writeSyncLog("ASR结果", job.id, job.store, "成功", `转写完成：${result.segments.length} 个分段`)
 }
 
 async function syncOneJob(job) {

@@ -560,8 +560,9 @@ module.exports = {
     audit: { create: "app_setting_create", update: "app_setting_update", delete: "app_setting_delete" },
   },
 
- sessions: {
-   name: "sessions",
+  sessions: {
+    name: "sessions",
+    idempotentKey: "transcript",
     roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN", "ADMIN"] },
    scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
    filters: ["audio_file", "transcript", "employee", "store", "device_sn", "status"],

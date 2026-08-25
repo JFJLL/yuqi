@@ -84,7 +84,8 @@ function setField(record, name, value, spec) {
 
 function totalCount(name, filter, params) {
   try {
-    const q = $app.db().newQuery("SELECT count(*) as c FROM `" + name + "` WHERE " + filter).bind(params || {})
+    const sqlFilter = String(filter || "").replace(/ && /g, " AND ").replace(/ \|\| /g, " OR ")
+    const q = $app.db().newQuery("SELECT count(*) as c FROM `" + name + "` WHERE " + sqlFilter).bind(params || {})
     const row = q.one({ c: 0 })
     const n = Number(row && row.get ? row.get("c") : row && row.c)
     return Number.isFinite(n) ? n : 0
