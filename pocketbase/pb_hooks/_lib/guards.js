@@ -299,13 +299,32 @@ module.exports = {
     if (tenant && tenant !== ctx.tenantId) throw new NotFoundError("记录不存在")
     const scope = ctx.scope || { type: "SELF" }
     if (scope.type === "ALL") return
+    let collectionName = ""
+    try {
+      collectionName = String(record.collection().name || "")
+    } catch (_) {}
     if (scope.type === "STORE") {
+      if (collectionName === "stores") {
+        if (record.id !== scope.store) throw new NotFoundError("记录不存在")
+        return
+      }
       const storeField = cfg.storeField || "store"
       const storeId = String(record.get(storeField) || "")
       if (storeId !== scope.store) throw new NotFoundError("记录不存在")
       return
     }
     if (scope.type === "ORG_TREE") {
+      if (collectionName === "stores") {
+        const regionId = String(record.get("region") || "")
+        const ids = this.regionSubtreeIds(scope.orgNode)
+        if (!regionId || ids.indexOf(regionId) < 0) throw new NotFoundError("记录不存在")
+        return
+      }
+      if (collectionName === "regions") {
+        const ids = this.regionSubtreeIds(scope.orgNode)
+        if (ids.indexOf(record.id) < 0) throw new NotFoundError("记录不存在")
+        return
+      }
       const storeField = cfg.storeField || "store"
       let storeId = String(record.get(storeField) || "")
       if (storeId) {

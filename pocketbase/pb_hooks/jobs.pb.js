@@ -68,7 +68,7 @@ routerAdd("POST", "/api/yuqi/internal/jobs/claim", (e) => {
     const cutoffStr = JH.pbDate(new Date(now.getTime() - lockMs))
 
     // 原子领取: 单条条件 UPDATE (SQLite 单语句原子), 避免双 worker 重复领取
-    const sql = "UPDATE `processing_jobs` SET `status`='RUNNING', `locked_by`={:w}, `locked_at`={:now}, `attempts`=`attempts`+1, `started_at`={:now} WHERE `id` = (SELECT `id` FROM `processing_jobs` WHERE `tenant`={:t} AND `status` IN ('QUEUED','RETRYING') AND (`next_retry_at`='' OR `next_retry_at` <= {:now}) AND (`locked_at`='' OR `locked_at` <= {:cutoff}) ORDER BY `priority` DESC, `created` ASC LIMIT 1) AND `status` IN ('QUEUED','RETRYING') AND (`locked_at`='' OR `locked_at` <= {:cutoff})"
+    const sql = "UPDATE `processing_jobs` SET `status`='RUNNING', `locked_by`={:w}, `locked_at`={:now}, `attempts`=`attempts`+1, `started_at`={:now} WHERE `id` = (SELECT `id` FROM `processing_jobs` WHERE `tenant`={:t} AND (`status` IN ('QUEUED','RETRYING') OR (`status`='RUNNING' AND `locked_at` <= {:cutoff})) AND (`next_retry_at`='' OR `next_retry_at` <= {:now}) AND (`locked_at`='' OR `locked_at` <= {:cutoff}) ORDER BY `priority` DESC, `created` ASC LIMIT 1) AND (`status` IN ('QUEUED','RETRYING') OR (`status`='RUNNING' AND `locked_at` <= {:cutoff})) AND (`locked_at`='' OR `locked_at` <= {:cutoff})"
     const upd = $app.db().newQuery(sql).bind({ w: workerId, now: nowStr, cutoff: cutoffStr, t: svc.tenantId })
     upd.execute()
 

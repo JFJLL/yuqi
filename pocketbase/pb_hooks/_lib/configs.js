@@ -48,20 +48,32 @@ module.exports = {
     audit: { create: "region_create", update: "region_update", delete: "region_delete" },
   },
 
-  stores: {
-    name: "stores",
-    roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
-    scope: {
-      storeField: "store",
-      storeType: "relation",
-      employeeField: "id",
-      employeeType: "relation",
-      scopeFilterOverrides: {
-        STORE: (ctx) => ({ filter: "id = {:sid}", params: { sid: ctx.scope.store } }),
-        SELF: (ctx) => ({ filter: "id = {:none}", params: { none: "-" } }),
-      },
-    },
-    filters: ["name", "region"],
+ stores: {
+   name: "stores",
+   roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
+   scope: {
+      storeField: "id",
+     storeType: "relation",
+     employeeField: "id",
+     employeeType: "relation",
+     scopeFilterOverrides: {
+        ORG_TREE: (ctx) => {
+          const g2 = require(`${__hooks}/_lib/guards.js`)
+          const ids = g2.regionSubtreeIds(ctx.scope.orgNode)
+          if (ids.length === 0 || (ids.length === 1 && !ids[0])) return { filter: "id = {:none}", params: { none: "-" } }
+          const parts = []
+          const params = {}
+          for (let i = 0; i < ids.length; i++) {
+            parts.push("region = {:r" + i + "}")
+            params["r" + i] = ids[i]
+          }
+          return { filter: "(" + parts.join(" || ") + ")", params }
+        },
+       STORE: (ctx) => ({ filter: "id = {:sid}", params: { sid: ctx.scope.store } }),
+       SELF: (ctx) => ({ filter: "id = {:none}", params: { none: "-" } }),
+     },
+   },
+   filters: ["name", "region"],
     fields: {
       name: { type: "text", max: 80, required: true },
       region: { type: "relation" },
@@ -141,12 +153,12 @@ module.exports = {
     audit: { create: "device_log_create", update: "device_log_update", delete: "device_log_delete" },
   },
 
-  audio_files: {
-    name: "audio_files",
-    roles: { list: ORG_READ, view: ORG_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
-    scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
-    filters: ["object_key", "file_name", "device_sn", "status"],
-    idempotentKey: "object_key",
+ audio_files: {
+   name: "audio_files",
+    roles: { list: ORG_READ, view: ORG_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN", "ADMIN"] },
+   scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
+   filters: ["object_key", "file_name", "device_sn", "status"],
+   idempotentKey: "object_key",
     fields: {
       object_key: { type: "text", max: 400, required: true },
       file_name: { type: "text", max: 200 },
@@ -158,15 +170,32 @@ module.exports = {
       chunk: { type: "text", max: 20 },
       status: { type: "text", max: 20 },
       attempts: { type: "number" },
-      next_retry_at: { type: "date" },
-      transcript: { type: "text", max: 20 },
-      asr_job: { type: "text", max: 20 },
-      error_message: { type: "text", max: 1000 },
+     next_retry_at: { type: "date" },
+     transcript: { type: "text", max: 20 },
+     asr_job: { type: "text", max: 20 },
+     error_message: { type: "text", max: 1000 },
+   },
+    beforeDelete: (e, ctx, rec) => {
+      let sessions = []
+      try {
+        sessions = $app.findRecordsByFilter("sessions", "audio_file = {:af}", "", 10, 0, { af: rec.id })
+      } catch (_) {
+        sessions = []
+      }
+      for (let i = 0; i < sessions.length; i++) {
+        let issues = []
+        try {
+          issues = $app.findRecordsByFilter("issues", "session = {:s}", "", 1, 0, { s: sessions[i].id })
+        } catch (_) {}
+        if (issues && issues.length > 0) {
+          throw new BadRequestError("音频关联会话已被疑似问题引用，处于证据锁定状态禁止删除")
+        }
+      }
     },
-    audit: { create: "audio_file_create", update: "audio_file_update", delete: "audio_file_delete" },
-  },
+   audit: { create: "audio_file_create", update: "audio_file_update", delete: "audio_file_delete" },
+ },
 
-  asr_jobs: {
+ asr_jobs: {
     name: "asr_jobs",
     roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN", "ADMIN"] },
     scope: { storeField: "store", storeType: "text", employeeField: "employee", employeeType: "text" },
@@ -198,11 +227,11 @@ module.exports = {
     audit: { create: "asr_job_create", update: "asr_job_update", delete: "asr_job_delete" },
   },
 
-  transcripts: {
-    name: "transcripts",
-    roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN", "COMPLIANCE"], delete: ["SUPER_ADMIN"] },
-    scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
-    filters: ["device", "employee", "store", "status", "source", "asr_status", "qc_result", "asr_job"],
+ transcripts: {
+   name: "transcripts",
+    roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN", "COMPLIANCE"], delete: ["SUPER_ADMIN", "ADMIN"] },
+   scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
+   filters: ["device", "employee", "store", "status", "source", "asr_status", "qc_result", "asr_job"],
     fields: {
       device: { type: "text", max: 60 },
       employee: { type: "relation" },
@@ -216,14 +245,34 @@ module.exports = {
       source: { type: "text", max: 20 },
       model: { type: "text", max: 80 },
       asr_job: { type: "text", max: 20 },
-      segments_json: { type: "json" },
-      speaker_aliases: { type: "json" },
-      marks_json: { type: "json" },
+     segments_json: { type: "json" },
+     speaker_aliases: { type: "json" },
+     marks_json: { type: "json" },
+   },
+    beforeDelete: (e, ctx, rec) => {
+      let issues = []
+      try {
+        issues = $app.findRecordsByFilter("issues", "transcript = {:t}", "", 1, 0, { t: rec.id })
+      } catch (_) {
+        issues = []
+      }
+      if (issues && issues.length > 0) {
+        throw new BadRequestError("转写已被疑似问题引用，处于证据锁定状态禁止删除")
+      }
+      let insp = []
+      try {
+        insp = $app.findRecordsByFilter("inspection_issues", "transcript = {:t}", "", 1, 0, { t: rec.id })
+      } catch (_) {
+        insp = []
+      }
+      if (insp && insp.length > 0) {
+        throw new BadRequestError("转写已被巡检问题引用，处于证据锁定状态禁止删除")
+      }
     },
-    audit: { create: "transcript_create", update: "transcript_update", delete: "transcript_delete" },
-  },
+   audit: { create: "transcript_create", update: "transcript_update", delete: "transcript_delete" },
+ },
 
-  inspection_issues: {
+ inspection_issues: {
     name: "inspection_issues",
     roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", ...MGMT_WRITE], update: ["SERVICE", ...MGMT_WRITE], delete: ["SUPER_ADMIN", "ADMIN"] },
     scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
@@ -357,11 +406,11 @@ module.exports = {
     audit: { create: "app_setting_create", update: "app_setting_update", delete: "app_setting_delete" },
   },
 
-  sessions: {
-    name: "sessions",
-    roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
-    scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
-    filters: ["audio_file", "transcript", "employee", "store", "device_sn", "status"],
+ sessions: {
+   name: "sessions",
+    roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN", "ADMIN"] },
+   scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
+   filters: ["audio_file", "transcript", "employee", "store", "device_sn", "status"],
     fields: {
       audio_file: { type: "relation" },
       transcript: { type: "relation" },
@@ -374,14 +423,23 @@ module.exports = {
       ended_at: { type: "date" },
       duration_ms: { type: "number" },
       transcript_version: { type: "number" },
-      parent_session: { type: "relation" },
-      source_session: { type: "relation" },
-      version: { type: "number" },
+     parent_session: { type: "relation" },
+     source_session: { type: "relation" },
+     version: { type: "number" },
+   },
+    beforeDelete: (e, ctx, rec) => {
+      let issues = []
+      try {
+        issues = $app.findRecordsByFilter("issues", "session = {:s}", "", 1, 0, { s: rec.id })
+      } catch (_) {}
+      if (issues && issues.length > 0) {
+        throw new BadRequestError("会话已被疑似问题引用，处于证据锁定状态禁止删除")
+      }
     },
-    audit: { create: "session_create", update: "session_update", delete: "session_delete" },
-  },
+   audit: { create: "session_create", update: "session_update", delete: "session_delete" },
+ },
 
-  transcript_segments: {
+ transcript_segments: {
     name: "transcript_segments",
     roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
     scope: {
@@ -474,10 +532,10 @@ module.exports = {
     audit: { create: "risk_segment_create" },
   },
 
-  issues: {
-    name: "issues",
-    roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN", "COMPLIANCE"], delete: [] },
-    scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
+ issues: {
+   name: "issues",
+    roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN", "COMPLIANCE"], delete: ["SUPER_ADMIN", "ADMIN"] },
+   scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
     filters: ["session", "transcript", "employee", "store", "rule", "rule_code", "risk_level", "review_status", "analysis_status", "appeal_status", "rectification_status", "close_status"],
     fields: {
       session: { type: "relation" },
@@ -507,14 +565,22 @@ module.exports = {
       review_comment: { type: "text", max: 2000 },
       reviewed_at: { type: "date" },
       pushed_to_employee: { type: "bool" },
-      pushed_at: { type: "date" },
-      is_false_positive: { type: "bool" },
-      closed_at: { type: "date" },
+     pushed_at: { type: "date" },
+     is_false_positive: { type: "bool" },
+     closed_at: { type: "date" },
+   },
+    beforeDelete: (e, ctx, rec) => {
+      const appealStatus = String(rec.get("appeal_status") || "")
+      const rectStatus = String(rec.get("rectification_status") || "")
+      if (appealStatus === "PENDING" || appealStatus === "NEEDS_MORE_INFO" ||
+          rectStatus === "PENDING" || rectStatus === "SUBMITTED" || rectStatus === "NEEDS_REVISION") {
+        throw new BadRequestError("问题处于申诉或整改进行中，证据已锁定禁止删除")
+      }
     },
-    audit: { create: "issue_create", update: "issue_update" },
-  },
+   audit: { create: "issue_create", update: "issue_update" },
+ },
 
-  rectifications: {
+ rectifications: {
     name: "rectifications",
     roles: {
       list: STAFF_READ,

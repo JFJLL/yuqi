@@ -18,6 +18,7 @@
 //   YUQI_WORKER_LOCK_MS    任务锁超时, 默认 300000 (5 分钟)
 
 import { analyzeRisk } from "./rule-analyzer.mjs"
+import { fileURLToPath } from "node:url"
 
 const PB_URL = String(process.env.YUQI_PB_URL || "http://127.0.0.1:7040").replace(/\/+$/, "")
 const SERVICE_TOKEN = String(process.env.YUQI_SERVICE_TOKEN || "")
@@ -25,7 +26,7 @@ const WORKER_ID = String(process.env.YUQI_WORKER_ID || `worker-${process.pid}`)
 const POLL_MS = Number(process.env.YUQI_WORKER_POLL_MS || 2000)
 const LOCK_MS = Number(process.env.YUQI_WORKER_LOCK_MS || 300000)
 
-if (!SERVICE_TOKEN) {
+if (!SERVICE_TOKEN && process.argv[1] && process.argv[1].endsWith("business-worker.mjs")) {
   console.error("[worker] 缺少 YUQI_SERVICE_TOKEN, 退出")
   process.exit(1)
 }
@@ -35,12 +36,15 @@ function redact(text) {
 }
 
 async function api(method, path, body) {
-  const res = await fetch(`${PB_URL}${path}`, {
+  const pbUrl = String(process.env.YUQI_PB_URL || "http://127.0.0.1:7040").replace(/\/+$/, "")
+  const serviceToken = String(process.env.YUQI_SERVICE_TOKEN || "")
+  const workerId = String(process.env.YUQI_WORKER_ID || `worker-${process.pid}`)
+  const res = await fetch(`${pbUrl}${path}`, {
     method,
     headers: {
       "Content-Type": "application/json",
-      "X-Yuqi-Service-Token": SERVICE_TOKEN,
-      "X-Yuqi-Worker-Id": WORKER_ID,
+      "X-Yuqi-Service-Token": serviceToken,
+      "X-Yuqi-Worker-Id": workerId,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
@@ -186,7 +190,12 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(`[worker] 致命错误: ${redact(err && err.stack || err)}`)
-  process.exit(1)
-})
+const isMain = process.argv[1] && fileURLToPath(import.meta.url).replace(/\\/g, "/") === process.argv[1].replace(/\\/g, "/")
+if (isMain) {
+  main().catch((err) => {
+    console.error(`[worker] 致命错误: ${redact(err && err.stack || err)}`)
+    process.exit(1)
+  })
+}
+
+export { executeJob, handleRiskAnalysis, handleSlaScan, runOnce, claim, api }

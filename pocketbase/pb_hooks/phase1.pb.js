@@ -9,8 +9,8 @@
 
 routerAdd("POST", "/api/yuqi/admin/users", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN"])
     const body = e.requestInfo().body || {}
@@ -44,14 +44,15 @@ routerAdd("POST", "/api/yuqi/admin/users", (e) => {
     g.writeAudit(e, ctx, "user_create", "app_users", rec.id, { email })
     return e.json(200, rec.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "账号创建失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "账号创建失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "账号创建失败") })
   }
 })
 
 routerAdd("PATCH", "/api/yuqi/admin/users/{id}", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN"])
     const rec = H.findRecord("app_users", e.request.pathValue("id"))
@@ -72,7 +73,8 @@ routerAdd("PATCH", "/api/yuqi/admin/users/{id}", (e) => {
     g.writeAudit(e, ctx, "user_update", "app_users", rec.id, {})
     return e.json(200, rec.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "账号更新失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "账号更新失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "账号更新失败") })
   }
 })
 
@@ -82,8 +84,8 @@ routerAdd("PATCH", "/api/yuqi/admin/users/{id}", (e) => {
 
 routerAdd("POST", "/api/yuqi/issues/{id}/review", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"])
     const issue = H.findRecord("issues", e.request.pathValue("id"))
@@ -121,15 +123,16 @@ routerAdd("POST", "/api/yuqi/issues/{id}/review", (e) => {
     }
     throw new BadRequestError("无效操作")
   } catch (err) {
-    return H.responseError(e, err, "复核失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "复核失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "复核失败") })
   }
 })
 
 // 推送员工
 routerAdd("POST", "/api/yuqi/issues/{id}/push", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"])
     const issue = H.findRecord("issues", e.request.pathValue("id"))
@@ -153,15 +156,16 @@ routerAdd("POST", "/api/yuqi/issues/{id}/push", (e) => {
     g.writeAudit(e, ctx, "issue_push", "issues", issue.id, {})
     return e.json(200, issue.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "推送失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "推送失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "推送失败") })
   }
 })
 
 // 关闭 (人工直接关闭, 如无需整改)
 routerAdd("POST", "/api/yuqi/issues/{id}/close", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"])
     const issue = H.findRecord("issues", e.request.pathValue("id"))
@@ -177,7 +181,8 @@ routerAdd("POST", "/api/yuqi/issues/{id}/close", (e) => {
     g.writeAudit(e, ctx, "issue_close", "issues", issue.id, { comment })
     return e.json(200, issue.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "关闭失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "关闭失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "关闭失败") })
   }
 })
 
@@ -187,8 +192,8 @@ routerAdd("POST", "/api/yuqi/issues/{id}/close", (e) => {
 
 routerAdd("POST", "/api/yuqi/employee/appeals", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["EMPLOYEE"])
     const body = e.requestInfo().body || {}
@@ -205,27 +210,27 @@ routerAdd("POST", "/api/yuqi/employee/appeals", (e) => {
     rec.set("tenant", ctx.tenantId)
     rec.set("issue_ref", issue.id)
     rec.set("employee", String(ctx.user.get("employee") || ""))
-    rec.set("reason", reason.slice(0, 1000))
-    rec.set("status", "PENDING")
-    rec.set("submitted_at", H.pbDate())
-    $app.save(rec)
-
-    issue.set("appeal_status", "PENDING")
+     rec.set("reason", reason.slice(0, 1000))
+     rec.set("status", "PENDING")
+     rec.set("submitted_at", H.pbDate())
+     $app.save(rec)
+     issue.set("appeal_status", "PENDING")
     $app.save(issue)
     H.writeIssueEvent(issue, "appeal_submitted", "NONE", "PENDING", ctx, reason, { appeal: rec.id })
     H.notifyStaffByScope(ctx.tenantId, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"], "收到员工申诉", "员工提交了一条申诉，请及时复核。", "appeal_new", "/appeals")
     g.writeAudit(e, ctx, "appeal_submit", "appeals", rec.id, { issue: issue.id })
     return e.json(200, rec.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "申诉提交失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "申诉提交失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "申诉提交失败") })
   }
 })
 
 // 补充申诉内容 (新增记录, 不覆盖原申诉)
 routerAdd("POST", "/api/yuqi/employee/appeals/{id}/supplement", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["EMPLOYEE"])
     const existing = H.findRecord("appeals", e.request.pathValue("id"))
@@ -243,12 +248,14 @@ routerAdd("POST", "/api/yuqi/employee/appeals/{id}/supplement", (e) => {
     rec.set("issue_ref", String(existing.get("issue_ref") || ""))
     rec.set("employee", String(existing.get("employee") || ""))
     rec.set("reason", String(existing.get("reason") || ""))
-    rec.set("supplementary_text", text.slice(0, 4000))
-    rec.set("status", "PENDING")
-    rec.set("submitted_at", H.pbDate())
-    $app.save(rec)
-
-    const issue = String(existing.get("issue_ref") || "") ? H.findRecord("issues", String(existing.get("issue_ref"))) : null
+     rec.set("supplementary_text", text.slice(0, 4000))
+     rec.set("status", "PENDING")
+     rec.set("submitted_at", H.pbDate())
+     $app.save(rec)
+      existing.set("status", "PENDING")
+      existing.set("supplementary_text", text.slice(0, 4000))
+      $app.save(existing)
+     const issue = String(existing.get("issue_ref") || "") ? H.findRecord("issues", String(existing.get("issue_ref"))) : null
     if (issue) {
       issue.set("appeal_status", "PENDING")
       $app.save(issue)
@@ -258,15 +265,16 @@ routerAdd("POST", "/api/yuqi/employee/appeals/{id}/supplement", (e) => {
     g.writeAudit(e, ctx, "appeal_supplement", "appeals", rec.id, { issue: issue ? issue.id : "" })
     return e.json(200, rec.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "补充失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "补充失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "补充失败") })
   }
 })
 
 // 申诉复核
 routerAdd("POST", "/api/yuqi/appeals/{id}/review", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "STORE_MANAGER"])
     const appeal = H.findRecord("appeals", e.request.pathValue("id"))
@@ -346,7 +354,8 @@ routerAdd("POST", "/api/yuqi/appeals/{id}/review", (e) => {
     }
     throw new BadRequestError("无效操作")
   } catch (err) {
-    return H.responseError(e, err, "复核失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "复核失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "复核失败") })
   }
 })
 
@@ -357,8 +366,8 @@ routerAdd("POST", "/api/yuqi/appeals/{id}/review", (e) => {
 // 员工提交整改
 routerAdd("POST", "/api/yuqi/rectifications/{id}/submit", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["EMPLOYEE"])
     const rect = H.findRecord("rectifications", e.request.pathValue("id"))
@@ -386,15 +395,16 @@ routerAdd("POST", "/api/yuqi/rectifications/{id}/submit", (e) => {
     g.writeAudit(e, ctx, "rectification_submit", "rectifications", rect.id, {})
     return e.json(200, rect.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "提交失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "提交失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "提交失败") })
   }
 })
 
 // 店长/合规退回整改
 routerAdd("POST", "/api/yuqi/rectifications/{id}/revise", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "STORE_MANAGER"])
     const rect = H.findRecord("rectifications", e.request.pathValue("id"))
@@ -421,15 +431,16 @@ routerAdd("POST", "/api/yuqi/rectifications/{id}/revise", (e) => {
     g.writeAudit(e, ctx, "rectification_revise", "rectifications", rect.id, { comment })
     return e.json(200, rect.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "退回失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "退回失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "退回失败") })
   }
 })
 
 // 店长/合规确认整改 → 关闭
 routerAdd("POST", "/api/yuqi/rectifications/{id}/confirm", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "STORE_MANAGER"])
     const rect = H.findRecord("rectifications", e.request.pathValue("id"))
@@ -458,15 +469,16 @@ routerAdd("POST", "/api/yuqi/rectifications/{id}/confirm", (e) => {
     g.writeAudit(e, ctx, "rectification_confirm", "rectifications", rect.id, { comment })
     return e.json(200, rect.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "确认失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "确认失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "确认失败") })
   }
 })
 
 // 管理端派发整改
 routerAdd("POST", "/api/yuqi/issues/{id}/rectifications", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"])
     const issue = H.findRecord("issues", e.request.pathValue("id"))
@@ -494,7 +506,8 @@ routerAdd("POST", "/api/yuqi/issues/{id}/rectifications", (e) => {
     g.writeAudit(e, ctx, "rectification_dispatch", "rectifications", rec.id, {})
     return e.json(200, rec.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "派发失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "派发失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "派发失败") })
   }
 })
 
@@ -505,12 +518,12 @@ routerAdd("POST", "/api/yuqi/issues/{id}/rectifications", (e) => {
 // 员工申请绑定
 routerAdd("POST", "/api/yuqi/device-bindings/request", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["EMPLOYEE"])
     const body = e.requestInfo().body || {}
-    const deviceNo = String(body.device_no || "").trim()
+    const deviceNo = String(body.device_no || body.device_sn || "").trim()
     if (!deviceNo) throw new BadRequestError("请输入设备码")
     let device = null
     try {
@@ -537,15 +550,16 @@ routerAdd("POST", "/api/yuqi/device-bindings/request", (e) => {
     g.writeAudit(e, ctx, "binding_request", "device_bindings", rec.id, { device_no: deviceNo })
     return e.json(200, rec.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "申请失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "申请失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "申请失败") })
   }
 })
 
 // 店长/管理员审批绑定 (事务: 结束旧活跃绑定 + 新绑定生效)
 routerAdd("POST", "/api/yuqi/device-bindings/{id}/approve", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "STORE_MANAGER"])
     const binding = H.findRecord("device_bindings", e.request.pathValue("id"))
@@ -587,14 +601,15 @@ routerAdd("POST", "/api/yuqi/device-bindings/{id}/approve", (e) => {
     } catch (_) {}
     return e.json(200, binding.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "审批失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "审批失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "审批失败") })
   }
 })
 
 routerAdd("POST", "/api/yuqi/device-bindings/{id}/reject", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "STORE_MANAGER"])
     const binding = H.findRecord("device_bindings", e.request.pathValue("id"))
@@ -611,7 +626,8 @@ routerAdd("POST", "/api/yuqi/device-bindings/{id}/reject", (e) => {
     g.writeAudit(e, ctx, "binding_reject", "device_bindings", binding.id, {})
     return e.json(200, binding.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "操作失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "操作失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "操作失败") })
   }
 })
 
@@ -621,8 +637,8 @@ routerAdd("POST", "/api/yuqi/device-bindings/{id}/reject", (e) => {
 
 routerAdd("POST", "/api/yuqi/employee/consent", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["EMPLOYEE"])
     const body = e.requestInfo().body || {}
@@ -653,7 +669,8 @@ routerAdd("POST", "/api/yuqi/employee/consent", (e) => {
     g.writeAudit(e, ctx, "consent_confirm", "recording_consents", consent.id, {})
     return e.json(200, consent.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "确认失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "确认失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "确认失败") })
   }
 })
 
@@ -663,8 +680,8 @@ routerAdd("POST", "/api/yuqi/employee/consent", (e) => {
 
 routerAdd("POST", "/api/yuqi/notifications/{id}/read", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     const rec = H.findRecord("notifications", e.request.pathValue("id"))
     if (!rec) throw new NotFoundError("通知不存在")
@@ -674,14 +691,15 @@ routerAdd("POST", "/api/yuqi/notifications/{id}/read", (e) => {
     $app.save(rec)
     return e.json(200, rec.publicExport())
   } catch (err) {
-    return H.responseError(e, err, "操作失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "操作失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "操作失败") })
   }
 })
 
 routerAdd("POST", "/api/yuqi/notifications/read-all", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     const rows = $app.findRecordsByFilter("notifications", "user = {:u} && is_read = false", "", 500, 0, { u: ctx.user.id })
     for (let i = 0; i < rows.length; i++) {
@@ -691,7 +709,8 @@ routerAdd("POST", "/api/yuqi/notifications/read-all", (e) => {
     }
     return e.json(200, { ok: true, marked: rows.length })
   } catch (err) {
-    return H.responseError(e, err, "操作失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "操作失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "操作失败") })
   }
 })
 
@@ -701,8 +720,8 @@ routerAdd("POST", "/api/yuqi/notifications/read-all", (e) => {
 
 routerAdd("GET", "/api/yuqi/employee/home", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["EMPLOYEE"])
     const employeeId = String(ctx.user.get("employee") || "")
@@ -744,37 +763,39 @@ routerAdd("GET", "/api/yuqi/employee/home", (e) => {
       server_time: g.nowIso(),
     })
   } catch (err) {
-    return H.responseError(e, err, "加载失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "加载失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "加载失败") })
   }
 })
 
 // 员工本人已推送问题列表
 routerAdd("GET", "/api/yuqi/employee/issues", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["EMPLOYEE"])
     const employeeId = String(ctx.user.get("employee") || "")
     const query = e.requestInfo().query || {}
     const page = parseInt(String(query.page || "1"), 10) || 1
     const perPage = Math.min(Math.max(parseInt(String(query.perPage || "20"), 10) || 20, 1), 100)
-    const filter = "tenant = {:t} && employee = {:e} && review_status = 'APPROVED' && employee_visibility = 'VISIBLE'"
-    const params = { t: ctx.tenantId, e: employeeId }
-    const records = $app.findRecordsByFilter("issues", filter, "-pushed_at", perPage, (page - 1) * perPage, params)
-    const items = []
+      const filter = "tenant = {:t} && employee = {:e} && review_status = 'APPROVED' && employee_visibility = 'VISIBLE'"
+      const params = { t: ctx.tenantId, e: employeeId }
+      const records = $app.findRecordsByFilter("issues", filter, "-created", perPage, (page - 1) * perPage, params)
+      const items = []
     for (let i = 0; i < records.length; i++) items.push(records[i].publicExport())
     return e.json(200, { items, page, perPage, totalItems: items.length })
   } catch (err) {
-    return H.responseError(e, err, "加载失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "加载失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "加载失败") })
   }
 })
 
 // 员工问题详情 + 证据片段
 routerAdd("GET", "/api/yuqi/employee/issues/{id}", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["EMPLOYEE"])
     const issue = H.findRecord("issues", e.request.pathValue("id"))
@@ -796,15 +817,16 @@ routerAdd("GET", "/api/yuqi/employee/issues/{id}", (e) => {
     $app.save(issue)
     return e.json(200, { issue: issue.publicExport(), segments })
   } catch (err) {
-    return H.responseError(e, err, "加载失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "加载失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "加载失败") })
   }
 })
 
 // 员工我的设备
 routerAdd("GET", "/api/yuqi/employee/device", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["EMPLOYEE"])
     const employeeId = String(ctx.user.get("employee") || "")
@@ -829,15 +851,16 @@ routerAdd("GET", "/api/yuqi/employee/device", (e) => {
     }
     return e.json(200, { binding, device, consent })
   } catch (err) {
-    return H.responseError(e, err, "加载失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "加载失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "加载失败") })
   }
 })
 
 // 员工个人信息
 routerAdd("GET", "/api/yuqi/employee/profile", (e) => {
   try {
-    const g = require(`${__hooks}/_lib/guards.js`)
-    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    var g = require(`${__hooks}/_lib/guards.js`)
+    var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["EMPLOYEE"])
     const employee = H.findRecord("employees", String(ctx.user.get("employee") || ""))
@@ -855,6 +878,7 @@ routerAdd("GET", "/api/yuqi/employee/profile", (e) => {
       store: store ? store.publicExport() : null,
     })
   } catch (err) {
-    return H.responseError(e, err, "加载失败")
+    var H2 = H || (() => { try { return require(`${__hooks}/_lib/phase1-helpers.js`) } catch(_) { return null } })()
+    return H2 ? H2.responseError(e, err, "加载失败") : e.json(Number(err && err.status) || 500, { error: "error", message: String(err && err.message || err || "加载失败") })
   }
 })

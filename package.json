@@ -14,7 +14,7 @@
     "lint:secrets": "node scripts/check-secrets.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "node --test tests/integration/",
+    "test:integration": "node --test tests/integration/phase1-scenarios.test.mjs tests/integration/phase1-e2e-flow.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

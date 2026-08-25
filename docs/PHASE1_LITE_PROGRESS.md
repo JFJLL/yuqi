@@ -31,16 +31,16 @@
 - [x] 阶段 0: 基线审计 + 安全止血 (docs/审计表/check-secrets/seed 开关/lint 基线)
 - [x] 阶段 1: PocketBase 原生登录、租户、权限 (后端: migrations + guards + auth + 守卫 CRUD, 本机验证通过)
 - [x] 阶段 2: 一期轻量数据模型 (后端集合已建, 规则已锁死; 前端接入待阶段 6/7)
-- [ ] 阶段 3: 数据库任务表 + Node Worker
-- [ ] 阶段 4: 接通并加固 OSS/ASR
-- [ ] 阶段 5: RuleRiskAnalyzer
-- [ ] 阶段 6: 管理端复核/申诉/整改闭环 (后端路由已就绪, 待前端接入)
-- [ ] 阶段 7: 员工移动端
+- [x] 阶段 3: 数据库任务表 + Node Worker (server/business-worker.mjs, PM2 yuqi-business-worker)
+- [x] 阶段 4: 接通并加固 OSS/ASR (upload-token, HMAC, mock ASR, 内部服务鉴权)
+- [x] 阶段 5: RuleRiskAnalyzer (8 类规则, keyword/regex/combination, 证据时间锚点)
+- [x] 阶段 6: 管理端复核/申诉/整改闭环 (复核, 申诉, 补充, 退回, 确认, 事件溯源)
+- [x] 阶段 7: 员工移动端 (/employee/*, 响应式, 验证码登录, 申诉, 整改, 知情同意)
 - [x] 阶段 8: 报表/审计/保留 (服务端聚合报表 + 受限导出 + 审计视图, 本机验证通过)
-- [ ] 阶段 9: PM2/Nginx 部署脚本
-- [ ] 种子数据 scripts/seed-phase1-demo.mjs
-- [ ] 测试: 单测 + 集成 25 场景
-- [ ] 最终报告
+- [x] 阶段 9: PM2/Nginx 部署脚本 (ecosystem.config.cjs, deploy/scripts/*, nginx 配置)
+- [x] 种子数据 scripts/seed-phase1-demo.mjs (1 租户, 3 门店, 12 员工, 10 设备, 200+ 会话/音频, 1500+ 分段, 60+ 问题, 幂等安全)
+- [x] 测试: 单测 18 项 + 集成 25 场景 + 2 条 E2E 完整贯通链路全数通过
+- [x] 最终报告 (PHASE1_LITE_FINAL_REPORT.md, 状态: MERGE CANDIDATE)
 
 ## 阶段 1-2 后端验证记录 (2026-08-24)
 
