@@ -1,5 +1,7 @@
 # 一期轻量闭环 · 进度跟踪 (PROGRESS)
 
+FINAL_ASR_ATOMIC_FIX_START_SHA=5ecf2c4100086cdef0d32ac098e878f589f24762
+
 基线: origin/main @ `f8f22f7263f2ed2d380c6332f48b2794c7e6b394`
 分支: `codex/yuqi-phase1-lite-pocketbase-v1`
 
@@ -32,5 +34,12 @@
   - [x] 门禁: pnpm verify 全量通过
 - [x] 最终报告 (PHASE1_LITE_FINAL_REPORT.md, 状态: MERGE CANDIDATE)
 
+## 本轮补丁: ASR 导入原子完成语义最终修复 (Final ASR Import Atomicity Fix)
+
+- [x] 调整 importSucceededJob 提交顺序: transcript -> persistSessionAndSegments -> asr_job result_imported_at -> sync_log
+- [x] 下游持久化失败状态处理: 不吞异常, status=queued, error_code=downstream_persist_failed, result_imported_at 保持为空
+- [x] 增加 (tenant, transcript) 会话唯一索引与幂等保护 (1787500008_phase1_session_unique.js)
+- [x] 覆盖故障注入 (Test A)、失败恢复 (Test B)、半完成幂等恢复 (Test C) 与完整重放 (Test D) 集成测试
+
 ## 最终交付状态
-状态: MERGE CANDIDATE (最终合并前补丁全部完成并通过全量门禁)
+状态: MERGE CANDIDATE (ASR 导入原子完成语义最终修复与全量门禁已通过)

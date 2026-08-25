@@ -27,11 +27,13 @@
 
 ---
 
-## 三、ASR 重复导入幂等验证
+## 三、ASR 导入原子性与下游故障恢复验证 (ASR Import Atomicity & Recovery)
 
-- 导出真实网关 `importSucceededJob` 函数并在集成测试中针对同一 `asr_job` 调用两次。
-- 统计 6 类核心数据表（`transcripts`, `sessions`, `transcript_segments`, `processing_jobs`, `risk_segments`, `issues`），严格断言记录总数完全保持一致 (+0)。
-- 模拟崩溃导致 `result_imported_at` 丢失后重放，6 类数据仍严格保持不变 (+0)。
+针对 ASR 导入原子性完成语义进行了单点 P0 深度加固与测试覆盖：
+1. **故障注入 (Test A - Downstream Failure)**: 模拟 ASR 成功后在下游 `persistSessionAndSegments` 发生异常。断言异常未被吞掉并正确抛出，`asr_job.result_imported_at` 严格保持为空，`asr_job.status` 保持为 `queued`，`error_code` 置为 `downstream_persist_failed`，`error_message` 记录脱敏错误信息，未产生孤儿 `sessions` 或 `processing_jobs`。
+2. **自动恢复重试 (Test B - Downstream Recovery)**: 对上述失败状态的 `asr_job` 再次执行真实导入。断言成功恢复，`asr_job.status` 置为 `succeeded`，`result_imported_at` 回填时间戳，`error_code` 清空，下游 `session`, `transcript_segments`, `processing_jobs`, `risk_segments`, `issues` 全部正常补齐并被 Worker 成功处理。
+3. **半完成故障幂等恢复 (Test C - Partial Recovery)**: 模拟部分下游数据（如 `session` 与分段 1）已写入后发生崩溃。再次重试导入后，断言已存在数据被安全复用，分段不重复，最终分段为严格递增序列 `[1, 2, 3]`。
+4. **重复导入与崩溃重放验证 (Test D - Replay & Crash Idempotency)**: 对带 `result_imported_at` 的完成任务重复调用立即安全跳过；模拟崩溃丢失 `result_imported_at` 后重放，6 类核心数据表（`transcripts`, `sessions`, `transcript_segments`, `processing_jobs`, `risk_segments`, `issues`）记录总数严格保持完全一致 (+0)。
 
 ---
 
