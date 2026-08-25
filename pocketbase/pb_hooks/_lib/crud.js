@@ -184,8 +184,8 @@ function handleCreate(e, config) {
         try {
           existing = $app.findFirstRecordByFilter(
             config.name,
-            config.idempotentKey + " = {:k}",
-            { k: keyVal },
+            "tenant = {:t} && " + config.idempotentKey + " = {:k}",
+            { t: ctx.tenantId, k: keyVal },
           )
         } catch (_) {
           existing = null

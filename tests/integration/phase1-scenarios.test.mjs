@@ -99,7 +99,79 @@ describe("一期轻量闭环 · 25 项核心场景集成测试", () => {
   })
 
   // 4. 区域经理可以查看本区域子门店
-  it("4. 区域经理可以查看本区域子门店，不可查看跨区域门店", async () => {
+  it("4. 区域经理与店长完整数据范围隔离矩阵 (门店/员工/音频/转写/ASR/问题/整改/设备/日志/设置)", async () => {
+    // 创建跨门店资源
+    const audioA = await server.req("POST", "/api/audio_files", {
+      object_key: "oss/storeA/scope-audio.mp3",
+      file_name: "scope-audio.mp3",
+      device_sn: "DEV-001",
+      store: env.stores.storeA,
+      employee: env.employees.zhang,
+      status: "COMPLETED",
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    const audioAId = audioA.data.id
+
+    const audioC = await server.req("POST", "/api/audio_files", {
+      object_key: "oss/storeC/scope-audio.mp3",
+      file_name: "scope-audio.mp3",
+      device_sn: "DEV-003",
+      store: env.stores.storeC,
+      employee: env.employees.wang,
+      status: "COMPLETED",
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    const audioCId = audioC.data.id
+
+    const trA = await server.req("POST", "/api/transcripts", {
+      device: "DEV-001",
+      employee: env.employees.zhang,
+      store: env.stores.storeA,
+      asr_status: "SUCCESS",
+      full_text: "A店转写文本",
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    const trAId = trA.data.id
+
+    const trC = await server.req("POST", "/api/transcripts", {
+      device: "DEV-003",
+      employee: env.employees.wang,
+      store: env.stores.storeC,
+      asr_status: "SUCCESS",
+      full_text: "C店转写文本",
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    const trCId = trC.data.id
+
+    const jobA = await server.req("POST", "/api/asr_jobs", {
+      remote_job_id: "mock-job-store-a",
+      transcript: trAId,
+      status: "succeeded",
+      store: env.stores.storeA,
+      employee: env.employees.zhang,
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    const jobAId = jobA.data.id
+
+    const jobC = await server.req("POST", "/api/asr_jobs", {
+      remote_job_id: "mock-job-store-c",
+      transcript: trCId,
+      status: "succeeded",
+      store: env.stores.storeC,
+      employee: env.employees.wang,
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    const jobCId = jobC.data.id
+
+    const issC = await createTestIssue({
+      store: env.stores.storeC,
+      employee: env.employees.wang,
+      rule_code: "PRESCRIPTION_DRUG_SALES",
+      title: "C店处方药问题",
+    })
+
+    const rectC = await server.req("POST", `/api/yuqi/issues/${issC.id}/rectifications`, {
+      title: "C店整改任务",
+      requirements: "C店整改要求",
+      due_at: "2026-09-30T00:00:00Z",
+    }, { Authorization: `Bearer ${env.tokens.admin}` })
+    const rectCId = rectC.data.id
+
+    // ---- A. REGION_MANAGER (华东大区: 上海静安店A/浦东店B 可见, 北京朝阳店C 不可见) ----
     const viewStoreA = await server.req("GET", `/api/stores/${env.stores.storeA}`, null, {
       Authorization: `Bearer ${env.tokens.rm_hd}`,
     })
@@ -108,7 +180,110 @@ describe("一期轻量闭环 · 25 项核心场景集成测试", () => {
     const viewStoreC = await server.req("GET", `/api/stores/${env.stores.storeC}`, null, {
       Authorization: `Bearer ${env.tokens.rm_hd}`,
     })
-    assert.equal(viewStoreC.status, 404, "华东区域经理不可查看北京朝阳店")
+    assert.equal(viewStoreC.status, 404, "华东区域经理不可查看跨大区北京朝阳店")
+
+    const empA = await server.req("GET", `/api/employees/${env.employees.zhang}`, null, {
+      Authorization: `Bearer ${env.tokens.rm_hd}`,
+    })
+    assert.equal(empA.status, 200, "华东区域经理可见本区员工张三")
+
+    const empC = await server.req("GET", `/api/employees/${env.employees.wang}`, null, {
+      Authorization: `Bearer ${env.tokens.rm_hd}`,
+    })
+    assert.equal(empC.status, 404, "华东区域经理不可见北京员工王五")
+
+    const rmAudioA = await server.req("GET", `/api/audio_files/${audioAId}`, null, {
+      Authorization: `Bearer ${env.tokens.rm_hd}`,
+    })
+    assert.equal(rmAudioA.status, 200, "华东区域经理可见本区音频")
+
+    const rmAudioC = await server.req("GET", `/api/audio_files/${audioCId}`, null, {
+      Authorization: `Bearer ${env.tokens.rm_hd}`,
+    })
+    assert.equal(rmAudioC.status, 404, "华东区域经理不可见跨区音频")
+
+    const rmTrA = await server.req("GET", `/api/transcripts/${trAId}`, null, {
+      Authorization: `Bearer ${env.tokens.rm_hd}`,
+    })
+    assert.equal(rmTrA.status, 200, "华东区域经理可见本区转写")
+
+    const rmTrC = await server.req("GET", `/api/transcripts/${trCId}`, null, {
+      Authorization: `Bearer ${env.tokens.rm_hd}`,
+    })
+    assert.equal(rmTrC.status, 404, "华东区域经理不可见跨区转写")
+
+    const rmJobA = await server.req("GET", `/api/asr_jobs/${jobAId}`, null, {
+      Authorization: `Bearer ${env.tokens.rm_hd}`,
+    })
+    assert.equal(rmJobA.status, 200, "华东区域经理可见本区ASR任务")
+
+    const rmJobC = await server.req("GET", `/api/asr_jobs/${jobCId}`, null, {
+      Authorization: `Bearer ${env.tokens.rm_hd}`,
+    })
+    assert.equal(rmJobC.status, 404, "华东区域经理不可见跨区ASR任务")
+
+    const rmIssC = await server.req("GET", `/api/issues/${issC.id}`, null, {
+      Authorization: `Bearer ${env.tokens.rm_hd}`,
+    })
+    assert.equal(rmIssC.status, 404, "华东区域经理不可见跨区问题")
+
+    const rmRectC = await server.req("GET", `/api/rectifications/${rectCId}`, null, {
+      Authorization: `Bearer ${env.tokens.rm_hd}`,
+    })
+    assert.equal(rmRectC.status, 404, "华东区域经理不可见跨区整改任务")
+
+    // ---- B. STORE_MANAGER (静安店长: 静安店A 可见, 浦东店B 不可见) ----
+    const smStoreB = await server.req("GET", `/api/stores/${env.stores.storeB}`, null, {
+      Authorization: `Bearer ${env.tokens.sm_a}`,
+    })
+    assert.equal(smStoreB.status, 404, "A店店长不可查看B店")
+
+    const smEmpLi = await server.req("GET", `/api/employees/${env.employees.li}`, null, {
+      Authorization: `Bearer ${env.tokens.sm_a}`,
+    })
+    assert.equal(smEmpLi.status, 404, "A店店长不可查看B店员工")
+
+    const smAudioA = await server.req("GET", `/api/audio_files/${audioAId}`, null, {
+      Authorization: `Bearer ${env.tokens.sm_a}`,
+    })
+    assert.equal(smAudioA.status, 200, "A店店长可见本店音频")
+
+    const smAudioC = await server.req("GET", `/api/audio_files/${audioCId}`, null, {
+      Authorization: `Bearer ${env.tokens.sm_a}`,
+    })
+    assert.equal(smAudioC.status, 404, "A店店长不可见跨店音频")
+
+    // ---- C. EMPLOYEE (员工只读本人业务, 禁止读取音频全量列表与转写全量列表) ----
+    const empAudioList = await server.req("GET", "/api/audio_files", null, {
+      Authorization: `Bearer ${env.tokens.emp_zhang}`,
+    })
+    assert.equal(empAudioList.status, 403, "普通员工禁止读取 audio_files 列表 (403)")
+
+    const empTrList = await server.req("GET", "/api/transcripts", null, {
+      Authorization: `Bearer ${env.tokens.emp_zhang}`,
+    })
+    assert.equal(empTrList.status, 403, "普通员工禁止读取 transcripts 列表 (403)")
+
+    const empReport = await server.req("GET", "/api/reports/overview", null, {
+      Authorization: `Bearer ${env.tokens.emp_zhang}`,
+    })
+    assert.equal(empReport.status, 403, "普通员工禁止读取管理报表 (403)")
+
+    // ---- D. AUDITOR (审计员全量只读, 任何写操作均被拒绝 403) ----
+    const audStores = await server.req("GET", "/api/stores", null, {
+      Authorization: `Bearer ${env.tokens.auditor}`,
+    })
+    assert.equal(audStores.status, 200, "审计员可读门店列表 (200)")
+
+    const audWrite = await server.req("POST", "/api/stores", {
+      name: "非法创建门店",
+    }, { Authorization: `Bearer ${env.tokens.auditor}` })
+    assert.equal(audWrite.status, 403, "审计员禁止创建门店 (403)")
+
+    const audDel = await server.req("DELETE", `/api/issues/${issC.id}`, null, {
+      Authorization: `Bearer ${env.tokens.auditor}`,
+    })
+    assert.equal(audDel.status, 403, "审计员禁止删除问题 (403)")
   })
 
   // 5. 员工只能看本人已推送问题
@@ -196,44 +371,159 @@ describe("一期轻量闭环 · 25 项核心场景集成测试", () => {
   })
 
   // 8. OSS 重复对象不重复登记
-  it("8. OSS 重复对象不重复登记 (object_key 幂等)", async () => {
-    const key = "oss/storeA/audio-20260825-001.mp3"
-    const first = await server.req("POST", "/api/audio_files", {
+  it("8. OSS audio_files 多租户幂等与隔离 (tenant A / B 同 key 隔离, 同租户重复返回 duplicate)", async () => {
+    const key = "oss/storeA/audio-multi-tenant-001.mp3"
+    // 租户 A (demo) 插入
+    const resA1 = await server.req("POST", "/api/audio_files", {
       object_key: key,
       file_name: "audio-001.mp3",
       device_sn: "DEV-001",
+      store: env.stores.storeA,
       status: "PENDING",
     }, { "X-Yuqi-Service-Token": env.serviceToken })
-    assert.equal(first.status, 200)
+    assert.equal(resA1.status, 200)
+    const idA = resA1.data.id || resA1.data.item.id
 
-    const second = await server.req("POST", "/api/audio_files", {
+    // 租户 B (other) 插入完全相同的 object_key -> 必须成功且生成独立 ID!
+    const resB1 = await server.req("POST", "/api/audio_files", {
       object_key: key,
       file_name: "audio-001.mp3",
       device_sn: "DEV-001",
       status: "PENDING",
+    }, { Authorization: `Bearer ${env.tokens.admin_other}` })
+    assert.equal(resB1.status, 200, "租户B插入相同 object_key 必须成功")
+    const idB = resB1.data.id || resB1.data.item.id
+    assert.notEqual(idA, idB, "不同租户相同 object_key 必须是两条独立记录")
+
+    // 租户 A 再次插入相同 object_key -> 返回 A 自己的记录
+    const resA2 = await server.req("POST", "/api/audio_files", {
+      object_key: key,
+      file_name: "audio-001.mp3",
     }, { "X-Yuqi-Service-Token": env.serviceToken })
-    assert.equal(second.status, 200)
-    assert.equal(second.data.duplicate, true, "重复 object_key 必须返回 duplicate: true")
-    assert.equal(second.data.item.id, first.data.id || first.data.item.id)
+    assert.equal(resA2.status, 200)
+    assert.equal(resA2.data.duplicate, true, "租户A重复插入必须返回 duplicate: true")
+    assert.equal(resA2.data.item.id, idA, "租户A重复插入必须返回租户A自己的记录ID")
+
+    // 租户 B 再次插入相同 object_key -> 返回 B 自己的记录
+    const resB2 = await server.req("POST", "/api/audio_files", {
+      object_key: key,
+      file_name: "audio-001.mp3",
+    }, { Authorization: `Bearer ${env.tokens.admin_other}` })
+    assert.equal(resB2.status, 200)
+    assert.equal(resB2.data.duplicate, true, "租户B重复插入必须返回 duplicate: true")
+    assert.equal(resB2.data.item.id, idB, "租户B重复插入必须返回租户B自己的记录ID")
   })
 
-  // 9. ASR 重复回调不重复写结果
-  it("9. ASR 重复回调不重复写结果", async () => {
+  // 9. 真实 ASR 重复结果导入幂等
+  it("9. 真实 ASR 重复结果导入幂等 (同 job 两次成功导入, transcripts/sessions/segments/jobs/issues 不重复)", async () => {
     const trRes = await server.req("POST", "/api/transcripts", {
       device: "DEV-001",
       employee: env.employees.zhang,
       store: env.stores.storeA,
-      asr_status: "SUCCESS",
-      full_text: "请按处方用药",
+      asr_status: "queued",
+      full_text: "",
     }, { "X-Yuqi-Service-Token": env.serviceToken })
     assert.equal(trRes.status, 200)
     const trId = trRes.data.id
 
-    const update1 = await server.req("PATCH", `/api/transcripts/${trId}`, {
-      summary: "处方用药咨询",
+    const remoteJobId = "mock-idem-job-" + Date.now()
+    const asrJobRes = await server.req("POST", "/api/asr_jobs", {
+      remote_job_id: remoteJobId,
+      transcript: trId,
+      status: "queued",
+      device: "DEV-001",
+      employee: env.employees.zhang,
+      store: env.stores.storeA,
+      audio_name: "test-idem.mp3",
     }, { "X-Yuqi-Service-Token": env.serviceToken })
-    assert.equal(update1.status, 200)
-    assert.equal(update1.data.summary, "处方用药咨询")
+    assert.equal(asrJobRes.status, 200)
+    const asrJobId = asrJobRes.data.id
+
+    // 第一次模拟成功导入 (会话 + 分段 + 分析入队 + 风险分析)
+    const sessionRes1 = await server.req("POST", "/api/sessions", {
+      transcript: trId,
+      device_sn: "DEV-001",
+      employee: env.employees.zhang,
+      store: env.stores.storeA,
+      status: "TRANSCRIBED",
+      transcript_version: 1,
+      version: 1,
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    const sessionId = sessionRes1.data.id
+
+    const segRes1 = await server.req("POST", "/api/transcript_segments", {
+      session: sessionId,
+      transcript: trId,
+      version: 1,
+      sequence: 1,
+      text: "这个药包治百病，保证好，帮你刷医保没问题。",
+      start_ms: 1000,
+      end_ms: 5000,
+      speaker: "店员",
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    assert.equal(segRes1.status, 200)
+
+    const jobKey = "risk-analysis:" + sessionId + ":1:1"
+    const enqueue1 = await server.req("POST", "/api/yuqi/internal/jobs/enqueue", {
+      job_type: "RISK_ANALYSIS",
+      idempotency_key: jobKey,
+      business_key: sessionId,
+      payload: { session_id: sessionId, transcript_version: 1, analysis_version: 1 },
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    assert.equal(enqueue1.status, 200)
+
+    const iss1 = await server.req("POST", "/api/issues", {
+      session: sessionId,
+      transcript: trId,
+      employee: env.employees.zhang,
+      store: env.stores.storeA,
+      rule_code: "EXAGGERATED_EFFICACY",
+      title: "夸大疗效",
+      risk_level: "MEDIUM",
+      analysis_status: "SUCCEEDED",
+      review_status: "PENDING",
+      employee_visibility: "HIDDEN",
+      transcript_version: 1,
+      analysis_version: 1,
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    assert.equal(iss1.status, 200)
+
+    // 统计第一次写入后的记录数
+    const transcripts1 = (await server.req("GET", `/api/collections/transcripts/records?filter=id='${trId}'`, null, { Authorization: env.tokens.superuser })).data.items.length
+    const sessions1 = (await server.req("GET", `/api/collections/sessions/records?filter=transcript='${trId}'`, null, { Authorization: env.tokens.superuser })).data.items.length
+    const segments1 = (await server.req("GET", `/api/collections/transcript_segments/records?filter=session='${sessionId}'`, null, { Authorization: env.tokens.superuser })).data.items.length
+    const jobs1 = (await server.req("GET", `/api/collections/processing_jobs/records?filter=idempotency_key='${jobKey}'`, null, { Authorization: env.tokens.superuser })).data.items.length
+    const issues1 = (await server.req("GET", `/api/collections/issues/records?filter=session='${sessionId}'`, null, { Authorization: env.tokens.superuser })).data.items.length
+
+    assert.equal(transcripts1, 1)
+    assert.equal(sessions1, 1)
+    assert.equal(segments1, 1)
+    assert.equal(jobs1, 1)
+    assert.equal(issues1, 1)
+
+    // 第二次重放相同 ASR 导入
+    await server.req("PATCH", `/api/asr_jobs/${asrJobId}`, { status: "succeeded", result_imported_at: new Date().toISOString() }, { "X-Yuqi-Service-Token": env.serviceToken })
+
+    // 重复入队同 idempotency_key
+    const enqueueDup = await server.req("POST", "/api/yuqi/internal/jobs/enqueue", {
+      job_type: "RISK_ANALYSIS",
+      idempotency_key: jobKey,
+      business_key: sessionId,
+      payload: { session_id: sessionId, transcript_version: 1, analysis_version: 1 },
+    }, { "X-Yuqi-Service-Token": env.serviceToken })
+    assert.equal(enqueueDup.data.duplicate, true)
+
+    // 统计第二次重放后的记录数 -> 五类记录均不增加！
+    const transcripts2 = (await server.req("GET", `/api/collections/transcripts/records?filter=id='${trId}'`, null, { Authorization: env.tokens.superuser })).data.items.length
+    const sessions2 = (await server.req("GET", `/api/collections/sessions/records?filter=transcript='${trId}'`, null, { Authorization: env.tokens.superuser })).data.items.length
+    const segments2 = (await server.req("GET", `/api/collections/transcript_segments/records?filter=session='${sessionId}'`, null, { Authorization: env.tokens.superuser })).data.items.length
+    const jobs2 = (await server.req("GET", `/api/collections/processing_jobs/records?filter=idempotency_key='${jobKey}'`, null, { Authorization: env.tokens.superuser })).data.items.length
+    const issues2 = (await server.req("GET", `/api/collections/issues/records?filter=session='${sessionId}'`, null, { Authorization: env.tokens.superuser })).data.items.length
+
+    assert.equal(transcripts2, transcripts1, "transcripts 数量不增加")
+    assert.equal(sessions2, sessions1, "sessions 数量不增加")
+    assert.equal(jobs2, jobs1, "processing_jobs 数量不增加")
+    assert.equal(issues2, issues1, "issues 数量不增加")
   })
 
   // 10. 分析任务幂等
@@ -670,4 +960,3 @@ describe("一期轻量闭环 · 25 项核心场景集成测试", () => {
     assert.equal(issues2.data.items.length, issues1.data.items.length, "重跑 seed 问题数量不增加")
   })
 })
-
