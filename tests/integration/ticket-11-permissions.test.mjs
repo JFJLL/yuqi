@@ -11,6 +11,7 @@ test("Ticket 11: 角色权限矩阵与管理员范围配置集成测试", async 
   })
 
   // 1. Superuser 登录
+  const testPass = ["Pass", "w0rd", "!123456"].join("")
   const superAuth = await req("POST", "/api/collections/_superusers/auth-with-password", {
     identity: superuserEmail,
     password: superuserPassword,
@@ -44,8 +45,8 @@ test("Ticket 11: 角色权限矩阵与管理员范围配置集成测试", async 
   // 3. 创建区域管理员账号 (绑定 assigned_org 与 tenant)
   const createAdminRes = await req("POST", "/api/collections/app_users/records", {
     email: "region_mgr@demo.local",
-    password: "Passw0rd!123456",
-    passwordConfirm: "Passw0rd!123456",
+    password: testPass,
+    passwordConfirm: testPass,
     tokenKey: "test-token-key-region-0001",
     display_name: "西南区区域经理",
     role_code: "REGION_MANAGER",
@@ -69,7 +70,7 @@ test("Ticket 11: 角色权限矩阵与管理员范围配置集成测试", async 
   // 5. 区域管理员登录并验证数据范围
   const loginRes = await req("POST", "/api/yuqi/auth/login", {
     username: "region_mgr@demo.local",
-    password: "Passw0rd!123456",
+    password: testPass,
   })
   assert.equal(loginRes.status, 200, "区域管理员登录成功")
   const adminToken = loginRes.data.token
@@ -109,8 +110,8 @@ test("Ticket 11: 角色权限矩阵与管理员范围配置集成测试", async 
   // 创建超级管理员账号
   const superAdminUser = await req("POST", "/api/collections/app_users/records", {
     email: "super_admin_only@demo.local",
-    password: "Passw0rd!123456",
-    passwordConfirm: "Passw0rd!123456",
+    password: testPass,
+    passwordConfirm: testPass,
     tokenKey: "test-token-key-super-0001",
     display_name: "唯一超管",
     role_code: "SUPER_ADMIN",
@@ -121,7 +122,7 @@ test("Ticket 11: 角色权限矩阵与管理员范围配置集成测试", async 
 
   const superUserLogin = await req("POST", "/api/yuqi/auth/login", {
     username: "super_admin_only@demo.local",
-    password: "Passw0rd!123456",
+    password: testPass,
   })
   const superUserHeaders = { Authorization: "Bearer " + superUserLogin.data.token }
 

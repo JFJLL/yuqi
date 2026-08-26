@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
+import { useEffect } from "react"
 import {
   AudioLines,
   Badge,
@@ -104,6 +105,25 @@ export function AdminLayout() {
   const navigate = useNavigate()
   const user = currentUser()
   const role = currentRole()
+
+  // 预加载后台核心模块，消除首次点击标签页时的网络等待
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      import("@/pages/Dashboard")
+      import("@/pages/Org")
+      import("@/pages/Employees")
+      import("@/pages/Devices")
+      import("@/pages/Records")
+      import("@/pages/Inspection")
+      import("@/pages/Appeals")
+      import("@/pages/Activity")
+      import("@/pages/Reports")
+      import("@/pages/Permissions")
+      import("@/pages/Settings")
+      import("@/pages/Logs")
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [])
 
   async function handleSync() {
     try {

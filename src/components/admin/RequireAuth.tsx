@@ -15,16 +15,24 @@ interface RequireAuthProps {
 /** 路由守卫: 未登录跳转 /login, 角色不符跳转 /403 */
 export function RequireAuth({ children, roles, permission, employeeOnly }: RequireAuthProps) {
   const location = useLocation()
-  const [checking, setChecking] = useState(true)
-  const [ok, setOk] = useState(false)
+  const [authed, setAuthed] = useState(() => isAuthed())
+  const [checking, setChecking] = useState(() => !isAuthed())
 
   useEffect(() => {
     let alive = true
-    ensureSession().then((valid) => {
-      if (!alive) return
-      setOk(valid && isAuthed())
-      setChecking(false)
-    })
+    if (!isAuthed()) {
+      ensureSession().then((valid) => {
+        if (!alive) return
+        setAuthed(valid)
+        setChecking(false)
+      })
+    } else {
+      // 静默后台校验会话有效性，零阻塞页面即时渲染
+      ensureSession().then((valid) => {
+        if (!alive) return
+        if (!valid) setAuthed(false)
+      })
+    }
     return () => {
       alive = false
     }
@@ -37,7 +45,7 @@ export function RequireAuth({ children, roles, permission, employeeOnly }: Requi
       </div>
     )
   }
-  if (!ok) return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  if (!authed) return <Navigate to="/login" replace state={{ from: location.pathname }} />
 
   const role = currentRole()
   if (employeeOnly && role !== "EMPLOYEE") return <Navigate to="/403" replace />

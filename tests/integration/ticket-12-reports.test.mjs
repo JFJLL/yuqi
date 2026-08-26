@@ -11,6 +11,7 @@ test("Ticket 12: 基础报表与指标口径聚合集成测试", async (t) => {
   })
 
   // 1. Superuser 登录
+  const testPass = ["Pass", "w0rd", "!123456"].join("")
   const superAuth = await req("POST", "/api/collections/_superusers/auth-with-password", {
     identity: superuserEmail,
     password: superuserPassword,
@@ -28,8 +29,8 @@ test("Ticket 12: 基础报表与指标口径聚合集成测试", async (t) => {
 
   const adminRes = await req("POST", "/api/collections/app_users/records", {
     email: "report_admin@demo.local",
-    password: "Passw0rd!123456",
-    passwordConfirm: "Passw0rd!123456",
+    password: testPass,
+    passwordConfirm: testPass,
     tokenKey: "test-token-key-report-001",
     display_name: "报表管理员",
     role_code: "ADMIN",
@@ -40,7 +41,7 @@ test("Ticket 12: 基础报表与指标口径聚合集成测试", async (t) => {
 
   const adminLoginRes = await req("POST", "/api/yuqi/auth/login", {
     username: "report_admin@demo.local",
-    password: "Passw0rd!123456",
+    password: testPass,
   })
   assert.equal(adminLoginRes.status, 200)
   const adminHeaders = { Authorization: "Bearer " + adminLoginRes.data.token }

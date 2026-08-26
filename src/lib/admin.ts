@@ -44,14 +44,44 @@ export interface DashboardSummary {
 
 export type DashboardTab = "all" | "high" | "appealing"
 
+// ---- 前端内存缓存 (SWR 模式: 秒切标签页零等待) ----
+interface CacheEntry<T> {
+  data: T
+  timestamp: number
+}
+
+const memoryCache = new Map<string, CacheEntry<unknown>>()
+const CACHE_TTL_MS = 60000 // 60 秒内存热缓存
+
+export function invalidateCache(collection?: string) {
+  if (collection) {
+    for (const key of memoryCache.keys()) {
+      if (key.startsWith(`list:${collection}:`)) {
+        memoryCache.delete(key)
+      }
+    }
+  } else {
+    memoryCache.clear()
+  }
+}
+
 export function fetchDashboardSummary(tab: DashboardTab): Promise<DashboardSummary> {
-  return pb.send("/api/admin/dashboard/summary", {
+  const cacheKey = `dashboard:${tab}`
+  const cached = memoryCache.get(cacheKey) as CacheEntry<DashboardSummary> | undefined
+  if (cached && Date.now() - cached.timestamp < 30000) {
+    return Promise.resolve(cached.data)
+  }
+  return pb.send<DashboardSummary>("/api/admin/dashboard/summary", {
     method: "GET",
     query: { tab },
+  }).then((data) => {
+    memoryCache.set(cacheKey, { data, timestamp: Date.now() })
+    return data
   })
 }
 
 export function triggerSync(): Promise<{ ok: boolean; synced_at: string }> {
+  invalidateCache()
   return pb.send("/api/admin/sync", { method: "POST" })
 }
 
@@ -282,11 +312,21 @@ export function exportCsv(filename: string, head: string[], rows: (string | numb
 export function fetchList<T>(
   collection: string,
   query?: Record<string, string | number>,
+  options?: { bypassCache?: boolean }
 ): Promise<ListResponse<T>> {
-  return pb.send(`/api/${collection}`, { method: "GET", query })
+  const cacheKey = `list:${collection}:${JSON.stringify(query || {})}`
+  const cached = memoryCache.get(cacheKey) as CacheEntry<ListResponse<T>> | undefined
+  if (!options?.bypassCache && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return Promise.resolve(cached.data)
+  }
+  return pb.send<ListResponse<T>>(`/api/${collection}`, { method: "GET", query }).then((res) => {
+    memoryCache.set(cacheKey, { data: res, timestamp: Date.now() })
+    return res
+  })
 }
 
 export function createRecord<T>(collection: string, body: Record<string, unknown>): Promise<T> {
+  invalidateCache(collection)
   return pb.send(`/api/${collection}`, { method: "POST", body })
 }
 
@@ -295,6 +335,7 @@ export function updateRecord<T>(
   id: string,
   body: Record<string, unknown>,
 ): Promise<T> {
+  invalidateCache(collection)
   // 禁用自动取消：连续 PATCH 同一条记录（如标记/别名/替换）不应互相取消
   // https://github.com/pocketbase/js-sdk#auto-cancellation
   return pb.send(`/api/${collection}/${id}`, { method: "PATCH", body, requestKey: null } as never)
