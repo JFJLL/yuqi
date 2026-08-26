@@ -12,7 +12,7 @@ routerAdd("POST", "/api/yuqi/admin/users", (e) => {
     var g = require(`${__hooks}/_lib/guards.js`)
     var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
-    g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN"])
+    g.requirePermission(e, ctx, "permission.manage")
     const body = e.requestInfo().body || {}
     const email = String(body.email || "").trim().toLowerCase()
     const password = String(body.password || "")
@@ -54,11 +54,25 @@ routerAdd("PATCH", "/api/yuqi/admin/users/{id}", (e) => {
     var g = require(`${__hooks}/_lib/guards.js`)
     var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
-    g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN"])
+    g.requirePermission(e, ctx, "permission.manage")
     const rec = H.findRecord("app_users", e.request.pathValue("id"))
     if (!rec) throw new NotFoundError("账号不存在")
     if (String(rec.get("tenant") || "") !== ctx.tenantId) throw new NotFoundError("账号不存在")
     const body = e.requestInfo().body || {}
+
+    // 1. 自锁保护：禁止停用当前正在登录的账号
+    if (rec.id === ctx.user.id && body.status === "DISABLED") {
+      throw new BadRequestError("不可停用当前正在登录的管理员账号")
+    }
+
+    // 2. 最后超管保护：禁止停用或降级最后一个超级管理员
+    if (rec.get("role_code") === "SUPER_ADMIN" && (body.status === "DISABLED" || (body.role_code && body.role_code !== "SUPER_ADMIN"))) {
+      const superAdmins = $app.findRecordsByFilter("app_users", "role_code = 'SUPER_ADMIN' && status = 'ACTIVE' && tenant = {:t}", "", 10, 0, { t: ctx.tenantId })
+      if (superAdmins.length <= 1) {
+        throw new BadRequestError("不可停用或降级系统中最后一个超级管理员账号")
+      }
+    }
+
     const allowed = ["display_name", "role_code", "status", "employee", "assigned_org", "assigned_store", "mobile"]
     for (const f of allowed) {
       if (body[f] !== undefined) rec.set(f, String(body[f]).slice(0, f === "display_name" ? 80 : f === "mobile" ? 30 : 40))
@@ -88,6 +102,7 @@ routerAdd("POST", "/api/yuqi/issues/{id}/review", (e) => {
     var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"])
+    g.requirePermission(e, ctx, "inspection.manage")
     const issue = H.findRecord("issues", e.request.pathValue("id"))
     if (!issue) throw new NotFoundError("问题不存在")
     g.assertVisible(e, ctx, issue, { storeField: "store", employeeField: "employee" })
@@ -135,6 +150,7 @@ routerAdd("POST", "/api/yuqi/issues/{id}/push", (e) => {
     var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"])
+    g.requirePermission(e, ctx, "inspection.manage")
     const issue = H.findRecord("issues", e.request.pathValue("id"))
     if (!issue) throw new NotFoundError("问题不存在")
     g.assertVisible(e, ctx, issue, { storeField: "store", employeeField: "employee" })
@@ -168,6 +184,7 @@ routerAdd("POST", "/api/yuqi/issues/{id}/close", (e) => {
     var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"])
+    g.requirePermission(e, ctx, "inspection.manage")
     const issue = H.findRecord("issues", e.request.pathValue("id"))
     if (!issue) throw new NotFoundError("问题不存在")
     g.assertVisible(e, ctx, issue, { storeField: "store", employeeField: "employee" })
@@ -277,6 +294,7 @@ routerAdd("POST", "/api/yuqi/appeals/{id}/review", (e) => {
     var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "STORE_MANAGER"])
+    g.requirePermission(e, ctx, "appeal.review")
     const appeal = H.findRecord("appeals", e.request.pathValue("id"))
     if (!appeal) throw new NotFoundError("申诉不存在")
     const issue = String(appeal.get("issue_ref") || "") ? H.findRecord("issues", String(appeal.get("issue_ref"))) : null
@@ -443,6 +461,7 @@ routerAdd("POST", "/api/yuqi/rectifications/{id}/confirm", (e) => {
     var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "STORE_MANAGER"])
+    g.requirePermission(e, ctx, "inspection.manage")
     const rect = H.findRecord("rectifications", e.request.pathValue("id"))
     if (!rect) throw new NotFoundError("整改任务不存在")
     const issue = String(rect.get("issue") || "") ? H.findRecord("issues", String(rect.get("issue"))) : null
@@ -562,6 +581,7 @@ routerAdd("POST", "/api/yuqi/device-bindings/{id}/approve", (e) => {
     var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "STORE_MANAGER"])
+    g.requirePermission(e, ctx, "device.manage")
     const binding = H.findRecord("device_bindings", e.request.pathValue("id"))
     if (!binding) throw new NotFoundError("绑定申请不存在")
     if (String(binding.get("status") || "") !== "REQUESTED") throw new BadRequestError("该申请已处理")
@@ -622,6 +642,7 @@ routerAdd("POST", "/api/yuqi/device-bindings/{id}/reject", (e) => {
     var H = require(`${__hooks}/_lib/phase1-helpers.js`)
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "STORE_MANAGER"])
+    g.requirePermission(e, ctx, "device.manage")
     const binding = H.findRecord("device_bindings", e.request.pathValue("id"))
     if (!binding) throw new NotFoundError("绑定申请不存在")
     if (String(binding.get("status") || "") !== "REQUESTED") throw new BadRequestError("该申请已处理")

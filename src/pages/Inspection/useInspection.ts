@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
-  createRecord,
+  closeIssue,
   exportCsv,
   fetchList,
+  pushIssueRectification,
+  reviewIssue,
   type Employee,
   type InspectionIssueRecord,
   type Store,
@@ -98,21 +100,41 @@ export function useInspection() {
   async function pushRectify(issue: IssueRow) {
     setPushing(true)
     try {
-      const due = new Date(Date.now() + 3 * 24 * 3600 * 1000)
-      const dueText = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-${String(due.getDate()).padStart(2, "0")}`
-      await createRecord("rectify_tasks", {
-        title: `${issue.issue_type}整改`,
-        owner: issue.employee,
-        store: issue.store,
-        source_issue: issue.id,
-        due_date: dueText,
-        progress: 0,
-        state: "待整改",
-      })
-      toast.success("整改任务已推送")
+      await reviewIssue(issue.id, "APPROVE")
+      await pushIssueRectification(issue.id, 3)
+      toast.success("已审核通过并向员工推送整改任务")
       setDetail(null)
+      await reload()
     } catch {
-      toast.error("推送失败，请稍后重试")
+      toast.error("审核推送失败，请稍后重试")
+    } finally {
+      setPushing(false)
+    }
+  }
+
+  async function handleDismissIssue(issue: IssueRow) {
+    setPushing(true)
+    try {
+      await reviewIssue(issue.id, "DISMISS", "人工判定为误报")
+      toast.success("已标记为误报并忽略")
+      setDetail(null)
+      await reload()
+    } catch {
+      toast.error("判定操作失败")
+    } finally {
+      setPushing(false)
+    }
+  }
+
+  async function handleCloseIssue(issue: IssueRow) {
+    setPushing(true)
+    try {
+      await closeIssue(issue.id, "管理员手动关闭")
+      toast.success("问题已关闭")
+      setDetail(null)
+      await reload()
+    } catch {
+      toast.error("关闭问题失败")
     } finally {
       setPushing(false)
     }
@@ -144,6 +166,8 @@ export function useInspection() {
     openDetail,
     closeDetail,
     pushRectify,
+    handleDismissIssue,
+    handleCloseIssue,
     handleExport,
     reload,
   }

@@ -13,6 +13,20 @@ function matchVibexPrefix(): string | null {
 
 // 浏览器侧用 VibeX 路径推 __pb 代理前缀; 本地直跑 dev (无 app-preview 前缀)时 fallback 到 /__pb
 export function getPocketBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const queryUrl = params.get("pb_url")
+      if (queryUrl) {
+        localStorage.setItem("yuqi_pb_url", queryUrl)
+        return queryUrl
+      }
+    } catch {
+      // ignore
+    }
+    const custom = localStorage.getItem("yuqi_pb_url")
+    if (custom) return custom
+  }
   const prefix = matchVibexPrefix()
   return prefix ? `${prefix}/__pb` : "/__pb"
 }
@@ -42,6 +56,12 @@ pb.beforeSend = (url, options) => {
   const token = getSessionToken()
   if (token && !headers.Authorization) {
     headers.Authorization = token
+  }
+  if (typeof window !== "undefined") {
+    const custom = localStorage.getItem("yuqi_pb_url")
+    if (custom && pb.baseUrl !== custom) {
+      pb.baseUrl = custom
+    }
   }
   return { url, options: { ...options, headers } }
 }

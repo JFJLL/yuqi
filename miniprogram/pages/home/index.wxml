@@ -1,0 +1,123 @@
+<view class="page home-page" wx:if="{{dashboard}}">
+  <view class="welcome">
+    <view>
+      <text class="welcome-title">{{dashboard.user.name}}，{{dashboard.isManager ? '门店运营已更新' : '今日巡检已更新'}}</text>
+      <text class="welcome-sub">{{dashboard.user.storeName}} · {{dashboard.user.role}}</text>
+    </view>
+    <view class="live-dot">在线</view>
+  </view>
+
+  <view class="summary surface">
+    <view class="summary-head">
+      <view>
+        <text class="summary-label">{{dashboard.isManager ? '今日门店巡检' : '今日已巡检'}}</text>
+        <text class="summary-value">{{dashboard.metrics.inspected}}<text class="summary-unit"> 段</text></text>
+      </view>
+      <view class="summary-action" bindtap="goFeedback">查看反馈</view>
+    </view>
+    <view class="metric-row">
+      <view class="metric-item">
+        <text class="metric-value {{dashboard.isManager ? '' : 'risk-value'}}">{{dashboard.isManager ? dashboard.metrics.onlineDevices : dashboard.metrics.highRisk}}</text>
+        <text class="metric-label">{{dashboard.isManager ? '在线工牌' : '高风险'}}</text>
+      </view>
+      <view class="metric-item">
+        <text class="metric-value {{dashboard.isManager ? 'risk-value' : ''}}">{{dashboard.isManager ? dashboard.metrics.highRisk : dashboard.metrics.pending}}</text>
+        <text class="metric-label">{{dashboard.isManager ? '高风险' : '待整改'}}</text>
+      </view>
+      <view class="metric-item">
+        <text class="metric-value">{{dashboard.isManager ? dashboard.metrics.pending : dashboard.metrics.appeals}}</text>
+        <text class="metric-label">{{dashboard.isManager ? '待处理' : '申诉处理中'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="quick-actions section">
+    <view class="quick-item surface" bindtap="goDevice">
+      <text class="quick-mark mark-blue">设备</text>
+      <text class="quick-title">{{dashboard.isManager ? '工牌总览' : '绑定工牌'}}</text>
+      <text class="quick-sub">{{dashboard.isManager ? '查看全店在线状态' : '扫码或输入设备码'}}</text>
+    </view>
+    <view class="quick-item surface" bindtap="goFeedback">
+      <text class="quick-mark mark-red">反馈</text>
+      <text class="quick-title">{{dashboard.isManager ? '问题处置' : '处理问题'}}</text>
+      <text class="quick-sub">{{dashboard.isManager ? '跟进店员整改申诉' : '查看依据和建议'}}</text>
+    </view>
+    <view class="quick-item surface" bindtap="goRecommend">
+      <text class="quick-mark mark-green">荐药</text>
+      <text class="quick-title">生成组合</text>
+      <text class="quick-sub">库存、安全与毛利</text>
+    </view>
+    <view class="quick-item surface" bindtap="goLearning">
+      <text class="quick-mark mark-amber">学习</text>
+      <text class="quick-title">{{dashboard.isManager ? '团队培训' : '整改任务'}}</text>
+      <text class="quick-sub">{{dashboard.isManager ? '查看学习完成情况' : '课程、考试和复盘'}}</text>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{dashboard.latestFeedback}}">
+    <view class="section-head">
+      <text class="section-title">优先处理</text>
+      <text class="section-link" bindtap="goFeedback">全部反馈</text>
+    </view>
+    <view class="issue surface" bindtap="openLatest">
+      <view class="issue-head">
+        <text class="issue-title">{{dashboard.latestFeedback.title}}</text>
+        <text class="status status-{{dashboard.latestFeedback.riskTone}}">{{dashboard.latestFeedback.risk}}</text>
+      </view>
+      <text class="issue-meta">{{dashboard.isManager ? dashboard.latestFeedback.employeeName + ' · ' : ''}}{{dashboard.latestFeedback.time}} · {{dashboard.latestFeedback.state}}</text>
+      <text class="issue-quote">“{{dashboard.latestFeedback.quote}}”</text>
+      <text class="issue-link">查看判断依据和整改建议</text>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{dashboard.isManager}}">
+    <view class="section-head">
+      <text class="section-title">店员与工牌</text>
+      <text class="section-link" bindtap="goDevice">全部设备</text>
+    </view>
+    <view class="team-list surface">
+      <view class="staff-row" wx:for="{{dashboard.staff}}" wx:key="id" bindtap="goDevice">
+        <view class="staff-avatar">{{item.avatarText}}</view>
+        <view class="staff-main">
+          <view class="staff-name-line">
+            <text class="staff-name">{{item.name}}</text>
+            <text class="staff-role">{{item.role}}</text>
+          </view>
+          <text class="staff-device">{{item.deviceCode || '尚未绑定工牌'}} · {{item.todayRecords}} 段</text>
+        </view>
+        <view class="staff-side">
+          <text class="status status-{{item.statusTone}}">{{item.deviceStatus}}</text>
+          <text class="staff-risk {{item.pending ? 'has-risk' : ''}}">{{item.pending ? item.pending + ' 个待处理' : '暂无问题'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section" wx:else>
+    <view class="section-head">
+      <text class="section-title">设备状态</text>
+      <text class="section-link" bindtap="goDevice">管理设备</text>
+    </view>
+    <view class="device-row surface" wx:if="{{dashboard.device}}" bindtap="goDevice">
+      <view class="device-main">
+        <text class="device-name">{{dashboard.device.type}}</text>
+        <text class="caption">{{dashboard.device.code}}</text>
+      </view>
+      <view class="device-side">
+        <text class="status status-{{dashboard.device.statusTone}}">{{dashboard.device.status}}</text>
+        <text class="caption">电量 {{dashboard.device.battery}}%</text>
+      </view>
+    </view>
+    <view class="device-row surface" wx:else bindtap="goDevice">
+      <view class="device-main">
+        <text class="device-name">尚未绑定智能工牌</text>
+        <text class="caption">绑定后才能接收个人巡检结果</text>
+      </view>
+      <text class="section-link">去绑定</text>
+    </view>
+  </view>
+</view>
+
+<view class="page" wx:else>
+  <view class="empty">正在同步今日巡检数据...</view>
+</view>

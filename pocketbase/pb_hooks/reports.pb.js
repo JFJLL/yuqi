@@ -13,10 +13,14 @@ routerAdd("GET", "/api/reports/overview", function (e) {
     var g = require(`${__hooks}/_lib/guards.js`)
     var ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["ADMIN", "COMPLIANCE", "REGION_MANAGER", "STORE_MANAGER", "AUDITOR"])
+    g.requirePermission(e, ctx, "report.export")
 
     var query = e.requestInfo().query || {}
     var from = String(query["from"] || "")
     var to = String(query["to"] || "")
+    var filterRegionId = String(query["regionId"] || "").trim()
+    var filterStoreId = String(query["storeId"] || "").trim()
+    var filterEmployeeId = String(query["employeeId"] || "").trim()
     var nowIso = new Date().toISOString()
     if (!from || from.length < 10) {
       var d = new Date()
@@ -63,9 +67,18 @@ routerAdd("GET", "/api/reports/overview", function (e) {
 
     // ---- 门店/员工名称索引 ----
     var storeName = {}
+    var storeRegionName = {}
     var empName = {}
+    var regions = listAll("regions", "tenant = {:t}", { t: ctx.tenantId }, 1000)
+    var regNameMap = {}
+    for (var ri = 0; ri < regions.length; ri++) regNameMap[text(regions[ri], "id")] = text(regions[ri], "name")
     var stores = listAll("stores", storeScope.filter, storeScope.params, 5000)
-    for (var si = 0; si < stores.length; si++) storeName[text(stores[si], "id")] = text(stores[si], "name") || text(stores[si], "code")
+    for (var si = 0; si < stores.length; si++) {
+      var sid = text(stores[si], "id")
+      storeName[sid] = text(stores[si], "name") || text(stores[si], "code")
+      var rid = text(stores[si], "region")
+      storeRegionName[sid] = regNameMap[rid] || "默认区域"
+    }
     var emps = listAll("employees", scope.filter, scope.params, 5000)
     for (var ei = 0; ei < emps.length; ei++) empName[text(emps[ei], "id")] = text(emps[ei], "name") || text(emps[ei], "employee_no")
 
@@ -196,6 +209,40 @@ routerAdd("GET", "/api/reports/overview", function (e) {
       else if (js === "QUEUED" || js === "RUNNING" || js === "RETRYING") jobsPending++
     }
 
+    // 构造门店聚合报表明细行
+    var storeRows = []
+    var bindings = listAll("device_bindings", scope.filter, scope.params, 10000)
+    for (var sj = 0; sj < stores.length; sj++) {
+      var stId = text(stores[sj], "id")
+      var stName = text(stores[sj], "name")
+      var stReg = text(stores[sj], "region")
+      var rName = storeRegionName[stId] || "默认区域"
+
+      if (filterRegionId && stReg !== filterRegionId && rName !== filterRegionId) continue
+      if (filterStoreId && stId !== filterStoreId) continue
+
+      var stEmps = emps.filter(function(e) { return (text(e, "store") === stId || text(e, "store") === stName) && (!filterEmployeeId || text(e, "id") === filterEmployeeId) })
+      if (filterEmployeeId && stEmps.length === 0) continue
+
+      var stBinds = bindings.filter(function(b) { return (text(b, "store") === stId || text(b, "store") === stName) && text(b, "status") === "ACTIVE" && (!filterEmployeeId || text(b, "employee") === filterEmployeeId) })
+      var stTrans = transcripts.filter(function(t) { return (text(t, "store") === stId || text(t, "store") === stName) && (!filterEmployeeId || text(t, "employee") === filterEmployeeId) })
+      var stIssues = issues.filter(function(i) { return (idOf(i.get("store")) === stId || text(i, "store") === stName) && (!filterEmployeeId || idOf(i.get("employee")) === filterEmployeeId) })
+      var stRects = rects.filter(function(r) { return (idOf(r.get("store")) === stId || text(r, "store") === stName) && text(r, "status") !== "CONFIRMED" && (!filterEmployeeId || idOf(r.get("employee")) === filterEmployeeId) })
+      var stAppeals = appeals.filter(function(a) { return stIssues.some(function(i) { return idOf(i.get("id")) === idOf(a.get("issue")) }) })
+
+      storeRows.push({
+        storeId: stId,
+        storeName: stName,
+        regionName: rName,
+        employeeCount: stEmps.length,
+        deviceCount: stBinds.length,
+        recordingCount: stTrans.length,
+        issueCount: stIssues.length,
+        pendingRectifyCount: stRects.length,
+        appealCount: stAppeals.length,
+      })
+    }
+
     return e.json(200, {
       generated_at: nowIso,
       range: { from: from, to: to, scope: ctx.scope ? ctx.scope.type : "ALL" },
@@ -219,6 +266,7 @@ routerAdd("GET", "/api/reports/overview", function (e) {
       analysis_jobs: { total: analysisTotal, succeeded: analysisSucceeded, failed: analysisFailed, pending: jobsPending, success_rate: rate(analysisSucceeded, analysisTotal) },
       store_rank: storeRank,
       employee_distribution: empRank,
+      store_rows: storeRows,
       disclaimer: "系统识别结果仅为疑似风险，最终判断由授权管理人员完成。",
     })
   } catch (err) {
@@ -239,6 +287,7 @@ routerAdd("GET", "/api/reports/export/issues", function (e) {
     var g = require(`${__hooks}/_lib/guards.js`)
     var ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["ADMIN", "COMPLIANCE", "REGION_MANAGER", "STORE_MANAGER", "AUDITOR"])
+    g.requirePermission(e, ctx, "report.export")
 
     var query = e.requestInfo().query || {}
     var from = String(query["from"] || "")

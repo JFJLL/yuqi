@@ -1,0 +1,14 @@
+.container { padding: 30rpx; background: #f4f6f8; min-height: 100vh; }
+.card { background: #fff; border-radius: 16rpx; padding: 24rpx; margin-bottom: 24rpx; border: 1rpx solid #e2e8f0; }
+.title { font-size: 34rpx; font-weight: bold; color: #1a202c; display: block; margin-bottom: 12rpx; }
+.category { font-size: 22rpx; color: #126b59; background: #e6f4ef; padding: 4rpx 12rpx; border-radius: 6rpx; display: inline-block; margin-bottom: 16rpx; }
+.summary { font-size: 26rpx; color: #718096; line-height: 1.5; display: block; margin-bottom: 20rpx; }
+.progress-bar { height: 12rpx; background: #edf2f7; border-radius: 6rpx; overflow: hidden; margin-bottom: 12rpx; }
+.progress-fill { height: 100%; background: #126b59; border-radius: 6rpx; }
+.progress-text { font-size: 24rpx; color: #4a5568; }
+.section-title { font-size: 30rpx; font-weight: bold; color: #2d3748; margin-bottom: 16rpx; display: block; }
+.unit-item { display: flex; justify-content: space-between; padding: 20rpx 0; border-bottom: 1rpx solid #edf2f7; font-size: 28rpx; }
+.btn-group { display: flex; flex-direction: column; gap: 16rpx; margin-top: 30rpx; }
+.btn { border-radius: 12rpx; font-size: 28rpx; height: 80rpx; line-height: 80rpx; text-align: center; }
+.btn-primary { background: #126b59; color: #fff; }
+.btn-outline { background: #fff; color: #126b59; border: 1rpx solid #126b59; }

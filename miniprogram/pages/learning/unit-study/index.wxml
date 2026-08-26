@@ -1,0 +1,10 @@
+<view class="container">
+  <view class="card header">
+    <text class="title">{{unit.title}}</text>
+    <text class="duration">预计学习时长：{{unit.durationSeconds}} 秒</text>
+  </view>
+  <view class="card content-card">
+    <text class="content">{{unit.content}}</text>
+  </view>
+  <button class="btn btn-primary" bindtap="markComplete" disabled="{{submitting}}">完成本章节学习</button>
+</view>

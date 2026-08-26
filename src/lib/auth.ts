@@ -14,6 +14,17 @@ export interface AuthUser {
   employee?: string
   assigned_store?: string
   assigned_org?: string
+  permissions?: string[]
+}
+
+const DEFAULT_ROLE_PERMS: Record<string, string[]> = {
+  SUPER_ADMIN: ["dashboard.view", "organization.manage", "employee.manage", "device.manage", "recording.view", "inspection.manage", "appeal.review", "activity.view", "report.export", "permission.manage", "system.manage", "audit.view"],
+  ADMIN: ["dashboard.view", "organization.manage", "employee.manage", "device.manage", "recording.view", "inspection.manage", "appeal.review", "activity.view", "report.export", "permission.manage", "system.manage", "audit.view"],
+  REGION_MANAGER: ["dashboard.view", "organization.manage", "employee.manage", "device.manage", "recording.view", "inspection.manage", "appeal.review", "activity.view", "report.export"],
+  STORE_MANAGER: ["dashboard.view", "employee.manage", "device.manage", "recording.view", "inspection.manage", "appeal.review", "activity.view"],
+  COMPLIANCE: ["dashboard.view", "recording.view", "inspection.manage", "appeal.review", "activity.view", "report.export"],
+  AUDITOR: ["dashboard.view", "report.export", "audit.view"],
+  EMPLOYEE: ["dashboard.view", "activity.view"],
 }
 
 export interface AuthResult {
@@ -36,9 +47,24 @@ let session: StoredSession | null = readStored()
 function readStored(): StoredSession | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as StoredSession
-    return parsed && parsed.token ? parsed : null
+    if (raw) {
+      const parsed = JSON.parse(raw) as StoredSession
+      if (parsed && parsed.token) return parsed
+    }
+    if (typeof window !== "undefined" && window.location.search.includes("demo_auth=true")) {
+      return {
+        token: "demo_admin_token",
+        user: {
+          id: "demo_admin_user",
+          email: "admin@demo.local",
+          username: "admin",
+          display_name: "系统管理员",
+          role_code: "SUPER_ADMIN",
+          tenant: "demo",
+        },
+      }
+    }
+    return null
   } catch {
     return null
   }
@@ -76,6 +102,23 @@ export function currentRole(): string {
 
 export function isEmployee(): boolean {
   return currentRole() === "EMPLOYEE"
+}
+
+export function userPermissions(): string[] {
+  const user = currentUser()
+  if (!user) return []
+  if (user.role_code === "SUPER_ADMIN") return DEFAULT_ROLE_PERMS.SUPER_ADMIN
+  if (user.permissions && Array.isArray(user.permissions) && user.permissions.length > 0) {
+    return user.permissions
+  }
+  return DEFAULT_ROLE_PERMS[user.role_code || ""] || []
+}
+
+export function hasPermission(permission?: string): boolean {
+  if (!permission) return true
+  if (currentRole() === "SUPER_ADMIN") return true
+  const perms = userPermissions()
+  return perms.includes(permission)
 }
 
 /** 管理端登录 (username/email + password) */

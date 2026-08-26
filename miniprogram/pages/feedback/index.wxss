@@ -1,0 +1,29 @@
+.feedback-page { min-height: 100vh; }
+.manager-context { display: flex; align-items: baseline; justify-content: space-between; padding: 24rpx 28rpx 4rpx; background: #ffffff; }
+.manager-context-title { font-size: 30rpx; font-weight: 650; }
+.manager-context-sub { color: #758596; font-size: 23rpx; }
+
+.filter-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  width: 100%;
+  padding: 18rpx 24rpx;
+  background: rgba(255,255,255,.96);
+  border-bottom: 1rpx solid #dce5ea;
+  white-space: nowrap;
+}
+
+.filter-list { display: inline-flex; gap: 12rpx; }
+.filter-item { min-width: 120rpx; height: 64rpx; padding: 0 22rpx; border: 1rpx solid #d5dfe5; border-radius: 10rpx; color: #637385; line-height: 62rpx; text-align: center; }
+.filter-item.active { background: #143d38; border-color: #143d38; color: #ffffff; font-weight: 600; }
+
+.feedback-list { padding: 20rpx 24rpx 40rpx; }
+.feedback-item { margin-bottom: 16rpx; padding: 26rpx; background: #ffffff; border: 1rpx solid #dce5ea; border-radius: 12rpx; }
+.item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; }
+.item-title, .item-meta, .item-quote { display: block; }
+.item-title { font-size: 30rpx; font-weight: 650; }
+.item-meta { margin-top: 8rpx; color: #758596; font-size: 22rpx; }
+.item-quote { margin-top: 20rpx; color: #425262; font-size: 26rpx; line-height: 1.65; }
+.item-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 22rpx; padding-top: 20rpx; border-top: 1rpx solid #edf1f3; }
+.item-link { color: #126b59; font-size: 25rpx; font-weight: 600; }

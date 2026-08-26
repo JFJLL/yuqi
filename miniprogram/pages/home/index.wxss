@@ -1,0 +1,78 @@
+.home-page { padding-top: 18rpx; }
+
+.welcome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12rpx 4rpx 24rpx;
+}
+
+.welcome-title, .welcome-sub { display: block; }
+.welcome-title { font-size: 36rpx; font-weight: 700; line-height: 1.4; }
+.welcome-sub { margin-top: 6rpx; color: #6b7b8d; font-size: 25rpx; }
+
+.live-dot {
+  min-width: 82rpx;
+  padding: 8rpx 14rpx;
+  border-radius: 8rpx;
+  background: #e7f6f0;
+  color: #126b59;
+  font-size: 22rpx;
+  text-align: center;
+}
+
+.summary {
+  padding: 28rpx;
+  background: #143d38;
+  border-color: #143d38;
+  color: #ffffff;
+}
+
+.summary-head { display: flex; align-items: flex-start; justify-content: space-between; }
+.summary-label { display: block; color: rgba(255,255,255,.72); font-size: 25rpx; }
+.summary-value { display: block; margin-top: 8rpx; font-size: 56rpx; font-weight: 700; line-height: 1; }
+.summary-unit { font-size: 25rpx; font-weight: 500; }
+.summary-action { padding: 10rpx 16rpx; border: 1rpx solid rgba(255,255,255,.3); border-radius: 8rpx; font-size: 24rpx; }
+
+.metric-row { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 34rpx; border-top: 1rpx solid rgba(255,255,255,.16); }
+.metric-item { padding-top: 22rpx; }
+.metric-value, .metric-label { display: block; }
+.metric-value { font-size: 36rpx; font-weight: 650; }
+.metric-label { margin-top: 4rpx; color: rgba(255,255,255,.66); font-size: 22rpx; }
+.risk-value { color: #ffb6b9; }
+
+.quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 16rpx; }
+.quick-item { min-height: 176rpx; padding: 22rpx; }
+.quick-mark { display: inline-block; padding: 7rpx 12rpx; border-radius: 8rpx; font-size: 22rpx; font-weight: 650; }
+.mark-blue { background: #e8f1fa; color: #175f9b; }
+.mark-red { background: #fdebec; color: #b4232e; }
+.mark-green { background: #e7f6f0; color: #126b59; }
+.mark-amber { background: #fff2d7; color: #8b5200; }
+.quick-title, .quick-sub { display: block; }
+.quick-title { margin-top: 18rpx; font-size: 29rpx; font-weight: 650; }
+.quick-sub { margin-top: 5rpx; color: #768697; font-size: 22rpx; }
+
+.issue { padding: 26rpx; }
+.issue-head { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
+.issue-title { font-size: 30rpx; font-weight: 650; }
+.issue-meta { display: block; margin-top: 10rpx; color: #758596; font-size: 23rpx; }
+.issue-quote { display: block; margin-top: 20rpx; padding: 18rpx; background: #f7f9fa; border-left: 5rpx solid #c53c45; color: #435161; font-size: 26rpx; line-height: 1.65; }
+.issue-link { display: block; margin-top: 20rpx; color: #126b59; font-size: 25rpx; font-weight: 600; }
+
+.device-row { display: flex; align-items: center; justify-content: space-between; min-height: 126rpx; padding: 24rpx; }
+.device-main { min-width: 0; }
+.device-name, .device-main .caption, .device-side .caption { display: block; }
+.device-name { margin-bottom: 8rpx; font-weight: 650; }
+.device-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8rpx; }
+.team-list { overflow: hidden; }
+.staff-row { display: flex; align-items: center; gap: 18rpx; min-height: 128rpx; padding: 20rpx 22rpx; border-bottom: 1rpx solid #e7edef; }
+.staff-row:last-child { border-bottom: 0; }
+.staff-avatar { display: flex; flex: 0 0 68rpx; align-items: center; justify-content: center; width: 68rpx; height: 68rpx; border-radius: 50%; background: #e7f2ef; color: #126b59; font-size: 27rpx; font-weight: 700; }
+.staff-main { flex: 1; min-width: 0; }
+.staff-name-line { display: flex; align-items: baseline; gap: 12rpx; }
+.staff-name { font-size: 28rpx; font-weight: 650; }
+.staff-role { color: #7b8997; font-size: 21rpx; }
+.staff-device { display: block; margin-top: 8rpx; overflow: hidden; color: #748496; font-size: 21rpx; text-overflow: ellipsis; white-space: nowrap; }
+.staff-side { display: flex; flex: 0 0 150rpx; flex-direction: column; align-items: flex-end; gap: 8rpx; }
+.staff-risk { color: #748496; font-size: 21rpx; }
+.staff-risk.has-risk { color: #a52b34; }

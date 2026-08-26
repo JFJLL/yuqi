@@ -1,0 +1,31 @@
+.profile-page { min-height: 100vh; padding-bottom: calc(40rpx + env(safe-area-inset-bottom)); }
+.profile-head { display: flex; align-items: center; gap: 22rpx; padding: 34rpx 28rpx; background: #ffffff; border-bottom: 1rpx solid #dce5ea; }
+.avatar { display: flex; align-items: center; justify-content: center; width: 92rpx; height: 92rpx; border-radius: 50%; background: #143d38; color: #ffffff; font-size: 36rpx; font-weight: 700; }
+.profile-copy { flex: 1; min-width: 0; }
+.profile-name, .profile-meta, .menu-title, .menu-sub, .appeal-title, .appeal-reason, .appeal-time { display: block; }
+.profile-name { font-size: 36rpx; font-weight: 700; }
+.profile-meta { margin-top: 6rpx; color: #708092; font-size: 24rpx; }
+.menu-group { margin-top: 18rpx; padding: 0 24rpx; background: #ffffff; border-top: 1rpx solid #dce5ea; border-bottom: 1rpx solid #dce5ea; }
+.menu-row { display: flex; align-items: center; justify-content: space-between; min-height: 124rpx; border-bottom: 1rpx solid #e6ecef; }
+.menu-row:last-child { border-bottom: 0; }
+.menu-title { font-size: 29rpx; font-weight: 650; }
+.menu-sub { margin-top: 6rpx; color: #7a8998; font-size: 23rpx; }
+.menu-arrow { color: #8b98a5; font-size: 46rpx; font-family: Arial, sans-serif; }
+.appeal-section { margin-top: 26rpx; padding: 0 24rpx; }
+.appeal-row { display: flex; align-items: flex-start; gap: 18rpx; margin-bottom: 14rpx; padding: 24rpx; background: #ffffff; border: 1rpx solid #dce5ea; border-radius: 12rpx; }
+.appeal-main { flex: 1; min-width: 0; }
+.appeal-title { font-size: 28rpx; font-weight: 650; }
+.appeal-reason { display: -webkit-box; margin-top: 8rpx; overflow: hidden; color: #5d6e80; font-size: 24rpx; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.appeal-time { margin-top: 10rpx; color: #8a97a3; font-size: 21rpx; }
+.account-info { margin-top: 26rpx; padding: 0 24rpx; background: #ffffff; border-top: 1rpx solid #dce5ea; border-bottom: 1rpx solid #dce5ea; }
+.account-info view { display: flex; align-items: center; justify-content: space-between; min-height: 92rpx; border-bottom: 1rpx solid #e8edef; color: #536375; font-size: 26rpx; }
+.account-info view:last-child { border-bottom: 0; }
+.account-info text:last-child { color: #172332; }
+.manager-summary { display: grid; grid-template-columns: repeat(3, 1fr); padding: 26rpx 24rpx; background: #143d38; color: #ffffff; }
+.manager-summary view { border-right: 1rpx solid rgba(255,255,255,.16); text-align: center; }
+.manager-summary view:last-child { border-right: 0; }
+.manager-number, .manager-label { display: block; }
+.manager-number { font-size: 34rpx; font-weight: 700; }
+.manager-number.risk-number { color: #ffb6b9; }
+.manager-label { margin-top: 6rpx; color: rgba(255,255,255,.68); font-size: 21rpx; }
+.rebind-action { margin: 34rpx 24rpx 0; color: #617184; font-size: 25rpx; text-align: center; }

@@ -1,0 +1,33 @@
+<view class="learning-page">
+  <view class="learning-summary">
+    <text class="summary-title">本周学习整改</text>
+    <view class="summary-metrics">
+      <view><text class="summary-number">{{tasks.length}}</text><text>任务</text></view>
+      <view><text class="summary-number">{{completedCount}}</text><text>已完成</text></view>
+      <view><text class="summary-number">{{tasks.length - completedCount}}</text><text>待完成</text></view>
+    </view>
+  </view>
+
+  <view class="task-list">
+    <view class="task-item" wx:for="{{tasks}}" wx:key="id">
+      <view class="task-head">
+        <view>
+          <text class="task-title">{{item.title}}</text>
+          <text class="task-source">来源：{{item.source}}</text>
+        </view>
+        <text class="status status-{{item.stateTone}}">{{item.state}}</text>
+      </view>
+      <view class="progress-track"><view class="progress-value" style="width: {{item.progress}}%"></view></view>
+      <view class="task-foot">
+        <text class="deadline">截止 {{item.deadline}}</text>
+        <text class="progress-text">{{item.progress}}%</text>
+      </view>
+      <button class="btn btn-small task-btn" data-id="{{item.id}}" bindtap="continueTask">{{item.progress >= 100 ? '查看记录' : '继续学习'}}</button>
+    </view>
+  </view>
+
+  <view class="learning-note">
+    <text class="note-title">整改闭环</text>
+    <text>课程和考试完成后会自动同步给店长；同类问题再次发生时，系统会关联历史学习记录。</text>
+  </view>
+</view>

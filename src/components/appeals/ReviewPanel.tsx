@@ -25,70 +25,78 @@ export function ReviewPanel({
   onViewContext,
 }: ReviewPanelProps) {
   return (
-    <section className="bg-card border border-border rounded-lg" style={{ boxShadow: "var(--elev-ring)" }}>
-      <div className="min-h-[54px] px-4 py-3.5 border-b border-border">
-        <h2 className="m-0 text-base font-semibold">复核工作台</h2>
+    <section className="bg-white border border-[#dbe3ec] rounded-[7px] overflow-hidden shadow-xs">
+      <div className="p-4 border-b border-[#dbe3ec]">
+        <h2 className="m-0 text-base font-bold text-[#172033]">申诉详情与决定</h2>
+        <p className="mt-0.5 mb-0 text-[#65738a] text-xs">查看上下文并进行复核判定。</p>
       </div>
       <div className="p-4">
         {!appeal ? (
-          <div className="border border-border rounded-lg p-3 bg-background grid gap-2">
+          <div className="border border-[#dbe3ec] rounded-[6px] p-6 bg-[#f8fafc] flex flex-col items-center justify-center gap-2 text-center">
             <div>
               <Pill tone="amber">待选择</Pill>
             </div>
-            <strong className="text-sm">请选择一条申诉记录</strong>
-            <span className="text-muted-foreground text-xs">查看命中文本、员工说明和复核动作。</span>
+            <strong className="text-xs font-semibold text-[#172033]">请在左侧选择一条申诉记录</strong>
+            <span className="text-[#65738a] text-xs">查看原始证据、员工申诉理由及复核决定。</span>
           </div>
         ) : (
-          <div className="grid gap-2.5">
-            <div className="border border-border rounded-lg p-3 bg-background grid gap-2">
+          <div className="flex flex-col gap-3">
+            <div className="border border-[#dbe3ec] rounded-[6px] p-3.5 bg-white flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2.5">
-                <strong className="text-sm">
+                <strong className="text-sm font-bold text-[#172033]">
                   {appeal.employeeName || "-"} · {appeal.issueType || "-"}
                 </strong>
                 {issueRisk ? <Pill tone={riskTone(issueRisk)}>{issueRisk}风险</Pill> : null}
               </div>
-              <span className="text-muted-foreground text-xs">{appeal.storeName || "-"}</span>
-              <div className="border-l-[3px] border-primary bg-card rounded-r-md px-2.5 py-2 text-sm leading-relaxed text-foreground/90">
-                {issueQuote || "未关联命中文本"}
+              <span className="text-[#65738a] text-xs">
+                {appeal.storeName || "-"} · 提交时间：{appeal.created ? appeal.created.slice(0, 16) : "-"}
+              </span>
+              <div className="border-l-3 border-[#1672a8] bg-[#f5f9fc] rounded-r p-2.5 text-xs leading-relaxed text-[#38475a] mt-1">
+                <div className="font-semibold text-[#172033] mb-1">员工申诉理由：</div>
+                {appeal.reason}
               </div>
+              {issueQuote && (
+                <div className="border-l-3 border-[#a96a12] bg-[#fffaf2] rounded-r p-2.5 text-xs leading-relaxed text-[#6d4408]">
+                  <div className="font-semibold text-[#172033] mb-1">巡检命中文本：</div>
+                  {issueQuote}
+                </div>
+              )}
             </div>
-            <div className="border border-border rounded-lg p-3 bg-background grid gap-2">
-              <strong className="text-sm">员工说明</strong>
-              <span className="text-muted-foreground text-sm leading-relaxed">{appeal.reason}</span>
-            </div>
-            <div className="border border-border rounded-lg p-3 bg-background grid gap-2">
-              <strong className="text-sm">复核记录</strong>
-              <span className="text-muted-foreground text-xs">已关联对应沟通片段，可由店长或合规专员复核。</span>
+
+            <div className="border border-[#dbe3ec] rounded-[6px] p-3.5 bg-[#f8fafc] flex items-center justify-between">
+              <span className="text-xs text-[#65738a]">关联沟通片段与完整录音上下文</span>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onPreview}>
+                <Button variant="outline" size="sm" className="h-8 gap-1 border-[#dbe3ec] bg-white text-xs" onClick={onPreview}>
                   <Play className="w-3.5 h-3.5" />
                   试听
                 </Button>
-                <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onViewContext}>
+                <Button variant="outline" size="sm" className="h-8 gap-1 border-[#dbe3ec] bg-white text-xs" onClick={onViewContext}>
                   <FileText className="w-3.5 h-3.5" />
-                  查看上下文
+                  完整上下文
                 </Button>
               </div>
             </div>
-            <div className="flex justify-end gap-2.5 pt-1">
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#edf1f5]">
               <Button
-                variant="outline"
-                className="border-[hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))] bg-[hsl(var(--destructive)/0.06)] hover:bg-[hsl(var(--destructive)/0.12)]"
+                size="sm"
+                className="h-9 bg-[#b43c3c] hover:bg-[#8f2b2b] text-white"
                 disabled={reviewing || appeal.status !== "待复核"}
                 onClick={() => onReject(appeal)}
               >
-                驳回
+                驳回申诉
               </Button>
               <Button
-                className="bg-[hsl(var(--success))] text-primary-foreground hover:bg-[hsl(var(--success)/0.9)]"
+                size="sm"
+                className="h-9 bg-[#167a5b] hover:bg-[#115540] text-white"
                 disabled={reviewing || appeal.status !== "待复核"}
                 onClick={() => onApprove(appeal)}
               >
-                通过
+                通过申诉
               </Button>
             </div>
             {appeal.status !== "待复核" && (
-              <p className="m-0 text-xs text-muted-foreground text-right">该申诉已完成复核（{appeal.status}）。</p>
+              <p className="m-0 text-xs text-[#65738a] text-right">该申诉已完成复核判定（{appeal.status}）。</p>
             )}
           </div>
         )}

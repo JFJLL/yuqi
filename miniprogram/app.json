@@ -1,0 +1,42 @@
+{
+  "pages": [
+    "pages/auth/login",
+    "pages/auth/profile-setup",
+    "pages/home/index",
+    "pages/feedback/index",
+    "pages/recommend/index",
+    "pages/learning/index",
+    "pages/learning/course-detail/index",
+    "pages/learning/unit-study/index",
+    "pages/learning/exam/index",
+    "pages/learning/exam-result/index",
+    "pages/learning/exam-history/index",
+    "pages/profile/index",
+    "pages/feedback/detail",
+    "pages/appeal/create",
+    "pages/device/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "智能巡检",
+    "backgroundColor": "#f3f6f8",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#718096",
+    "selectedColor": "#126b59",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "首页" },
+      { "pagePath": "pages/feedback/index", "text": "反馈" },
+      { "pagePath": "pages/recommend/index", "text": "荐药" },
+      { "pagePath": "pages/learning/index", "text": "学习" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

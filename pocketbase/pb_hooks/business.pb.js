@@ -14,7 +14,10 @@ const COLLECTIONS = [
   "app_settings",
   "sessions", "transcript_segments", "risk_rules", "risk_rule_versions",
   "risk_segments", "issues", "rectifications", "issue_events", "notifications",
-  "recording_consents", "processing_jobs",
+  "recording_consents", "processing_jobs", "recommendations", "wechat_accounts",
+  "learning_courses", "learning_course_units", "learning_tasks", "learning_progress",
+  "learning_exams", "learning_questions", "learning_exam_versions", "learning_attempts",
+  "app_users", "user_data_scopes",
 ]
 
 // 通配集合路由: /api/{coll} 与 /api/{coll}/{id}

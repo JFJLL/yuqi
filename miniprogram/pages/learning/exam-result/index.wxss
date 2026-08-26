@@ -1,0 +1,12 @@
+.container { padding: 40rpx; background: #f4f6f8; min-height: 100vh; text-align: center; }
+.result-card { background: #fff; border-radius: 20rpx; padding: 50rpx 30rpx; border: 1rpx solid #e2e8f0; margin-bottom: 40rpx; }
+.badge { width: 160rpx; height: 160rpx; border-radius: 80rpx; margin: 0 auto 30rpx; display: flex; align-items: center; justify-content: center; }
+.badge.pass { background: #e6f4ef; color: #126b59; }
+.badge.fail { background: #feebc8; color: #c05621; }
+.badge-text { font-size: 32rpx; font-weight: bold; }
+.score-text { font-size: 64rpx; font-weight: bold; color: #1a202c; display: block; margin-bottom: 12rpx; }
+.pass-info { font-size: 26rpx; color: #718096; }
+.btn-group { display: flex; flex-direction: column; gap: 16rpx; }
+.btn { border-radius: 12rpx; font-size: 28rpx; height: 80rpx; line-height: 80rpx; text-align: center; }
+.btn-primary { background: #126b59; color: #fff; }
+.btn-outline { background: #fff; color: #126b59; border: 1rpx solid #126b59; }

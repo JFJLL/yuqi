@@ -1,0 +1,48 @@
+<view class="page appeal-page">
+  <view class="source surface" wx:if="{{feedback}}">
+    <view class="source-head">
+      <text class="source-title">{{feedback.title}}</text>
+      <text class="status status-{{feedback.riskTone}}">{{feedback.risk}}</text>
+    </view>
+    <text class="source-meta">{{feedback.date}} {{feedback.time}}</text>
+    <text class="source-quote">“{{feedback.quote}}”</text>
+  </view>
+
+  <view class="form-section">
+    <view class="form-field">
+      <text class="form-label">申诉说明</text>
+      <textarea
+        class="textarea"
+        value="{{reason}}"
+        maxlength="500"
+        placeholder="请说明 AI 判断不准确的原因，以及当时已做过的提醒或核验。"
+        bindinput="onReasonInput"
+      />
+      <text class="counter">{{reason.length}} / 500</text>
+    </view>
+
+    <view class="evidence-row surface">
+      <view class="evidence-copy">
+        <text class="evidence-title">申请调取关联录音片段</text>
+        <text class="caption">仅调取问题前后必要片段用于复核，不进入长期业务存储</text>
+      </view>
+      <switch color="#126b59" checked="{{requestRecording}}" bindchange="onRecordingChange" />
+    </view>
+
+    <view class="form-field section">
+      <text class="form-label">补充凭证（选填）</text>
+      <view class="attachment-list">
+        <view class="attachment" wx:for="{{attachments}}" wx:key="*this">
+          <image src="{{item}}" mode="aspectFill" />
+          <view class="remove" data-index="{{index}}" bindtap="removeAttachment">删除</view>
+        </view>
+        <view class="add-attachment" wx:if="{{attachments.length < 3}}" bindtap="chooseEvidence">
+          <text class="add-mark">＋</text>
+          <text>处方或凭证</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <button class="btn btn-primary submit-btn" bindtap="submit" loading="{{submitting}}">提交申诉</button>
+</view>

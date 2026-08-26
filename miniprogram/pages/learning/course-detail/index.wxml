@@ -1,0 +1,22 @@
+<view class="container" wx:if="{{!loading}}">
+  <view class="card header-card">
+    <text class="title">{{course.title}}</text>
+    <text class="category">{{course.category}}</text>
+    <text class="summary">{{course.summary}}</text>
+    <view class="progress-bar">
+      <view class="progress-fill" style="width: {{progress.progressPercent || 0}}%"></view>
+    </view>
+    <text class="progress-text">学习进度：{{progress.progressPercent || 0}}%</text>
+  </view>
+  <view class="card units-card">
+    <text class="section-title">课程章节</text>
+    <view class="unit-item" wx:for="{{units}}" wx:key="id" data-unit-id="{{item.id}}" bindtap="startUnit">
+      <text class="unit-title">{{index + 1}}. {{item.title}}</text>
+      <text class="unit-duration">{{item.durationSeconds}} 秒</text>
+    </view>
+  </view>
+  <view class="btn-group">
+    <button class="btn btn-primary" bindtap="goToExam">进入结业考试</button>
+    <button class="btn btn-outline" bindtap="viewHistory">查看考核历史</button>
+  </view>
+</view>

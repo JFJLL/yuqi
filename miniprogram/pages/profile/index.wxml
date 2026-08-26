@@ -1,0 +1,75 @@
+<view class="profile-page" wx:if="{{profile}}">
+  <view class="profile-head">
+    <view class="avatar">{{profile.avatarText}}</view>
+    <view class="profile-copy">
+      <text class="profile-name">{{profile.user.name}}</text>
+      <text class="profile-meta">{{profile.user.role}} · {{profile.user.storeName}}</text>
+    </view>
+    <text class="status status-green">在职</text>
+  </view>
+
+  <view class="manager-summary" wx:if="{{profile.isManager}}">
+    <view><text class="manager-number">{{profile.storeSummary.staffCount}}</text><text class="manager-label">门店人员</text></view>
+    <view><text class="manager-number">{{profile.storeSummary.onlineCount}}</text><text class="manager-label">在线工牌</text></view>
+    <view><text class="manager-number risk-number">{{profile.storeSummary.pendingCount}}</text><text class="manager-label">待处理问题</text></view>
+  </view>
+
+  <view class="menu-group">
+    <view class="menu-row" bindtap="goDevice">
+      <view>
+        <text class="menu-title">{{profile.isManager ? '门店工牌' : '我的设备'}}</text>
+        <text class="menu-sub" wx:if="{{profile.isManager}}">查看全部店员的绑定与在线状态</text>
+        <text class="menu-sub" wx:elif="{{profile.device}}">{{profile.device.code}} · {{profile.device.status}}</text>
+        <text class="menu-sub" wx:else>尚未绑定智能工牌</text>
+      </view>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-row" wx:if="{{profile.isManager}}" bindtap="goFeedback">
+      <view>
+        <text class="menu-title">门店问题处置</text>
+        <text class="menu-sub">查看店员问题、整改和申诉</text>
+      </view>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-row" wx:else bindtap="contactManager">
+      <view>
+        <text class="menu-title">联系店长</text>
+        <text class="menu-sub">设备、申诉和排班问题</text>
+      </view>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+
+  <view class="appeal-section">
+    <view class="section-head">
+      <text class="section-title">{{profile.isManager ? '待复核申诉' : '我的申诉'}}</text>
+      <text class="caption">{{profile.appeals.length}} 条</text>
+    </view>
+    <view
+      class="appeal-row"
+      wx:for="{{profile.appeals}}"
+      wx:key="id"
+      data-feedback-id="{{item.feedbackId}}"
+      bindtap="openAppeal"
+    >
+      <view class="appeal-main">
+        <text class="appeal-title">{{item.title}}</text>
+        <text class="appeal-reason">{{item.reason}}</text>
+        <text class="appeal-time">{{item.createdAt}}</text>
+      </view>
+      <text class="status status-{{item.stateTone}}">{{item.state}}</text>
+    </view>
+  </view>
+
+  <view class="account-info">
+    <view><text>员工编号</text><text>{{profile.user.id}}</text></view>
+    <view><text>所属区域</text><text>{{profile.user.regionName}}</text></view>
+    <view><text>手机号码</text><text>{{profile.user.mobile}}</text></view>
+  </view>
+
+  <view class="rebind-action" bindtap="rebindProfile">重新关联员工档案</view>
+</view>
+
+<view class="page" wx:else>
+  <view class="empty">正在加载个人信息...</view>
+</view>

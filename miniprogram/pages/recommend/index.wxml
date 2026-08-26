@@ -1,0 +1,122 @@
+<view class="recommend-page">
+  <view class="mode-bar">
+    <view
+      wx:for="{{modes}}"
+      wx:key="*this"
+      class="mode-item {{mode === item ? 'active' : ''}}"
+      data-mode="{{item}}"
+      bindtap="changeMode"
+    >{{item}}</view>
+  </view>
+
+  <view class="form-area">
+    <view class="form-field" wx:if="{{mode === '按病症'}}">
+      <text class="form-label">顾客主诉</text>
+      <textarea class="textarea complaint" value="{{complaint}}" maxlength="200" placeholder="例如：干咳、咽痒两天，无明显发热" bindinput="onComplaintInput" />
+    </view>
+    <view class="form-field" wx:else>
+      <text class="form-label">药品名称或类型</text>
+      <input class="input" value="{{medicine}}" placeholder="例如：布洛芬或解热镇痛类" bindinput="onMedicineInput" />
+    </view>
+
+    <view class="form-field">
+      <text class="form-label">顾客年龄段</text>
+      <picker mode="selector" range="{{ages}}" value="{{ageIndex}}" bindchange="onAgeChange">
+        <view class="picker-field">{{ages[ageIndex]}}</view>
+      </picker>
+    </view>
+
+    <view class="form-field">
+      <text class="form-label">需要关注的情况</text>
+      <checkbox-group class="condition-grid" bindchange="onConditionsChange">
+        <label class="condition-item {{item.checked ? 'selected' : ''}}" wx:for="{{conditions}}" wx:key="value">
+          <checkbox value="{{item.value}}" checked="{{item.checked}}" color="#126b59" />
+          <text>{{item.value}}</text>
+        </label>
+      </checkbox-group>
+    </view>
+
+    <view class="form-field">
+      <text class="form-label">正在使用的药品（选填）</text>
+      <input class="input" value="{{currentMedication}}" placeholder="用于检查重复成分和相互作用" bindinput="onMedicationInput" />
+    </view>
+
+    <button class="btn btn-primary generate-btn" bindtap="generate" loading="{{generating}}" disabled="{{generating}}">{{generating ? '正在计算门店组合' : '生成推荐组合'}}</button>
+
+    <view wx:if="{{errorMessage}}" class="request-error">
+      <text class="request-error-title">本次检索未完成</text>
+      <text class="request-error-message">{{errorMessage}}</text>
+      <text class="request-error-help">已使用真实医学知识服务，未切换为演示结果。可稍后重新生成。</text>
+    </view>
+  </view>
+
+  <view class="result-area" wx:if="{{result}}">
+    <view class="result-head">
+      <view>
+        <text class="result-title">{{result.summary}}</text>
+        <text class="result-sub">{{result.provider}} · {{result.sourceCount}} 条资料</text>
+      </view>
+      <text class="status status-{{result.safetyTone}}">{{result.safety}}</text>
+    </view>
+
+    <view class="product-list">
+      <view class="product-row" wx:for="{{result.products}}" wx:key="name">
+        <view class="product-main">
+          <text class="product-name">{{item.name}}</text>
+          <text class="product-meta">{{item.brand}} · {{item.role}}</text>
+          <text class="product-evidence">依据：{{item.evidenceTag}}</text>
+          <view class="product-facts">
+            <text wx:if="{{item.indication}}">适用：{{item.indication}}</text>
+            <text>禁忌：{{item.contraindication}}</text>
+            <text wx:if="{{item.dosage}}">用法：{{item.dosage}}</text>
+          </view>
+        </view>
+        <view class="product-side">
+          <text class="product-price">¥{{item.price}}</text>
+          <text class="product-stock">库存 {{item.stock}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="no-products" wx:if="{{result.products.length === 0}}">已取得医学检索资料，但门店 ERP 商品目录暂无匹配库存，请交由药师人工选品。</view>
+
+    <view class="business-row">
+      <view><text>组合售价</text><text class="business-value">¥{{result.totalPrice}}</text></view>
+      <view><text>预计毛利率</text><text class="business-value">{{result.grossMargin}}%</text></view>
+    </view>
+
+    <view class="result-section">
+      <text class="result-label">推荐依据</text>
+      <text class="result-body">{{result.rationale}}</text>
+    </view>
+
+    <view class="result-section talk-section">
+      <text class="result-label">与顾客沟通</text>
+      <text class="result-body">{{result.talk}}</text>
+    </view>
+
+    <view class="check-section">
+      <text class="result-label">成交前确认</text>
+      <view class="check-row" wx:for="{{result.checks}}" wx:key="*this">
+        <text class="check-mark">{{confirmed ? '✓' : '○'}}</text>
+        <text>{{item}}</text>
+      </view>
+      <button class="btn btn-small confirm-btn {{confirmed ? 'confirmed' : ''}}" bindtap="confirmChecks">{{confirmed ? '已完成风险问询' : '确认已完成以上问询'}}</button>
+    </view>
+
+    <view class="source-section" wx:if="{{result.sources.length}}">
+      <text class="result-label">医学资料来源</text>
+      <view class="source-row" wx:for="{{result.sources}}" wx:key="url" data-index="{{index}}" bindtap="showSource">
+        <view class="source-main">
+          <text class="source-title">{{item.title}}</text>
+          <text class="source-tag">{{item.tag}}</text>
+        </view>
+        <text class="source-action">查看</text>
+      </view>
+    </view>
+
+    <button class="btn btn-primary sale-btn" bindtap="submitSale">{{result.reviewRequired ? '提交执业药师复核' : '记录实际采用'}}</button>
+
+    <view class="medical-note">推荐结果用于辅助营业员问询和选品，不替代医师诊断、处方及执业药师审核。</view>
+  </view>
+</view>

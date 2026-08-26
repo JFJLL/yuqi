@@ -1,0 +1,33 @@
+<view class="setup-page">
+  <view class="setup-head">
+    <text class="setup-title">确认所属门店</text>
+    <text class="setup-sub">完成后将同步对应门店的巡检与设备数据</text>
+  </view>
+
+  <view class="setup-form">
+    <view class="form-field">
+      <text class="form-label">手机号</text>
+      <view class="readonly-field">{{mobile}}</view>
+    </view>
+
+    <view class="form-field">
+      <text class="form-label">个人姓名</text>
+      <input class="input" value="{{name}}" maxlength="20" placeholder="填写后台员工档案中的姓名" bindinput="onNameInput" />
+    </view>
+
+    <view class="form-field">
+      <text class="form-label">所属门店</text>
+      <picker mode="selector" range="{{stores}}" range-key="name" value="{{storeIndex}}" bindchange="onStoreChange">
+        <view class="picker-field {{selectedStore ? '' : 'placeholder'}}">{{selectedStore ? selectedStore.name : '选择门店'}}</view>
+      </picker>
+      <text class="store-address" wx:if="{{selectedStore}}">{{selectedStore.regionName}} · {{selectedStore.address}}</text>
+    </view>
+
+    <button class="btn btn-primary submit-button" bindtap="submitProfile" loading="{{submitting}}" disabled="{{loading || submitting}}">确认并进入</button>
+  </view>
+
+  <view class="match-note">
+    <text class="match-title">身份验证</text>
+    <text>系统将依据手机号，或姓名与门店的组合，匹配企业后台设置的岗位权限。</text>
+  </view>
+</view>

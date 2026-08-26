@@ -1,0 +1,97 @@
+<view class="page device-page" wx:if="{{isManager && overview}}">
+  <view class="manager-device-summary surface">
+    <view class="manager-summary-head">
+      <view>
+        <text class="device-title">{{overview.storeName}}</text>
+        <text class="device-type">工牌运行概览</text>
+      </view>
+      <text class="status status-green">{{overview.summary.onlineCount}} 在线</text>
+    </view>
+    <view class="manager-metrics">
+      <view><text class="metric-number">{{overview.summary.staffCount}}</text><text class="metric-name">门店人员</text></view>
+      <view><text class="metric-number">{{overview.summary.boundCount}}</text><text class="metric-name">已绑定</text></view>
+      <view><text class="metric-number risk-number">{{overview.summary.offlineCount}}</text><text class="metric-name">当前离线</text></view>
+      <view><text class="metric-number">{{overview.summary.unboundCount}}</text><text class="metric-name">未绑定</text></view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-head">
+      <text class="section-title">人员设备状态</text>
+      <text class="caption">{{overview.staff.length}} 人</text>
+    </view>
+    <view class="manager-device-list surface">
+      <view class="manager-device-row" wx:for="{{overview.staff}}" wx:key="id">
+        <view class="staff-avatar">{{item.avatarText}}</view>
+        <view class="staff-device-main">
+          <view class="staff-name-line">
+            <text class="staff-name">{{item.name}}</text>
+            <text class="staff-role">{{item.role}}</text>
+          </view>
+          <text class="staff-code">{{item.deviceCode || '未绑定设备'}}</text>
+          <text class="staff-last">最近在线：{{item.lastOnline}}</text>
+        </view>
+        <view class="staff-device-side">
+          <text class="status status-{{item.statusTone}}">{{item.deviceStatus}}</text>
+          <text class="battery" wx:if="{{item.deviceCode}}">电量 {{item.battery}}%</text>
+          <text class="problem-count {{item.pending ? 'has-problem' : ''}}">{{item.pending ? item.pending + ' 个问题' : '无待处理'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<view class="page device-page" wx:elif="{{!isManager}}">
+  <view class="current surface" wx:if="{{device}}">
+    <view class="current-head">
+      <view>
+        <text class="device-title">当前设备</text>
+        <text class="device-type">{{device.type}}</text>
+      </view>
+      <text class="status status-{{device.statusTone}}">{{device.status}}</text>
+    </view>
+    <view class="code-row">
+      <text class="device-code">{{device.code}}</text>
+      <text class="copy-link" bindtap="copyCode">复制</text>
+    </view>
+    <view class="device-metrics">
+      <view><text class="metric-number">{{device.battery}}%</text><text class="metric-name">电量</text></view>
+      <view><text class="metric-number">{{device.todayRecords}}</text><text class="metric-name">今日转写</text></view>
+      <view><text class="metric-number">{{device.lastOnline}}</text><text class="metric-name">最近在线</text></view>
+    </view>
+    <button class="btn btn-danger btn-small unbind-btn" bindtap="unbindDevice">解绑设备</button>
+  </view>
+
+  <view class="section">
+    <view class="section-head">
+      <text class="section-title">{{device ? '更换设备' : '绑定智能工牌'}}</text>
+    </view>
+    <view class="bind-form surface">
+      <view class="form-field">
+        <text class="form-label">设备码</text>
+        <view class="scan-row">
+          <input class="input" value="{{code}}" placeholder="扫描或输入工牌设备码" bindinput="onCodeInput" />
+          <button class="btn btn-small scan-btn" bindtap="scanCode">扫码</button>
+        </view>
+      </view>
+      <view class="store-row">
+        <text class="muted">绑定员工</text>
+        <text>{{user.name}}</text>
+      </view>
+      <view class="store-row">
+        <text class="muted">所属门店</text>
+        <text>{{user.storeName}}</text>
+      </view>
+      <button class="btn btn-primary bind-btn" bindtap="bindDevice" loading="{{submitting}}">确认绑定</button>
+    </view>
+  </view>
+
+  <view class="notice">
+    <text class="notice-title">绑定说明</text>
+    <text>设备同一时间只能绑定一名员工。更换班次或设备时，请先完成解绑，避免巡检结果归属错误。</text>
+  </view>
+</view>
+
+<view class="page" wx:else>
+  <view class="empty">正在同步门店设备状态...</view>
+</view>

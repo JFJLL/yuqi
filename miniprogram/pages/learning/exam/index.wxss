@@ -1,0 +1,9 @@
+.container { padding: 30rpx; background: #f4f6f8; min-height: 100vh; }
+.card { background: #fff; border-radius: 16rpx; padding: 24rpx; margin-bottom: 24rpx; border: 1rpx solid #e2e8f0; }
+.title { font-size: 32rpx; font-weight: bold; color: #1a202c; display: block; margin-bottom: 8rpx; }
+.info { font-size: 24rpx; color: #718096; }
+.q-stem { font-size: 28rpx; font-weight: 600; color: #2d3748; margin-bottom: 16rpx; display: block; }
+.option { display: flex; align-items: center; padding: 16rpx; border-radius: 10rpx; border: 1rpx solid #e2e8f0; margin-bottom: 12rpx; font-size: 26rpx; }
+.option.selected { border-color: #126b59; background: #e6f4ef; color: #126b59; font-weight: bold; }
+.opt-label { margin-right: 12rpx; }
+.btn-primary { background: #126b59; color: #fff; border-radius: 12rpx; font-size: 28rpx; height: 80rpx; line-height: 80rpx; }

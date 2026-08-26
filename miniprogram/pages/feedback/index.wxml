@@ -1,0 +1,42 @@
+<view class="feedback-page">
+  <view class="manager-context" wx:if="{{isManager}}">
+    <text class="manager-context-title">{{storeName}}</text>
+    <text class="manager-context-sub">全部店员巡检问题</text>
+  </view>
+  <scroll-view class="filter-bar" scroll-x enhanced show-scrollbar="false">
+    <view class="filter-list">
+      <view
+        wx:for="{{filters}}"
+        wx:key="*this"
+        class="filter-item {{activeFilter === item ? 'active' : ''}}"
+        data-value="{{item}}"
+        bindtap="changeFilter"
+      >{{item}}</view>
+    </view>
+  </scroll-view>
+
+  <view class="feedback-list">
+    <view
+      class="feedback-item"
+      wx:for="{{feedbacks}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="openDetail"
+    >
+      <view class="item-head">
+        <view>
+          <text class="item-title">{{item.title}}</text>
+          <text class="item-meta">{{item.date}} {{item.time}} · {{isManager ? item.employeeName : item.storeName}}</text>
+        </view>
+        <text class="status status-{{item.riskTone}}">{{item.risk}}</text>
+      </view>
+      <text class="item-quote">“{{item.quote}}”</text>
+      <view class="item-foot">
+        <text class="status status-{{item.stateTone}}">{{item.state}}</text>
+        <text class="item-link">查看详情</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty" wx:if="{{!loading && feedbacks.length === 0}}">当前筛选下没有巡检反馈</view>
+</view>

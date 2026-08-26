@@ -15,6 +15,7 @@ const tenantOnlyOverrides = {
 module.exports = {
   regions: {
     name: "regions",
+    permission: "organization.manage",
     roles: { list: ORG_READ, view: ORG_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
     scope: {
       storeField: "id",
@@ -44,12 +45,15 @@ module.exports = {
       code: { type: "text", max: 40 },
       parent: { type: "relation" },
       status: { type: "text", max: 20 },
+      manager_name: { type: "text", max: 60 },
+      manager_mobile: { type: "text", max: 30 },
     },
     audit: { create: "region_create", update: "region_update", delete: "region_delete" },
   },
 
  stores: {
    name: "stores",
+   permission: { create: "organization.manage", update: "organization.manage", delete: "organization.manage" },
    roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
    scope: {
       storeField: "id",
@@ -76,15 +80,20 @@ module.exports = {
    filters: ["name", "region"],
     fields: {
       name: { type: "text", max: 80, required: true },
+      code: { type: "text", max: 40 },
       region: { type: "relation" },
       address: { type: "text", max: 200 },
       status: { type: "text", max: 20 },
+      manager_name: { type: "text", max: 60 },
+      manager_mobile: { type: "text", max: 30 },
+      manager_employee: { type: "relation" },
     },
     audit: { create: "store_create", update: "store_update", delete: "store_delete" },
   },
 
   employees: {
     name: "employees",
+    permission: "employee.manage",
     roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
     scope: { storeField: "store", storeType: "relation", employeeField: "id", employeeType: "relation" },
     filters: ["name", "phone", "role", "status", "store"],
@@ -100,6 +109,7 @@ module.exports = {
 
   devices: {
     name: "devices",
+    permission: "device.manage",
     roles: { list: ORG_READ, view: ORG_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
     scope: {
       storeField: "current_store",
@@ -165,6 +175,7 @@ module.exports = {
 
   device_bindings: {
     name: "device_bindings",
+    permission: "device.manage",
     roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
     scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
     filters: ["device", "employee", "store", "status"],
@@ -382,9 +393,10 @@ module.exports = {
   },
 
  transcripts: {
-   name: "transcripts",
-    roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN", "COMPLIANCE"], delete: ["SUPER_ADMIN", "ADMIN"] },
-   scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
+    name: "transcripts",
+    permission: "recording.view",
+     roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN", "COMPLIANCE"], delete: ["SUPER_ADMIN", "ADMIN"] },
+    scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
    filters: ["device", "employee", "store", "status", "source", "asr_status", "qc_result", "asr_job"],
     fields: {
       device: { type: "text", max: 60 },
@@ -427,9 +439,10 @@ module.exports = {
  },
 
  inspection_issues: {
-    name: "inspection_issues",
-    roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", ...MGMT_WRITE], update: ["SERVICE", ...MGMT_WRITE], delete: ["SUPER_ADMIN", "ADMIN"] },
-    scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
+     name: "inspection_issues",
+     permission: "inspection.manage",
+     roles: { list: STAFF_READ, view: STAFF_READ, create: ["SERVICE", ...MGMT_WRITE], update: ["SERVICE", ...MGMT_WRITE], delete: ["SUPER_ADMIN", "ADMIN"] },
+     scope: { storeField: "store", storeType: "relation", employeeField: "employee", employeeType: "relation" },
     filters: ["transcript", "employee", "store", "issue_type", "risk", "state"],
     fields: {
       transcript: { type: "relation" },
@@ -447,6 +460,7 @@ module.exports = {
 
   rectify_tasks: {
     name: "rectify_tasks",
+    permission: "inspection.manage",
     roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
     scope: { storeField: "store", storeType: "relation", employeeField: "owner", employeeType: "relation" },
     filters: ["owner", "store", "source_issue", "state"],
@@ -491,6 +505,7 @@ module.exports = {
 
   compliance_rules: {
     name: "compliance_rules",
+    permission: "system.manage",
     roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: MGMT_WRITE },
     scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
     filters: ["name", "risk", "enabled"],
@@ -505,6 +520,7 @@ module.exports = {
 
   knowledge_items: {
     name: "knowledge_items",
+    permission: "system.manage",
     roles: { list: ORG_READ, view: ORG_READ, create: ["SUPER_ADMIN", "ADMIN"], update: ["SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
     scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
     filters: ["category", "name", "status"],
@@ -534,6 +550,7 @@ module.exports = {
 
   sync_logs: {
     name: "sync_logs",
+    permission: "audit.view",
     roles: { list: ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "AUDITOR"], view: ["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "AUDITOR"], create: ["SERVICE", "SUPER_ADMIN", "ADMIN"], update: ["SERVICE", "SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
     scope: { storeField: "store", storeType: "text", employeeField: "store", employeeType: "text" },
     filters: ["type", "object", "store", "status"],
@@ -550,6 +567,7 @@ module.exports = {
 
   app_settings: {
     name: "app_settings",
+    permission: "system.manage",
     roles: { list: ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"], view: ["SUPER_ADMIN", "ADMIN", "COMPLIANCE"], create: ["SUPER_ADMIN", "ADMIN"], update: ["SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
     scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
     filters: ["key"],
@@ -998,5 +1016,303 @@ module.exports = {
       request_id: { type: "text", max: 80 },
     },
     audit: { create: "processing_job_create", update: "processing_job_update" },
+  },
+
+  recommendations: {
+    name: "recommendations",
+    roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
+    scope: {
+      storeField: "store",
+      storeType: "relation",
+      employeeField: "employee",
+      employeeType: "relation",
+      scopeFilterOverrides: {
+        ORG_TREE: (ctx) => {
+          const g2 = require(`${__hooks}/_lib/guards.js`)
+          const ids = g2.storeSubtreeIds(ctx.scope.orgNode)
+          if (ids.length === 0) return { filter: "id = {:none}", params: { none: "-" } }
+          const parts = []
+          const params = {}
+          for (let i = 0; i < ids.length; i++) {
+            parts.push("store = {:s" + i + "}")
+            params["s" + i] = ids[i]
+          }
+          return { filter: "(" + parts.join(" || ") + ")", params }
+        },
+        STORE: (ctx) => ({ filter: "store = {:s}", params: { s: ctx.scope.store } }),
+        SELF: (ctx) => ({ filter: "employee = {:e}", params: { e: ctx.scope.employee } }),
+      },
+    },
+    filters: ["product_name", "indication", "store", "employee"],
+    fields: {
+      product_name: { type: "text", max: 120, required: true },
+      indication: { type: "text", max: 200 },
+      recommended_drugs: { type: "json" },
+      risk_tips: { type: "text", max: 500 },
+      source: { type: "text", max: 60 },
+      store: { type: "relation" },
+      employee: { type: "relation" },
+    },
+    audit: { create: "recommendation_create", update: "recommendation_update", delete: "recommendation_delete" },
+  },
+
+  wechat_accounts: {
+    name: "wechat_accounts",
+    roles: { list: ORG_READ, view: ORG_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
+    scope: {
+      storeField: "id",
+      storeType: "text",
+      employeeField: "employee",
+      employeeType: "relation",
+      scopeFilterOverrides: {
+        ORG_TREE: (ctx) => {
+          const g2 = require(`${__hooks}/_lib/guards.js`)
+          const empIds = g2.employeeSubtreeIds(ctx.scope.orgNode)
+          if (empIds.length === 0) return { filter: "id = {:none}", params: { none: "-" } }
+          const parts = []
+          const params = {}
+          for (let i = 0; i < empIds.length; i++) {
+            parts.push("employee = {:e" + i + "}")
+            params["e" + i] = empIds[i]
+          }
+          return { filter: "(" + parts.join(" || ") + ")", params }
+        },
+        STORE: (ctx) => {
+          const g2 = require(`${__hooks}/_lib/guards.js`)
+          const empIds = g2.storeEmployeeIds(ctx.scope.store)
+          if (empIds.length === 0) return { filter: "id = {:none}", params: { none: "-" } }
+          const parts = []
+          const params = {}
+          for (let i = 0; i < empIds.length; i++) {
+            parts.push("employee = {:e" + i + "}")
+            params["e" + i] = empIds[i]
+          }
+          return { filter: "(" + parts.join(" || ") + ")", params }
+        },
+        SELF: (ctx) => ({ filter: "employee = {:e}", params: { e: ctx.scope.employee } }),
+      },
+    },
+    filters: ["openid", "mobile", "status", "employee"],
+    fields: {
+      openid: { type: "text", max: 120, required: true },
+      appid: { type: "text", max: 120 },
+      unionid: { type: "text", max: 120 },
+      mobile: { type: "text", max: 30, required: true },
+      status: { type: "text", max: 30 },
+      employee: { type: "relation" },
+      bound_at: { type: "date" },
+      last_login_at: { type: "date" },
+      raw_profile: { type: "json" },
+    },
+    audit: { create: "wechat_account_create", update: "wechat_account_update", delete: "wechat_account_delete" },
+  },
+
+  learning_courses: {
+    name: "learning_courses",
+    roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
+    scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
+    filters: ["title", "category", "status"],
+    fields: {
+      title: { type: "text", max: 120, required: true },
+      category: { type: "text", max: 60 },
+      summary: { type: "text", max: 500 },
+      cover_url: { type: "text", max: 300 },
+      target_issue_types: { type: "json" },
+      status: { type: "text", max: 30 },
+    },
+    audit: { create: "learning_course_create", update: "learning_course_update", delete: "learning_course_delete" },
+  },
+
+  learning_course_units: {
+    name: "learning_course_units",
+    roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
+    scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
+    filters: ["course", "title", "content_type"],
+    fields: {
+      course: { type: "relation", required: true },
+      title: { type: "text", max: 120, required: true },
+      content_type: { type: "text", max: 30 },
+      content: { type: "text", max: 10000 },
+      duration_seconds: { type: "number" },
+      sort_order: { type: "number" },
+    },
+    audit: { create: "learning_unit_create", update: "learning_unit_update", delete: "learning_unit_delete" },
+  },
+
+  learning_tasks: {
+    name: "learning_tasks",
+    roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
+    scope: {
+      storeField: "store",
+      storeType: "relation",
+      employeeField: "employee",
+      employeeType: "relation",
+      scopeFilterOverrides: {
+        ORG_TREE: (ctx) => {
+          const g2 = require(`${__hooks}/_lib/guards.js`)
+          const ids = g2.storeSubtreeIds(ctx.scope.orgNode)
+          if (ids.length === 0) return { filter: "id = {:none}", params: { none: "-" } }
+          const parts = []
+          const params = {}
+          for (let i = 0; i < ids.length; i++) {
+            parts.push("store = {:s" + i + "}")
+            params["s" + i] = ids[i]
+          }
+          return { filter: "(" + parts.join(" || ") + ")", params }
+        },
+        STORE: (ctx) => ({ filter: "store = {:s}", params: { s: ctx.scope.store } }),
+        SELF: (ctx) => ({ filter: "employee = {:e}", params: { e: ctx.scope.employee } }),
+      },
+    },
+    filters: ["course", "employee", "store", "status"],
+    fields: {
+      course: { type: "relation", required: true },
+      employee: { type: "relation", required: true },
+      store: { type: "relation" },
+      due_date: { type: "date" },
+      status: { type: "text", max: 30 },
+      pass_required: { type: "bool" },
+      source_issue: { type: "relation" },
+    },
+    audit: { create: "learning_task_create", update: "learning_task_update", delete: "learning_task_delete" },
+  },
+
+  learning_progress: {
+    name: "learning_progress",
+    roles: { list: STAFF_READ, view: STAFF_READ, create: STAFF_READ, update: STAFF_READ, delete: ["SUPER_ADMIN"] },
+    scope: {
+      storeField: "id",
+      storeType: "text",
+      employeeField: "employee",
+      employeeType: "relation",
+      scopeFilterOverrides: {
+        SELF: (ctx) => ({ filter: "employee = {:e}", params: { e: ctx.scope.employee } }),
+      },
+    },
+    filters: ["task", "course", "employee", "status"],
+    fields: {
+      task: { type: "relation", required: true },
+      course: { type: "relation", required: true },
+      employee: { type: "relation", required: true },
+      progress_percent: { type: "number" },
+      completed_units: { type: "json" },
+      last_unit: { type: "relation" },
+      status: { type: "text", max: 30 },
+      completed_at: { type: "date" },
+    },
+    audit: { create: "learning_progress_create", update: "learning_progress_update" },
+  },
+
+  learning_exams: {
+    name: "learning_exams",
+    roles: { list: STAFF_READ, view: STAFF_READ, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
+    scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
+    filters: ["course", "title", "status"],
+    fields: {
+      course: { type: "relation", required: true },
+      title: { type: "text", max: 120, required: true },
+      pass_score: { type: "number" },
+      time_limit_minutes: { type: "number" },
+      max_attempts: { type: "number" },
+      current_version: { type: "number" },
+      status: { type: "text", max: 30 },
+    },
+    audit: { create: "learning_exam_create", update: "learning_exam_update", delete: "learning_exam_delete" },
+  },
+
+  learning_questions: {
+    name: "learning_questions",
+    roles: { list: MGMT_WRITE, view: MGMT_WRITE, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
+    scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
+    filters: ["exam", "question_type"],
+    fields: {
+      exam: { type: "relation", required: true },
+      stem: { type: "text", max: 1000, required: true },
+      question_type: { type: "text", max: 30 },
+      options_json: { type: "json" },
+      standard_answer: { type: "text", max: 200, required: true },
+      score: { type: "number" },
+      analysis: { type: "text", max: 1000 },
+      sort_order: { type: "number" },
+    },
+    audit: { create: "learning_question_create", update: "learning_question_update", delete: "learning_question_delete" },
+  },
+
+  learning_exam_versions: {
+    name: "learning_exam_versions",
+    roles: { list: MGMT_WRITE, view: MGMT_WRITE, create: MGMT_WRITE, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
+    scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
+    filters: ["exam", "version_number"],
+    fields: {
+      exam: { type: "relation", required: true },
+      version_number: { type: "number", required: true },
+      snapshot_json: { type: "json" },
+    },
+    audit: { create: "learning_version_create" },
+  },
+
+  learning_attempts: {
+    name: "learning_attempts",
+    roles: { list: STAFF_READ, view: STAFF_READ, create: STAFF_READ, update: MGMT_WRITE, delete: ["SUPER_ADMIN"] },
+    scope: {
+      storeField: "id",
+      storeType: "text",
+      employeeField: "employee",
+      employeeType: "relation",
+      scopeFilterOverrides: {
+        SELF: (ctx) => ({ filter: "employee = {:e}", params: { e: ctx.scope.employee } }),
+      },
+    },
+    filters: ["task", "exam", "employee", "passed"],
+    fields: {
+      task: { type: "relation" },
+      exam: { type: "relation", required: true },
+      exam_version: { type: "relation" },
+      employee: { type: "relation", required: true },
+      answers_json: { type: "json" },
+      score: { type: "number" },
+      passed: { type: "bool" },
+      detail_json: { type: "json" },
+      started_at: { type: "date" },
+      submitted_at: { type: "date" },
+    },
+    audit: { create: "learning_attempt_create" },
+  },
+
+  app_users: {
+    name: "app_users",
+    permission: "permission.manage",
+    roles: { list: ["SUPER_ADMIN", "ADMIN"], view: ["SUPER_ADMIN", "ADMIN"], create: ["SUPER_ADMIN", "ADMIN"], update: ["SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
+    scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
+    filters: ["email", "username", "role_code", "status"],
+    fields: {
+      email: { type: "text", max: 120, required: true },
+      username: { type: "text", max: 80 },
+      display_name: { type: "text", max: 80 },
+      role_code: { type: "text", max: 40, required: true },
+      status: { type: "text", max: 20 },
+      employee: { type: "relation" },
+      assigned_org: { type: "relation" },
+      assigned_store: { type: "relation" },
+      mobile: { type: "text", max: 30 },
+      password: { type: "text", max: 100 },
+    },
+    audit: { create: "user_create", update: "user_update", delete: "user_delete" },
+  },
+
+  user_data_scopes: {
+    name: "user_data_scopes",
+    permission: "permission.manage",
+    roles: { list: ["SUPER_ADMIN", "ADMIN"], view: ["SUPER_ADMIN", "ADMIN"], create: ["SUPER_ADMIN", "ADMIN"], update: ["SUPER_ADMIN", "ADMIN"], delete: ["SUPER_ADMIN"] },
+    scope: { storeField: "id", storeType: "text", employeeField: "id", employeeType: "text", scopeFilterOverrides: tenantOnlyOverrides },
+    filters: ["user", "scope_type", "status"],
+    fields: {
+      user: { type: "relation", required: true },
+      scope_type: { type: "text", max: 20 },
+      org_node: { type: "relation" },
+      store: { type: "relation" },
+      status: { type: "text", max: 20 },
+    },
+    audit: { create: "scope_create", update: "scope_update", delete: "scope_delete" },
   },
 }

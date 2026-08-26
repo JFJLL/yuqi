@@ -1,0 +1,12 @@
+.setup-page { min-height: 100vh; padding: 56rpx 36rpx calc(48rpx + env(safe-area-inset-bottom)); background: #f3f6f8; }
+.setup-head { padding: 20rpx 4rpx 42rpx; }
+.setup-title, .setup-sub, .store-address, .match-title { display: block; }
+.setup-title { font-size: 44rpx; font-weight: 700; line-height: 1.3; }
+.setup-sub { margin-top: 12rpx; color: #6b7b8d; font-size: 25rpx; line-height: 1.6; }
+.setup-form { padding: 32rpx; border: 1rpx solid #dce5ea; border-radius: 12rpx; background: #ffffff; }
+.readonly-field { height: 84rpx; padding: 0 22rpx; border: 1rpx solid #e0e7eb; border-radius: 10rpx; background: #f1f4f5; color: #687889; line-height: 82rpx; }
+.picker-field.placeholder { color: #8b98a5; }
+.store-address { margin-top: 12rpx; color: #657587; font-size: 23rpx; }
+.submit-button { width: 100%; margin-top: 16rpx; }
+.match-note { margin-top: 28rpx; padding: 0 6rpx; color: #687889; font-size: 24rpx; line-height: 1.7; }
+.match-title { margin-bottom: 6rpx; color: #334353; font-weight: 650; }

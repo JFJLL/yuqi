@@ -20,6 +20,31 @@ module.exports = {
     AUDITOR: "AUDITOR",
   },
 
+  ALL_PERMISSIONS: [
+    "dashboard.view",
+    "organization.manage",
+    "employee.manage",
+    "device.manage",
+    "recording.view",
+    "inspection.manage",
+    "appeal.review",
+    "activity.view",
+    "report.export",
+    "permission.manage",
+    "system.manage",
+    "audit.view",
+  ],
+
+  DEFAULT_ROLE_PERMISSIONS: {
+    SUPER_ADMIN: ["dashboard.view", "organization.manage", "employee.manage", "device.manage", "recording.view", "inspection.manage", "appeal.review", "activity.view", "report.export", "permission.manage", "system.manage", "audit.view"],
+    ADMIN: ["dashboard.view", "organization.manage", "employee.manage", "device.manage", "recording.view", "inspection.manage", "appeal.review", "activity.view", "report.export", "permission.manage", "system.manage", "audit.view"],
+    REGION_MANAGER: ["dashboard.view", "organization.manage", "employee.manage", "device.manage", "recording.view", "inspection.manage", "appeal.review", "activity.view", "report.export"],
+    STORE_MANAGER: ["dashboard.view", "employee.manage", "device.manage", "recording.view", "inspection.manage", "appeal.review", "activity.view"],
+    COMPLIANCE: ["dashboard.view", "recording.view", "inspection.manage", "appeal.review", "activity.view", "report.export"],
+    AUDITOR: ["dashboard.view", "report.export", "audit.view"],
+    EMPLOYEE: ["dashboard.view", "activity.view"],
+  },
+
   nowIso(now) {
     const d = now || new Date()
     return d.toISOString()
@@ -186,6 +211,35 @@ module.exports = {
     if (ctx.kind === "service") return
     if (roles.indexOf(ctx.roleCode) >= 0) return
     throw new ForbiddenError("无权执行该操作")
+  },
+
+  getRolePermissions(tenantId, roleCode) {
+    if (roleCode === "SUPER_ADMIN") return this.ALL_PERMISSIONS
+    try {
+      const setting = $app.findFirstRecordByFilter("app_settings", "key = 'role_permissions_v1' && (tenant = {:t} || tenant = '')", { t: tenantId || "" })
+      if (setting && setting.get("value")) {
+        const parsed = JSON.parse(setting.get("value"))
+        if (Array.isArray(parsed)) {
+          const found = parsed.find((r) => r.code === roleCode)
+          if (found && Array.isArray(found.permissions)) {
+            return found.permissions
+          }
+        }
+      }
+    } catch (_) {}
+    return this.DEFAULT_ROLE_PERMISSIONS[roleCode] || []
+  },
+
+  hasPermission(ctx, permCode) {
+    if (ctx.kind === "service") return true
+    if (ctx.roleCode === "SUPER_ADMIN") return true
+    const perms = this.getRolePermissions(ctx.tenantId, ctx.roleCode)
+    return perms.indexOf(permCode) >= 0
+  },
+
+  requirePermission(e, ctx, permCode) {
+    if (this.hasPermission(ctx, permCode)) return
+    throw new ForbiddenError("权限不足，缺少权限: " + permCode)
   },
 
   requireEmployeeActive(user) {

@@ -1,0 +1,10 @@
+<view class="container">
+  <view class="card" wx:for="{{attempts}}" wx:key="id">
+    <view class="row">
+      <text class="time">{{item.submittedAt}}</text>
+      <text class="tag {{item.passed ? 'pass' : 'fail'}}">{{item.passed ? "及格" : "未及格"}}</text>
+    </view>
+    <text class="score">成绩：{{item.score}} 分</text>
+  </view>
+  <view class="empty" wx:if="{{attempts.length === 0}}"><text>暂无作答历史记录</text></view>
+</view>

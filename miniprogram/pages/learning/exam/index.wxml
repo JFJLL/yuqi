@@ -1,0 +1,16 @@
+<view class="container" wx:if="{{!loading}}">
+  <view class="card header">
+    <text class="title">{{paper.title}}</text>
+    <text class="info">及格分：{{paper.passScore}}分 | 限时：{{paper.timeLimitMinutes}}分钟</text>
+  </view>
+  <view class="card question-card" wx:for="{{paper.questions}}" wx:key="id">
+    <text class="q-stem">{{index + 1}}. {{item.stem}} ({{item.score}}分)</text>
+    <view class="options">
+      <view class="option {{answers[item.id] === opt.label ? 'selected' : ''}}" wx:for="{{item.options}}" wx:for-item="opt" wx:key="label" data-q-id="{{item.id}}" data-label="{{opt.label}}" bindtap="selectOption">
+        <text class="opt-label">{{opt.label}}.</text>
+        <text class="opt-text">{{opt.text}}</text>
+      </view>
+    </view>
+  </view>
+  <button class="btn btn-primary" bindtap="submitExam" disabled="{{submitting}}">提交答卷</button>
+</view>

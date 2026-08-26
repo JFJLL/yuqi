@@ -15,7 +15,7 @@ interface RecordTableProps {
   onDelete?: (row: RecordRow) => void
 }
 
-const HEADS = ["时间", "员工", "门店", "设备码", "来源", "文本摘要", "ASR 状态", "质检", "操作"]
+const HEADS = ["时间", "员工", "门店", "设备码", "时长", "ASR通道", "识别状态", "AI分析", "操作"]
 
 const ASR_STATUS: Record<string, { label: string; tone: PillTone }> = {
   queued: { label: "排队中", tone: "gray" },

@@ -1,0 +1,35 @@
+<view class="login-page">
+  <view class="safe-top"></view>
+  <view class="brand-block">
+    <image class="brand-logo" src="/assets/brand/e-yang-logo-v1.png" mode="widthFix" />
+    <text class="brand-name">连锁门店智能运营</text>
+    <text class="brand-sub">员工工作台</text>
+  </view>
+
+  <view class="login-panel">
+    <text class="login-title">登录门店工作台</text>
+    <view class="identity-row">
+      <text>员工身份</text>
+      <text class="identity-value">授权后关联员工档案</text>
+    </view>
+    <view class="identity-row">
+      <text>岗位权限</text>
+      <text class="identity-value">店长与店员按后台配置识别</text>
+    </view>
+
+    <button
+      class="phone-login"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="phoneLogin"
+      loading="{{loading}}"
+    >微信手机号快捷登录</button>
+
+    <view class="agreement-row" bindtap="toggleAgreement">
+      <view class="agreement-check {{agreed ? 'checked' : ''}}">{{agreed ? '✓' : ''}}</view>
+      <text>我已阅读并同意</text>
+      <text class="agreement-link" catchtap="showAgreement">《用户服务与隐私说明》</text>
+    </view>
+  </view>
+
+  <view class="login-footer">北京易美数科科技有限公司提供技术支持</view>
+</view>

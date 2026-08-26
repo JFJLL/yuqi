@@ -1,0 +1,22 @@
+.learning-page { min-height: 100vh; padding-bottom: calc(40rpx + env(safe-area-inset-bottom)); }
+.learning-summary { padding: 34rpx 28rpx; background: #143d38; color: #ffffff; }
+.summary-title { display: block; font-size: 34rpx; font-weight: 700; }
+.summary-metrics { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 28rpx; }
+.summary-metrics view { border-right: 1rpx solid rgba(255,255,255,.18); text-align: center; }
+.summary-metrics view:last-child { border-right: 0; }
+.summary-metrics text { display: block; }
+.summary-metrics .summary-number { font-size: 38rpx; font-weight: 700; }
+.summary-metrics text { margin-top: 4rpx; color: rgba(255,255,255,.68); font-size: 22rpx; }
+.task-list { padding: 22rpx 24rpx; }
+.task-item { margin-bottom: 16rpx; padding: 26rpx; background: #ffffff; border: 1rpx solid #dce5ea; border-radius: 12rpx; }
+.task-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; }
+.task-title, .task-source, .deadline, .progress-text, .note-title, .learning-note > text { display: block; }
+.task-title { font-size: 30rpx; font-weight: 650; }
+.task-source { margin-top: 7rpx; color: #718193; font-size: 23rpx; }
+.progress-track { height: 10rpx; margin-top: 26rpx; overflow: hidden; border-radius: 6rpx; background: #e7edef; }
+.progress-value { height: 100%; background: #16806a; }
+.task-foot { display: flex; justify-content: space-between; margin-top: 10rpx; }
+.deadline, .progress-text { color: #758596; font-size: 22rpx; }
+.task-btn { width: 100%; margin-top: 22rpx; color: #126b59; border-color: #8ab4aa; }
+.learning-note { margin: 0 24rpx; padding: 24rpx 4rpx; color: #6c7c8e; font-size: 24rpx; line-height: 1.7; }
+.note-title { margin-bottom: 6rpx; color: #334353; font-weight: 650; }

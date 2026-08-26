@@ -32,7 +32,7 @@ export function RecordFilters({ filters, stores, employees, onChange, onExport }
           <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             className={`${fieldClass} pl-8`}
-            placeholder="搜索转写内容 / 药品名 / 员工"
+            placeholder="转写内容 / 员工 / 设备码"
             value={filters.keyword}
             onChange={(e) => onChange({ ...filters, keyword: e.target.value })}
           />

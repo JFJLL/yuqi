@@ -1,0 +1,52 @@
+<view class="page detail-page" wx:if="{{detail}}">
+  <view class="detail-header">
+    <view>
+      <text class="detail-title">{{detail.title}}</text>
+      <text class="detail-meta">{{detail.date}} {{detail.time}} · {{detail.employeeName || detail.storeName}}</text>
+    </view>
+    <text class="status status-{{detail.riskTone}}">{{detail.risk}}</text>
+  </view>
+
+  <view class="quote-block">
+    <text class="block-label">命中内容</text>
+    <text class="quote-text">“{{detail.quote}}”</text>
+  </view>
+
+  <view class="detail-section">
+    <text class="block-label">判断依据</text>
+    <text class="body-text">{{detail.reason}}</text>
+  </view>
+
+  <view class="detail-section">
+    <text class="block-label">整改建议</text>
+    <text class="body-text">{{detail.advice}}</text>
+  </view>
+
+  <view class="context-row surface">
+    <view>
+      <text class="context-title">关联沟通片段</text>
+      <text class="caption" wx:if="{{detail.recordingAvailable}}">申诉时可申请调取该问题前后录音片段</text>
+      <text class="caption" wx:else>该问题不保留可调取的录音片段</text>
+    </view>
+    <text class="status status-{{detail.recordingAvailable ? 'blue' : 'gray'}}">{{detail.recordingAvailable ? '可调取' : '不可用'}}</text>
+  </view>
+
+  <view class="state-row">
+    <text class="muted">当前状态</text>
+    <text class="status status-{{detail.stateTone}}">{{detail.state}}</text>
+  </view>
+
+  <view class="fixed-actions" wx:if="{{detail.state !== '已完成' && isManager}}">
+    <button class="btn" bindtap="remindStaff">提醒店员整改</button>
+    <button class="btn btn-primary" bindtap="markLearned" loading="{{submitting}}">确认已整改</button>
+  </view>
+
+  <view class="fixed-actions" wx:elif="{{detail.state !== '已完成'}}">
+    <button class="btn btn-danger" bindtap="openAppeal" disabled="{{!detail.canAppeal}}">提交申诉</button>
+    <button class="btn btn-primary" bindtap="markLearned" loading="{{submitting}}">完成整改</button>
+  </view>
+</view>
+
+<view class="page" wx:else>
+  <view class="empty">正在加载问题详情...</view>
+</view>

@@ -8,9 +8,11 @@ interface IssueDetailDialogProps {
   pushing: boolean
   onClose: () => void
   onPushRectify: (issue: IssueRow) => void
+  onDismiss?: (issue: IssueRow) => void
+  onCloseIssue?: (issue: IssueRow) => void
 }
 
-export function IssueDetailDialog({ issue, pushing, onClose, onPushRectify }: IssueDetailDialogProps) {
+export function IssueDetailDialog({ issue, pushing, onClose, onPushRectify, onDismiss, onCloseIssue }: IssueDetailDialogProps) {
   return (
     <Dialog open={!!issue} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl">
@@ -40,17 +42,44 @@ export function IssueDetailDialog({ issue, pushing, onClose, onPushRectify }: Is
                 <span className="text-muted-foreground text-[13px] leading-relaxed">{issue.advice}</span>
               </div>
             </div>
-            <div className="flex justify-end gap-2.5 pt-1">
-              <Button variant="outline" onClick={onClose}>
-                关闭
-              </Button>
-              <Button
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-                disabled={pushing || issue.state === "已完成"}
-                onClick={() => onPushRectify(issue)}
-              >
-                {pushing ? "推送中…" : "推送整改"}
-              </Button>
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#edf1f5]">
+              <div className="flex items-center gap-2">
+                {onDismiss && issue.state !== "已完成" && issue.state !== "误报关闭" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-[#c2410c] border-[#ffedd5] bg-[#ffedd5]/50 hover:bg-[#ffedd5]"
+                    disabled={pushing}
+                    onClick={() => onDismiss(issue)}
+                  >
+                    判定为误报/忽略
+                  </Button>
+                )}
+                {onCloseIssue && issue.state !== "已完成" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-[#147054] border-[#e6f4ef] bg-[#e6f4ef]/50 hover:bg-[#e6f4ef]"
+                    disabled={pushing}
+                    onClick={() => onCloseIssue(issue)}
+                  >
+                    审核通过并关闭
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={onClose} className="border-[#dbe3ec]">
+                  关闭
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-[#1672a8] hover:bg-[#125c88] text-white"
+                  disabled={pushing || issue.state === "已完成" || issue.state === "误报关闭"}
+                  onClick={() => onPushRectify(issue)}
+                >
+                  {pushing ? "处理中…" : "审核通过并推送整改"}
+                </Button>
+              </div>
             </div>
           </>
         )}

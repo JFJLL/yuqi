@@ -1,0 +1,13 @@
+<view class="container">
+  <view class="card result-card">
+    <view class="badge {{passed ? 'pass' : 'fail'}}">
+      <text class="badge-text">{{passed ? "考核通过" : "未通过"}}</text>
+    </view>
+    <text class="score-text">{{score}} 分</text>
+    <text class="pass-info">及格标准：{{passScore}} 分</text>
+  </view>
+  <view class="btn-group">
+    <button wx:if="{{!passed}}" class="btn btn-primary" bindtap="reExam">重新考核</button>
+    <button class="btn btn-outline" bindtap="backHome">返回学习列表</button>
+  </view>
+</view>

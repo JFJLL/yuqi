@@ -33,10 +33,36 @@ function findUserByMobile(mobile) {
   }
 }
 
+function findUserByUsername(username) {
+  try {
+    return $app.findFirstRecordByFilter("app_users", "username = {:u}", { u: String(username || "").trim() })
+  } catch (_) {
+    return null
+  }
+}
+
+function findUserByIdentity(identity) {
+  var raw = String(identity || "").trim()
+  if (!raw) return null
+  var lower = raw.toLowerCase()
+  var user = findUserByEmail(lower)
+  if (user) return user
+  if (!lower.includes("@")) {
+    user = findUserByEmail(lower + "@demo.local")
+    if (user) return user
+  }
+  user = findUserByUsername(raw)
+  if (user) return user
+  user = findUserByMobile(raw)
+  return user
+}
+
 module.exports = {
   pbDate,
   isProduction,
   fixedDevCode,
   findUserByEmail,
+  findUserByUsername,
+  findUserByIdentity,
   findUserByMobile,
 }

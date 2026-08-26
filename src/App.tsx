@@ -11,6 +11,7 @@ const ForbiddenPage = lazy(() => import("@/pages/ForbiddenPage").then((m) => ({ 
 const NotFoundPage = lazy(() => import("@/pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })))
 const DashboardRoute = lazy(() => import("@/pages/Dashboard").then((m) => ({ default: m.DashboardRoute })))
 const OrgRoute = lazy(() => import("@/pages/Org").then((m) => ({ default: m.OrgRoute })))
+const EmployeesRoute = lazy(() => import("@/pages/Employees").then((m) => ({ default: m.EmployeesRoute })))
 const DevicesRoute = lazy(() => import("@/pages/Devices").then((m) => ({ default: m.DevicesRoute })))
 const DeviceOpsRoute = lazy(() => import("@/pages/DeviceOps").then((m) => ({ default: m.DeviceOpsRoute })))
 const RecordsRoute = lazy(() => import("@/pages/Records").then((m) => ({ default: m.RecordsRoute })))
@@ -18,6 +19,8 @@ const InspectionRoute = lazy(() => import("@/pages/Inspection").then((m) => ({ d
 const KnowledgeRoute = lazy(() => import("@/pages/Knowledge").then((m) => ({ default: m.KnowledgeRoute })))
 const TasksRoute = lazy(() => import("@/pages/Tasks").then((m) => ({ default: m.TasksRoute })))
 const AppealsRoute = lazy(() => import("@/pages/Appeals").then((m) => ({ default: m.AppealsRoute })))
+const ActivityRoute = lazy(() => import("@/pages/Activity").then((m) => ({ default: m.ActivityRoute })))
+const PermissionsRoute = lazy(() => import("@/pages/Permissions").then((m) => ({ default: m.PermissionsRoute })))
 const ReportsRoute = lazy(() => import("@/pages/Reports").then((m) => ({ default: m.ReportsRoute })))
 const LogsRoute = lazy(() => import("@/pages/Logs").then((m) => ({ default: m.LogsRoute })))
 const SettingsRoute = lazy(() => import("@/pages/Settings").then((m) => ({ default: m.SettingsRoute })))
@@ -69,21 +72,28 @@ function App() {
           <Route path="/employee/profile" element={<EmployeeProfilePage />} />
         </Route>
 
-        {/* 管理端 */}
+        {/* 管理端 12 个目标模块 */}
         <Route element={<RequireAuth roles={["SUPER_ADMIN", "ADMIN", "COMPLIANCE", "REGION_MANAGER", "STORE_MANAGER", "AUDITOR"]}><AdminLayout /></RequireAuth>}>
-          <Route path="/" element={<DashboardRoute />} />
-          <Route path="/org" element={<OrgRoute />} />
-          <Route path="/devices" element={<DevicesRoute />} />
-          <Route path="/device-ops" element={<DeviceOpsRoute />} />
-          <Route path="/records" element={<RecordsRoute />} />
-          <Route path="/inspection" element={<InspectionRoute />} />
-          <Route path="/knowledge" element={<KnowledgeRoute />} />
-          <Route path="/tasks" element={<TasksRoute />} />
-          <Route path="/appeals" element={<AppealsRoute />} />
-          <Route path="/reports" element={<ReportsRoute />} />
-          <Route path="/logs" element={<LogsRoute />} />
-          <Route path="/settings" element={<SettingsRoute />} />
-          {/* 一期占位模块, 后续再开发 */}
+          <Route path="/" element={<RequireAuth permission="dashboard.view"><DashboardRoute /></RequireAuth>} />
+          <Route path="/dashboard" element={<RequireAuth permission="dashboard.view"><DashboardRoute /></RequireAuth>} />
+          <Route path="/organization" element={<RequireAuth permission="organization.manage"><OrgRoute /></RequireAuth>} />
+          <Route path="/org" element={<RequireAuth permission="organization.manage"><OrgRoute /></RequireAuth>} />
+          <Route path="/employees" element={<RequireAuth permission="employee.manage"><EmployeesRoute /></RequireAuth>} />
+          <Route path="/devices" element={<RequireAuth permission="device.manage"><DevicesRoute /></RequireAuth>} />
+          <Route path="/device-ops" element={<RequireAuth permission="device.manage"><DeviceOpsRoute /></RequireAuth>} />
+          <Route path="/recordings" element={<RequireAuth permission="recording.view"><RecordsRoute /></RequireAuth>} />
+          <Route path="/records" element={<RequireAuth permission="recording.view"><RecordsRoute /></RequireAuth>} />
+          <Route path="/inspection" element={<RequireAuth permission="inspection.manage"><InspectionRoute /></RequireAuth>} />
+          <Route path="/appeals" element={<RequireAuth permission="appeal.review"><AppealsRoute /></RequireAuth>} />
+          <Route path="/activity" element={<RequireAuth permission="activity.view"><ActivityRoute /></RequireAuth>} />
+          <Route path="/tasks" element={<RequireAuth permission="activity.view"><TasksRoute /></RequireAuth>} />
+          <Route path="/reports" element={<RequireAuth permission="report.export"><ReportsRoute /></RequireAuth>} />
+          <Route path="/permissions" element={<RequireAuth permission="permission.manage"><PermissionsRoute /></RequireAuth>} />
+          <Route path="/settings" element={<RequireAuth permission="system.manage"><SettingsRoute /></RequireAuth>} />
+          <Route path="/knowledge" element={<RequireAuth permission="system.manage"><KnowledgeRoute /></RequireAuth>} />
+          <Route path="/audit" element={<RequireAuth permission="audit.view"><LogsRoute /></RequireAuth>} />
+          <Route path="/logs" element={<RequireAuth permission="audit.view"><LogsRoute /></RequireAuth>} />
+          {/* 兼容历史占位路由 */}
           <Route path="/drug-data" element={<ComingSoon />} />
           <Route path="/sales-ai" element={<ComingSoon />} />
           <Route path="/training" element={<ComingSoon />} />

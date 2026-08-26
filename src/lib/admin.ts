@@ -55,6 +55,28 @@ export function triggerSync(): Promise<{ ok: boolean; synced_at: string }> {
   return pb.send("/api/admin/sync", { method: "POST" })
 }
 
+// ---- 巡检与人工复核闭环安全接口 ----
+export function reviewIssue(id: string, action: "APPROVE" | "REJECT" | "DISMISS", notes?: string): Promise<{ ok: boolean }> {
+  return pb.send(`/api/yuqi/issues/${id}/review`, {
+    method: "POST",
+    body: { action, notes },
+  })
+}
+
+export function pushIssueRectification(id: string, deadline_days = 3, notes?: string): Promise<{ ok: boolean }> {
+  return pb.send(`/api/yuqi/issues/${id}/push`, {
+    method: "POST",
+    body: { deadline_days, notes },
+  })
+}
+
+export function closeIssue(id: string, reason?: string): Promise<{ ok: boolean }> {
+  return pb.send(`/api/yuqi/issues/${id}/close`, {
+    method: "POST",
+    body: { reason },
+  })
+}
+
 // ---- 通用业务表 CRUD ----
 
 export interface ListResponse<T> {
@@ -67,14 +89,26 @@ export interface ListResponse<T> {
 export interface Region {
   id: string
   name: string
-  code: string
+  code?: string
+  manager_name?: string
+  manager_mobile?: string
+  status?: string
+  storeCount?: number
+  employeeCount?: number
 }
 
 export interface Store {
   id: string
+  code?: string
   name: string
   region: string
-  address: string
+  address?: string
+  status?: string
+  manager_name?: string
+  manager_mobile?: string
+  manager_employee?: string
+  employeeCount?: number
+  deviceCount?: number
 }
 
 export interface Employee {
@@ -97,6 +131,8 @@ export interface InspectionIssueRecord {
   quote: string
   advice: string
   occurred_at: string
+  created?: string
+  updated?: string
 }
 
 export interface Device {
@@ -162,6 +198,8 @@ export interface TranscriptRecord {
   occurred_at: string
   speaker_aliases?: Record<string, string>
   marks_json?: TranscriptMark[]
+  created?: string
+  updated?: string
 }
 
 export interface RectifyTaskRecord {

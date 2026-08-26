@@ -22,7 +22,7 @@ routerAdd("POST", "/api/yuqi/auth/login", (e) => {
     const password = String(body.password || "")
     if (!username || !password) throw new BadRequestError("请输入用户名和密码")
 
-    const user = AH.findUserByEmail(username) || AH.findUserByMobile(username)
+    const user = AH.findUserByIdentity(username)
     if (!user) throw new BadRequestError("用户名或密码错误")
     if (!user.validatePassword(password)) throw new BadRequestError("用户名或密码错误")
     const status = String(user.get("status") || "ACTIVE")
@@ -36,12 +36,12 @@ routerAdd("POST", "/api/yuqi/auth/login", (e) => {
     $apis.recordAuthResponse(e, user, "password")
   } catch (err) {
     try {
+      console.log("LOGIN_ERROR: " + String((err && err.message) || err))
       const g = require(`${__hooks}/_lib/guards.js`)
-      if (err && err.status && err.status >= 400 && err.status < 600) {
-        const msg = String(err.message || "登录失败")
-        g.writeAudit(e, { kind: "guest", tenantId: "", roleCode: "" }, "user_login_failed", "app_users", "", { message: msg.slice(0, 100) })
-        return e.json(err.status, { error: "login_failed", message: msg })
-      }
+      const msg = String((err && err.message) || "登录失败")
+      const status = Number(err && err.status) || 400
+      g.writeAudit(e, { kind: "guest", tenantId: "", roleCode: "" }, "user_login_failed", "app_users", "", { message: msg.slice(0, 100) })
+      return e.json(status >= 400 && status <= 599 ? status : 400, { error: "login_failed", message: msg })
     } catch (_) {}
     return e.json(500, { error: "login_failed", message: "登录失败" })
   }
@@ -120,6 +120,7 @@ routerAdd("GET", "/api/yuqi/auth/me", (e) => {
       assigned_org: user.get("assigned_org"),
       assigned_store: user.get("assigned_store"),
       last_login_at: user.get("last_login_at"),
+      permissions: g.getRolePermissions(ctx.tenantId, String(user.get("role_code") || "")),
       scope,
       unread_notifications: unread,
       server_time: g.nowIso(),

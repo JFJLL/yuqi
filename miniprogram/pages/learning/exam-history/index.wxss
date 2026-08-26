@@ -1,0 +1,9 @@
+.container { padding: 30rpx; background: #f4f6f8; min-height: 100vh; }
+.card { background: #fff; border-radius: 14rpx; padding: 24rpx; margin-bottom: 20rpx; border: 1rpx solid #e2e8f0; }
+.row { display: flex; justify-content: space-between; margin-bottom: 12rpx; }
+.time { font-size: 24rpx; color: #718096; }
+.tag { font-size: 22rpx; padding: 4rpx 10rpx; border-radius: 6rpx; }
+.tag.pass { background: #e6f4ef; color: #126b59; }
+.tag.fail { background: #feebc8; color: #c05621; }
+.score { font-size: 30rpx; font-weight: bold; color: #2d3748; }
+.empty { text-align: center; color: #a0aec0; padding: 80rpx 0; font-size: 28rpx; }

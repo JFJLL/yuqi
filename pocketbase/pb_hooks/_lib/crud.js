@@ -98,6 +98,8 @@ function handleList(e, config) {
   try {
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, config.roles.list || [])
+    const perm = typeof config.permission === 'object' ? config.permission.list : config.permission
+    if (perm) g.requirePermission(e, ctx, perm)
 
     const query = e.requestInfo().query || {}
     const page = parseInt(String(query.page || "1"), 10) || 1
@@ -154,6 +156,8 @@ function handleGet(e, config) {
   try {
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, config.roles.view || [])
+    const perm = typeof config.permission === 'object' ? config.permission.view : config.permission
+    if (perm) g.requirePermission(e, ctx, perm)
     const id = String(e.request.pathValue("id") || "")
     if (!SAFE_ID_RE.test(id)) throw new NotFoundError("记录不存在")
     let rec = null
@@ -174,6 +178,8 @@ function handleCreate(e, config) {
   try {
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, config.roles.create || [])
+    const perm = typeof config.permission === 'object' ? config.permission.create : config.permission
+    if (perm) g.requirePermission(e, ctx, perm)
 
     const body = e.requestInfo().body || {}
 
@@ -225,6 +231,8 @@ function handleUpdate(e, config) {
   try {
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, config.roles.update || [])
+    const perm = typeof config.permission === 'object' ? config.permission.update : config.permission
+    if (perm) g.requirePermission(e, ctx, perm)
     const id = String(e.request.pathValue("id") || "")
     if (!SAFE_ID_RE.test(id)) throw new NotFoundError("记录不存在")
     let rec = null
@@ -257,6 +265,8 @@ function handleDelete(e, config) {
   try {
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, config.roles.delete || [])
+    const perm = typeof config.permission === 'object' ? config.permission.delete : config.permission
+    if (perm) g.requirePermission(e, ctx, perm)
     const id = String(e.request.pathValue("id") || "")
     if (!SAFE_ID_RE.test(id)) throw new NotFoundError("记录不存在")
     let rec = null
