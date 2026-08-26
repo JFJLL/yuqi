@@ -10,12 +10,38 @@
 //   pnpm install && pnpm build
 //   把 PocketBase linux 二进制放到 vibex-local/bin/linux/pocketbase
 //   pm2 start ecosystem.config.cjs && pm2 save
+const fs = require('fs')
 const path = require('path')
 
 const ROOT = __dirname
+const envFile = process.env.ENV === 'production' || process.env.NODE_ENV === 'production'
+  ? path.join(ROOT, '.env.production')
+  : (fs.existsSync(path.join(ROOT, '.env.production')) ? path.join(ROOT, '.env.production') : path.join(ROOT, '.env.test'))
+
+function parseEnv(filePath) {
+  if (!fs.existsSync(filePath)) return {}
+  const content = fs.readFileSync(filePath, 'utf8')
+  const env = {}
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const idx = trimmed.indexOf('=')
+    if (idx > 0) {
+      const key = trimmed.slice(0, idx).trim()
+      let val = trimmed.slice(idx + 1).trim()
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1)
+      }
+      env[key] = val
+    }
+  }
+  return env
+}
+
+const loadedEnv = parseEnv(envFile)
 
 module.exports = {
-  apps: [
+ apps: [
     {
       name: 'yuqi-pb',
       script: path.join(ROOT, 'vibex-local', 'bin', 'linux', 'pocketbase'),
@@ -32,6 +58,7 @@ module.exports = {
       ].join(' '),
       max_memory_restart: '300M',
       autorestart: true,
+      env: loadedEnv,
     },
     {
       name: 'yuqi-asr-gateway',
@@ -40,14 +67,7 @@ module.exports = {
       cwd: ROOT,
       max_memory_restart: '250M',
       autorestart: true,
-      // 请在云服务器的 PM2 环境或 systemd EnvironmentFile 中设置，勿提交真实值：
-      // YUQI_EMBEDDED_WORKER=1
-      // YUQI_WORKER_POLL_MS=5000
-      // YUQI_WORKER_LOCK_MS=300000
-      // ASR_BASE_URL=http://127.0.0.1:18082
-      // ASR_SERVICE_TOKEN=<long-random-token>
-      // POCKETBASE_URL=http://127.0.0.1:7040
-      // YUQI_ASR_GATEWAY_PORT=18084
+      env: loadedEnv,
     },
     {
       name: 'yuqi-oss-scanner',
@@ -56,12 +76,7 @@ module.exports = {
       cwd: ROOT,
       max_memory_restart: '200M',
       autorestart: true,
-      // 与 yuqi-asr-gateway 共用同一份环境文件，另需 OSS_* 与 SCAN_INTERVAL_MS：
-      // OSS_ENDPOINT=oss-cn-beijing.aliyuncs.com
-      // OSS_BUCKET=redmagic
-      // OSS_PREFIX=audio/
-      // OSS_ACCESS_KEY_ID=<...>
-      // OSS_ACCESS_KEY_SECRET=<...>
+      env: loadedEnv,
     },
   ],
 }
