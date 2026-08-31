@@ -22,6 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Pill, stateTone, type PillTone } from "@/components/dashboard/Pill"
 import { updateRecord } from "@/lib/admin"
+import { formatBeijingTime } from "@/lib/beijingTime"
 import type { TranscriptMark, TranscriptMarkColor, TranscriptRecord } from "@/lib/admin"
 import type { RecordRow } from "./RecordTable"
 
@@ -641,7 +642,7 @@ export function RecordDetailDialog({ record, onClose }: RecordDetailDialogProps)
                   <span>·</span>
                   <span>设备 {record.device || "-"}</span>
                   <span>·</span>
-                  <span>{record.occurred_at ? record.occurred_at.slice(0, 16) : "-"}</span>
+                  <span>{formatBeijingTime(record.occurred_at, { withDate: true })}</span>
                   {record.audio_name ? <><span>·</span><span className="max-w-full truncate">{record.audio_name}</span></> : null}
                 </div>
               </DialogHeader>

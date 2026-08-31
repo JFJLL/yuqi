@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Pill, stateTone, type PillTone } from "@/components/dashboard/Pill"
+import { formatBeijingTime } from "@/lib/beijingTime"
 import type { TranscriptRecord } from "@/lib/admin"
 
 export interface RecordRow extends TranscriptRecord {
@@ -64,7 +65,7 @@ export function RecordTable({ rows, loading, onView, onRetry, onDelete }: Record
             return (
               <tr key={row.id} className="hover:bg-accent/40">
                 <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">
-                  {row.occurred_at ? row.occurred_at.slice(11, 16) : "-"}
+                  {formatBeijingTime(row.occurred_at)}
                 </td>
                 <td className="px-2.5 py-3 border-b border-border">{row.employeeName || "-"}</td>
                 <td className="px-2.5 py-3 border-b border-border">{row.storeName || "-"}</td>

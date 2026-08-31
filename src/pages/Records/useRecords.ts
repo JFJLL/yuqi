@@ -10,6 +10,7 @@ import {
   type SyncLog,
   type TranscriptRecord,
 } from "@/lib/admin"
+import { beijingDayRangeMs, formatBeijingTime, pbDateMs } from "@/lib/beijingTime"
 import type { RecordFilterState } from "@/components/records/RecordFilters"
 import type { RecordRow } from "@/components/records/RecordTable"
 
@@ -121,7 +122,11 @@ export function useRecords() {
         if (filters.storeId && row.store !== filters.storeId) return false
         if (filters.employeeId && row.employee !== filters.employeeId) return false
         if (filters.qcResult && row.qc_result !== filters.qcResult) return false
-        if (filters.date && !(row.occurred_at ?? "").startsWith(filters.date)) return false
+        if (filters.date) {
+          const range = beijingDayRangeMs(filters.date)
+          const occurredMs = pbDateMs(row.occurred_at)
+          if (!range || occurredMs === null || occurredMs < range[0] || occurredMs >= range[1]) return false
+        }
         if (keyword) {
           const text = `${row.summary}${row.full_text}${row.employeeName}${row.storeName}${row.audio_name ?? ""}`.toLowerCase()
           if (!text.includes(keyword)) return false
@@ -204,7 +209,7 @@ export function useRecords() {
       "录音转写记录.csv",
       ["时间", "员工", "门店", "设备码", "文件名", "文本摘要", "ASR 状态", "质检"],
       rows.map((row) => [
-        row.occurred_at,
+        formatBeijingTime(row.occurred_at, { withDate: true }),
         row.employeeName,
         row.storeName,
         row.device,
