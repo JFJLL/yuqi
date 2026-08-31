@@ -255,7 +255,9 @@ function beijingToUtcDate(digits) {
 }
 
 function parseBadgeFilename(fileName) {
-  const match = BADGE_FILENAME_RE.exec(String(fileName || ""))
+  // OSS 允许按设备建子目录 (audio/WF.../WF....mp3)，取 basename 再匹配。
+  const base = String(fileName || "").split("/").pop()
+  const match = BADGE_FILENAME_RE.exec(base)
   if (!match) return { sn: "", startedAt: null, endedAt: null, chunk: "" }
   return {
     sn: match[1],
@@ -263,6 +265,10 @@ function parseBadgeFilename(fileName) {
     endedAt: beijingToUtcDate(match[3]),
     chunk: match[4],
   }
+}
+
+function validPbDate(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$/.test(value)
 }
 
 function extensionOf(key) {
@@ -469,6 +475,12 @@ function forwardOssObjectToAsr(objectKey, fileName, metadata) {
 async function submitAudioItem(item) {
   const fileName = item.file_name || item.object_key.split("/").pop()
   const parsed = parseBadgeFilename(fileName)
+  // 时间优先级: audio_files.started_at (登记时从文件名解析) > 重新解析文件名 > 扫描时刻。
+  const occurredAt = validPbDate(item.started_at)
+    ? item.started_at
+    : parsed.startedAt
+      ? pbDate(parsed.startedAt)
+      : pbDate()
   const mapping = mappingFor(parsed.sn)
   const metadata = {
     device: parsed.sn || String(item.device_sn || ""),
@@ -481,7 +493,6 @@ async function submitAudioItem(item) {
     const remoteJobId = String(remote?.job_id || "")
     if (!/^[0-9a-f]{32}$/i.test(remoteJobId)) throw new Error("ASR 返回的 job_id 无效")
 
-    const occurredAt = parsed.startedAt ? pbDate(parsed.startedAt) : item.started_at || pbDate()
     const transcript = await pbRequest("/api/transcripts", {
       method: "POST",
       body: {
