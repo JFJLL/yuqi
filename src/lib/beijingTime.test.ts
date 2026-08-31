@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest"
 import { beijingDayRangeMs, formatBeijingTime, parsePbDate } from "./beijingTime"
 
 describe("formatBeijingTime", () => {
+  it("withDate 输出完整北京时间 (年月日 时分秒)", () => {
+    expect(formatBeijingTime("2026-06-17 08:43:53Z", { withDate: true })).toBe("2026-06-17 16:43:53")
+  })
+
   it("把 UTC 时间转换为北京时间 (HH:mm:ss)", () => {
     // 文件名时间戳 26-06-17 16:43 北京时间 => UTC 08:43
     expect(formatBeijingTime("2026-06-17 08:43:53Z")).toBe("16:43:53")

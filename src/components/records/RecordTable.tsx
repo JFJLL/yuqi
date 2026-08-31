@@ -64,8 +64,8 @@ export function RecordTable({ rows, loading, onView, onRetry, onDelete }: Record
             const source = sourceInfo(row.source)
             return (
               <tr key={row.id} className="hover:bg-accent/40">
-                <td className="px-2.5 py-3 border-b border-border whitespace-nowrap">
-                  {formatBeijingTime(row.occurred_at)}
+                <td className="px-2.5 py-3 border-b border-border whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                  {formatBeijingTime(row.occurred_at, { withDate: true })}
                 </td>
                 <td className="px-2.5 py-3 border-b border-border">{row.employeeName || "-"}</td>
                 <td className="px-2.5 py-3 border-b border-border">{row.storeName || "-"}</td>
