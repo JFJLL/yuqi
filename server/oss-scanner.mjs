@@ -17,6 +17,7 @@ import { createHmac } from "node:crypto"
 import http from "node:http"
 import https from "node:https"
 import { Transform } from "node:stream"
+import { selectLatestActiveBindings } from "./binding-status.mjs"
 
 const POCKETBASE_URL = trimTrailingSlash(process.env.POCKETBASE_URL || "http://127.0.0.1:7040")
 // 内部服务身份: 写 PocketBase 必须携带 (与 PB 侧 YUQI_SERVICE_TOKEN 一致, 不提交 Git)
@@ -40,8 +41,6 @@ const RETRY_BACKOFF_BASE_MS = numberEnv("SCANNER_RETRY_BACKOFF_BASE_MS", 600_000
 const REQUEST_TIMEOUT_MS = numberEnv("SCANNER_REQUEST_TIMEOUT_MS", 120_000)
 const STALE_SUBMITTING_MS = numberEnv("SCANNER_STALE_SUBMITTING_MS", 300_000)
 const AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".m4a"])
-
-const BINDING_ACTIVE_STATUS = "已绑定"
 
 let cycleInFlight = false
 
@@ -304,8 +303,7 @@ async function refreshBindingCache() {
     }
   }
   const nextCache = new Map()
-  for (const binding of bindings) {
-    if (String(binding?.status || "") !== BINDING_ACTIVE_STATUS) continue
+  for (const binding of selectLatestActiveBindings(bindings).values()) {
     // 小数据量下线性查找可接受；bindingCache 规模通常 <500 条。
     const sn = [...deviceIdBySn.entries()].find(([, id]) => id === binding.device)?.[0]
     if (!sn || nextCache.has(sn)) continue
