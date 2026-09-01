@@ -218,15 +218,11 @@ async function main() {
     }))
   }
 
-  // device_bindings 历史 (每设备 1 条 ENDED + 1 条 ACTIVE)
+  // device_bindings 历史 (每设备先写较早的 ENDED，再写当前 ACTIVE；
+  // effective_date 才是业务顺序，不能让演示数据的 created 顺序制造歧义。)
   for (let i = 0; i < devices.length; i++) {
     const emp = employees[i % employees.length]
     const store = emp.store
-    await findOrCreate("device_bindings", `device='${devices[i].id}' && status='ACTIVE'`, {
-      tenant: TENANT, device: devices[i].id, employee: emp.id, store,
-      effective_date: new Date().toISOString(), status: "ACTIVE",
-      request_by: emp.name, approved_by: "admin", approved_at: new Date().toISOString(),
-    })
     const oldEmp = employees[(i + 3) % employees.length]
     const oldBinding = await findOne("device_bindings", `device='${devices[i].id}' && status='ENDED'`)
     if (!oldBinding) {
@@ -236,6 +232,11 @@ async function main() {
         request_by: oldEmp.name, approved_by: "admin", approved_at: "2026-07-02T00:00:00.000Z",
       }).catch(() => {})
     }
+    await findOrCreate("device_bindings", `device='${devices[i].id}' && status='ACTIVE'`, {
+      tenant: TENANT, device: devices[i].id, employee: emp.id, store,
+      effective_date: new Date().toISOString(), status: "ACTIVE",
+      request_by: emp.name, approved_by: "admin", approved_at: new Date().toISOString(),
+    })
   }
 
   // 8 条内置规则 (对应 init-builtin 的 code)

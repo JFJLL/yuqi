@@ -9,6 +9,7 @@ import {
   type Store,
 } from "@/lib/admin"
 import type { DeviceLogRow } from "@/components/device-ops/DeviceLogTable"
+import { selectCurrentBindings } from "../../../shared/device-binding-semantics.js"
 
 // 设备运行页逻辑: 设备汇总计算 + 日志类型过滤
 export function useDeviceOps() {
@@ -55,10 +56,11 @@ export function useDeviceOps() {
 
   const activeBindingByDevice = useMemo(() => {
     const map = new Map<string, DeviceBinding>()
-    for (const binding of bindings) {
-      if (binding.status !== "已绑定") continue
-      const prev = map.get(binding.device)
-      if (!prev || (binding.created ?? "") > (prev.created ?? "")) map.set(binding.device, binding)
+    const selections = selectCurrentBindings(bindings)
+    for (const [deviceId, selection] of selections.byDevice) {
+      if (selection.isActive && selection.binding) {
+        map.set(deviceId, selection.binding)
+      }
     }
     return map
   }, [bindings])

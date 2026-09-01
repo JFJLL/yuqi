@@ -17,6 +17,14 @@ import { createHmac } from "node:crypto"
 import http from "node:http"
 import https from "node:https"
 import { Transform } from "node:stream"
+import {
+  buildAsrMetadata,
+  buildBindingCache,
+  buildSubmittedAudioFilePatch,
+  countAudioDeviceOverlap,
+  relationFieldsForAudioFile,
+  selectFreshObjects,
+} from "./oss-scanner-helpers.mjs"
 
 const POCKETBASE_URL = trimTrailingSlash(process.env.POCKETBASE_URL || "http://127.0.0.1:7040")
 // 内部服务身份: 写 PocketBase 必须携带 (与 PB 侧 YUQI_SERVICE_TOKEN 一致, 不提交 Git)
@@ -40,8 +48,6 @@ const RETRY_BACKOFF_BASE_MS = numberEnv("SCANNER_RETRY_BACKOFF_BASE_MS", 600_000
 const REQUEST_TIMEOUT_MS = numberEnv("SCANNER_REQUEST_TIMEOUT_MS", 120_000)
 const STALE_SUBMITTING_MS = numberEnv("SCANNER_STALE_SUBMITTING_MS", 300_000)
 const AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".m4a"])
-
-const BINDING_ACTIVE_STATUS = "已绑定"
 
 let cycleInFlight = false
 
@@ -212,7 +218,7 @@ async function listOssAudioObjects() {
       headers: { Date: date, Authorization: authorization },
     })
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(`OSS ListObjects 失败：HTTP ${response.status} ${String(response.raw || "").slice(0, 500)}`)
+      throw new Error(`OSS ListObjects 失败：HTTP ${response.status}`)
     }
     const xml = response.raw || ""
     const contents = xml.match(/<Contents>[\s\S]*?<\/Contents>/g) || []
@@ -224,11 +230,7 @@ async function listOssAudioObjects() {
     }
     const truncated = /<IsTruncated>true<\/IsTruncated>/i.test(xml)
     const nextMarker = xml.match(/<NextMarker>([\s\S]*?)<\/NextMarker>/)?.[1] || ""
-    log(`OSS 列表页 ${page + 1}: 返回 ${contents.length} 条, IsTruncated=${truncated}${nextMarker ? `, NextMarker=${decodeXmlEntities(nextMarker).slice(0, 60)}` : ""}`)
-    if (contents.length > 0 && contents.length <= 5) {
-      const sampleKeys = objects.slice(-contents.length).map((o) => o.key)
-      log(`  样本: ${sampleKeys.join(" | ")}`)
-    }
+    log(`OSS 列表页 ${page + 1}: 返回 ${contents.length} 条, IsTruncated=${truncated}`)
     if (!truncated) break
     marker = nextMarker ? decodeXmlEntities(nextMarker) : objects.length > 0 ? objects[objects.length - 1].key : ""
     if (!marker) break
@@ -279,6 +281,7 @@ function extensionOf(key) {
 // ---- 设备绑定映射缓存 ----
 
 let bindingCache = new Map()
+let bindingDeviceIdBySn = new Map()
 
 async function refreshBindingCache() {
   const devices = []
@@ -296,27 +299,27 @@ async function refreshBindingCache() {
     if (items.length < 500) break
   }
 
-  // 列表按 -created 排序：首次命中的即最新绑定。
-  const deviceIdBySn = new Map()
-  for (const device of devices) {
-    if (device?.device_no && !deviceIdBySn.has(device.device_no)) {
-      deviceIdBySn.set(device.device_no, device.id)
-    }
+  const snapshot = buildBindingCache(devices, bindings)
+  bindingCache = snapshot.cache
+  bindingDeviceIdBySn = snapshot.deviceIdBySn
+  log(`DEVICE_RECORDS_TOTAL=${snapshot.stats.deviceRecordsTotal}`)
+  log(`CURRENT_BINDINGS_BY_EFFECTIVE_DATE=${snapshot.stats.currentBindingsByEffectiveDate}`)
+  log(`CURRENT_BINDINGS_RELATION_COMPLETE=${snapshot.stats.currentBindingsRelationComplete}`)
+  log(`CURRENT_BINDINGS_RELATION_INCOMPLETE=${snapshot.stats.currentBindingsRelationIncomplete}`)
+  if (snapshot.stats.legacyFallbackDevices > 0) {
+    log(`BINDING_LEGACY_FALLBACK_DEVICES=${snapshot.stats.legacyFallbackDevices}`)
   }
-  const nextCache = new Map()
-  for (const binding of bindings) {
-    if (String(binding?.status || "") !== BINDING_ACTIVE_STATUS) continue
-    // 小数据量下线性查找可接受；bindingCache 规模通常 <500 条。
-    const sn = [...deviceIdBySn.entries()].find(([, id]) => id === binding.device)?.[0]
-    if (!sn || nextCache.has(sn)) continue
-    nextCache.set(sn, { employee: String(binding.employee || ""), store: String(binding.store || "") })
+  if (snapshot.stats.futureEffectiveDateDevices > 0) {
+    log(`BINDING_FUTURE_EFFECTIVE_DATE_DEVICES=${snapshot.stats.futureEffectiveDateDevices}`)
   }
-  bindingCache = nextCache
-  log(`绑定映射刷新：设备 ${deviceIdBySn.size} 台，生效绑定 ${nextCache.size} 条`)
+  if (snapshot.stats.unknownStatusDevices > 0) {
+    log(`BINDING_UNKNOWN_STATUS_DEVICES=${snapshot.stats.unknownStatusDevices}`)
+  }
+  return snapshot
 }
 
 function mappingFor(sn) {
-  return bindingCache.get(sn) || { employee: "", store: "" }
+  return bindingCache.get(sn) || { device: "", employee: "", store: "" }
 }
 
 // ---- 登记与提交 ----
@@ -335,6 +338,7 @@ async function loadKnownObjectKeys() {
 async function ensureAudioFileRecord(object) {
   const fileName = object.key.slice(OSS_PREFIX.length) || object.key
   const parsed = parseBadgeFilename(fileName)
+  const mapping = mappingFor(parsed.sn)
   const payload = {
     object_key: object.key,
     file_name: fileName,
@@ -346,6 +350,7 @@ async function ensureAudioFileRecord(object) {
     chunk: parsed.chunk,
     status: "submitting",
     attempts: 0,
+    ...relationFieldsForAudioFile(mapping),
   }
   const result = await pbRequest("/api/audio_files", { method: "POST", body: payload })
   return { duplicate: Boolean(result?.duplicate), item: result?.item }
@@ -366,7 +371,7 @@ async function markSubmitFailure(item, error) {
       },
     })
   } catch (patchError) {
-    logError(`audio_files ${item?.id} 状态更新失败`, patchError)
+    logError("audio_files 状态更新失败", patchError)
   }
   await writeSyncLog("OSS采集", item?.id || "?", "", "失败", safeMessage(error))
 }
@@ -475,19 +480,15 @@ function forwardOssObjectToAsr(objectKey, fileName, metadata) {
 async function submitAudioItem(item) {
   const fileName = item.file_name || item.object_key.split("/").pop()
   const parsed = parseBadgeFilename(fileName)
+  const deviceSn = parsed.sn || String(item.device_sn || "")
   // 时间优先级: audio_files.started_at (登记时从文件名解析) > 重新解析文件名 > 扫描时刻。
   const occurredAt = validPbDate(item.started_at)
     ? item.started_at
     : parsed.startedAt
       ? pbDate(parsed.startedAt)
       : pbDate()
-  const mapping = mappingFor(parsed.sn)
-  const metadata = {
-    device: parsed.sn || String(item.device_sn || ""),
-    employee: mapping.employee,
-    store: mapping.store,
-    language: "zh-CN",
-  }
+  const mapping = mappingFor(deviceSn)
+  const metadata = buildAsrMetadata(deviceSn, mapping)
   try {
     const remote = await forwardOssObjectToAsr(item.object_key, fileName, metadata)
     const remoteJobId = String(remote?.job_id || "")
@@ -530,12 +531,12 @@ async function submitAudioItem(item) {
     })
     await pbRequest(`/api/audio_files/${encodeURIComponent(item.id)}`, {
       method: "PATCH",
-      body: { status: "submitted", transcript: transcript.id, asr_job: job.id, error_message: "", next_retry_at: "" },
+      body: buildSubmittedAudioFilePatch(transcript.id, job.id, mapping),
     })
-    await writeSyncLog("OSS采集", job.id, mapping.store, "成功", `已提交 ${fileName}`)
-    log(`已提交 ${item.object_key} -> ASR ${remoteJobId}`)
+    await writeSyncLog("OSS采集", job.id, mapping.store, "成功", "OSS 音频已提交")
+    log("AUDIO_SUBMITTED=1")
   } catch (error) {
-    logError(`提交失败 ${item.object_key}`, error)
+    logError("音频提交失败", error)
     await markSubmitFailure(item, error)
   }
 }
@@ -554,9 +555,9 @@ async function retryDueSubmissions() {
     if (hasTranscript) {
       const updatedAt = new Date(String(item.updated || "").replace(" ", "T").replace("Z", "+00:00")).getTime()
       if (Number.isFinite(updatedAt) && now - updatedAt < STALE_SUBMITTING_MS) continue
-      log(`回收超时 submitting 记录：${item.object_key}`)
+      log("回收超时 submitting 记录：1 条")
     } else {
-      log(`回收未完成的 submitting 记录：${item.object_key}`)
+      log("回收未完成的 submitting 记录：1 条")
     }
     budget -= 1
     await submitAudioItem(item)
@@ -583,7 +584,7 @@ async function retryFailedAsrJobs() {
     try {
       transcript = await pbRequest(`/api/transcripts/${encodeURIComponent(job.transcript)}`)
     } catch (error) {
-      logError(`转写记录 ${job.transcript} 读取失败`, error)
+      logError("转写记录读取失败", error)
       continue
     }
     if (String(transcript?.source || "") !== "oss_auto") continue
@@ -593,7 +594,7 @@ async function retryFailedAsrJobs() {
         headers: { Authorization: `Bearer ${ASR_SERVICE_TOKEN}` },
       })
       if (remote.status < 200 || remote.status >= 300) {
-        throw new Error(`HTTP ${remote.status} ${String(remote.data?.detail || remote.data?.raw || "").slice(0, 200)}`)
+        throw new Error(`HTTP ${remote.status} ${String(remote.data?.detail || "").slice(0, 200)}`)
       }
       await pbRequest(`/api/asr_jobs/${encodeURIComponent(job.id)}`, {
         method: "PATCH",
@@ -604,9 +605,9 @@ async function retryFailedAsrJobs() {
         body: { asr_status: "queued" },
       })
       await writeSyncLog("ASR重试", job.id, job.store || "", "成功", "OSS 自动重试已进入队列")
-      log(`ASR 失败任务自动重试 ${job.remote_job_id}（第 ${Number(job.attempts || 0)} 次）`)
+      log("ASR 失败任务自动重试：1 条")
     } catch (error) {
-      logError(`ASR 自动重试失败 ${job.remote_job_id}`, error)
+      logError("ASR 自动重试失败", error)
     }
   }
 }
@@ -625,9 +626,10 @@ async function runCycle() {
       if (object.size <= 0) return false
       return AUDIO_EXTENSIONS.has(extensionOf(object.key))
     })
+    log(`AUDIO_DEVICE_OVERLAP_DISTINCT=${countAudioDeviceOverlap(objects, parseBadgeFilename, bindingDeviceIdBySn.keys())}`)
 
     const known = await loadKnownObjectKeys()
-    const fresh = objects.filter((object) => !known.has(object.key))
+    const fresh = selectFreshObjects(objects, known)
     log(`扫描完成：OSS 命中 ${objects.length} 个音频，新发现 ${fresh.length} 个`)
 
     let budget = MAX_SUBMITS_PER_CYCLE
@@ -651,7 +653,7 @@ async function runCycle() {
 }
 
 assertConfigured()
-log(`启动：bucket=${OSS_BUCKET} endpoint=${OSS_ENDPOINT} prefix=${OSS_PREFIX || "(根)"} interval=${SCAN_INTERVAL_MS}ms`)
+log(`启动：OSS scanner interval=${SCAN_INTERVAL_MS}ms`)
 void runCycle()
 // 注意：这里不能 unref()。扫描器没有常驻 HTTP 服务，unref 后事件循环清空进程会退出，
 // 导致 PM2 反复拉起（表现为每几秒重启一次）。

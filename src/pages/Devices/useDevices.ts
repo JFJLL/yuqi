@@ -11,6 +11,7 @@ import {
   type Store,
 } from "@/lib/admin"
 import type { BindFormValues } from "@/components/devices/BindDialog"
+import { selectCurrentBindings } from "../../../shared/device-binding-semantics.js"
 
 export type DeviceTab = "ledger" | "ops" | "history"
 
@@ -78,14 +79,13 @@ export function useDevices() {
   const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees])
   const storeById = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores])
 
-  // 取每台设备的最新有效绑定
+  // 当前绑定按统一的 effective_date 业务语义选择；不能先过滤 ACTIVE 再按 created 回退。
   const activeBindingByDevice = useMemo(() => {
     const map = new Map<string, DeviceBinding>()
-    for (const binding of bindings) {
-      if (binding.status !== "已绑定" && binding.status !== "ACTIVE" && binding.status !== "active") continue
-      const prev = map.get(binding.device)
-      if (!prev || (binding.created || "") > (prev.created || "")) {
-        map.set(binding.device, binding)
+    const selections = selectCurrentBindings(bindings)
+    for (const [deviceId, selection] of selections.byDevice) {
+      if (selection.isActive && selection.binding) {
+        map.set(deviceId, selection.binding)
       }
     }
     return map

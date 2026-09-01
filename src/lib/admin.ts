@@ -182,7 +182,9 @@ export interface DeviceBinding {
   store: string
   effective_date: string
   status: string
+  approved_at?: string
   created?: string
+  updated?: string
 }
 
 export interface DeviceLog {

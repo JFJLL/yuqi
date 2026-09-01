@@ -11,6 +11,7 @@ import {
   type Store,
 } from "@/lib/admin"
 import { pb } from "@/lib/pb"
+import { selectCurrentBindings } from "../../../shared/device-binding-semantics.js"
 
 export interface WechatAccountRecord {
   id: string
@@ -84,9 +85,10 @@ export function useEmployees() {
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s.name])), [stores])
   const activeBindingMap = useMemo(() => {
     const map = new Map<string, string>()
-    for (const b of bindings) {
-      if (b.status === "ACTIVE" || b.status === "active" || b.status === "生效中") {
-        map.set(b.employee, b.device)
+    const selections = selectCurrentBindings(bindings)
+    for (const selection of selections.byDevice.values()) {
+      if (selection.isActive && selection.binding?.employee && selection.binding.device) {
+        map.set(selection.binding.employee, selection.binding.device)
       }
     }
     return map
