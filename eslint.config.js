@@ -12,6 +12,7 @@ export default defineConfig([
     '**/vibex-local/**',
     '**/pocketbase/pb_data/**',
     '**/pocketbase/pb_hooks/**',
+    '**/.migration/**',
     '**/scripts/**',
     '**/server/**',
     '**/deploy/**',
