@@ -129,7 +129,7 @@ routerAdd("GET", "/api/yuqi/employee/dashboard", (e) => {
       ? "store = {:s} && tenant = {:t} && review_status = 'APPROVED' && employee_visibility = 'VISIBLE'"
       : "employee = {:e} && tenant = {:t} && review_status = 'APPROVED' && employee_visibility = 'VISIBLE'"
     const issuesParams = isMgr ? { s: storeId, t: ctx.tenantId } : { e: empId, t: ctx.tenantId }
-    const issues = $app.findRecordsByFilter("issues", issuesFilter, "-occurred_at", 100, 0, issuesParams)
+    const issues = $app.findRecordsByFilter("issues", issuesFilter, "-created", 100, 0, issuesParams)
 
     const pending = issues.filter((i) => i.get("state") === "待整改")
     const highRisk = issues.filter((i) => (i.get("risk") === "高" || i.get("risk") === "HIGH") && i.get("state") !== "已完成")
@@ -199,12 +199,12 @@ routerAdd("GET", "/api/yuqi/employee/dashboard", (e) => {
       latestLearningTask: latestTask,
       feedbacks: issues.slice(0, 10).map((i) => ({
         id: i.id,
-        issueType: i.get("issue_type"),
-        risk: i.get("risk"),
+        issueType: i.get("issue_type") || i.get("title") || "",
+        risk: i.get("risk") || i.get("risk_level") || "低",
         state: i.get("state"),
-        quote: i.get("quote"),
+        quote: i.get("quote") || i.get("evidence_text") || "",
         advice: i.get("advice"),
-        occurredAt: i.get("occurred_at"),
+        occurredAt: i.get("occurred_at") || i.get("created"),
       })),
     })
   } catch (err) {
@@ -225,16 +225,16 @@ routerAdd("GET", "/api/yuqi/employee/feedbacks", (e) => {
       ? "store = {:s} && tenant = {:t} && review_status = 'APPROVED' && employee_visibility = 'VISIBLE'"
       : "employee = {:e} && tenant = {:t} && review_status = 'APPROVED' && employee_visibility = 'VISIBLE'"
     const params = isMgr ? { s: storeId, t: ctx.tenantId } : { e: empId, t: ctx.tenantId }
-    const issues = $app.findRecordsByFilter("issues", filter, "-occurred_at", 200, 0, params)
+    const issues = $app.findRecordsByFilter("issues", filter, "-created", 200, 0, params)
 
     return e.json(200, issues.map((i) => ({
       id: i.id,
-      issueType: i.get("issue_type"),
-      risk: i.get("risk"),
+      issueType: i.get("issue_type") || i.get("title") || "",
+      risk: i.get("risk") || i.get("risk_level") || "低",
       state: i.get("state"),
-      quote: i.get("quote"),
+      quote: i.get("quote") || i.get("evidence_text") || "",
       advice: i.get("advice"),
-      occurredAt: i.get("occurred_at"),
+      occurredAt: i.get("occurred_at") || i.get("created"),
     })))
   } catch (err) {
     const status = Number(err && err.status) || 500
