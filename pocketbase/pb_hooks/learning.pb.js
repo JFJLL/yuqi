@@ -19,11 +19,16 @@ routerAdd("GET", "/api/yuqi/employee/learning-tasks", (e) => {
       ? "employee = {:emp} && (tenant = {:tenant} || tenant = '')"
       : "employee = {:emp}"
     const params = ctx.tenantId ? { emp: empId, tenant: ctx.tenantId } : { emp: empId }
-    const tasks = $app.findRecordsByFilter("learning_tasks", filter, "-created", 100, 0, params)
+    const allTasks = $app.findRecordsByFilter("learning_tasks", filter, "-created", 100, 0, params)
 
-    const result = tasks.map((task) => {
+    const result = []
+    for (let i = 0; i < allTasks.length; i++) {
+      const task = allTasks[i]
+      const courseId = String(task.get("course") || "")
+      if (!courseId) continue
       let course = null
-      try { course = $app.findRecordById("learning_courses", String(task.get("course") || "")) } catch (_) {}
+      try { course = $app.findRecordById("learning_courses", courseId) } catch (_) {}
+      if (!course) continue
 
       let progress = null
       try {
@@ -47,16 +52,16 @@ routerAdd("GET", "/api/yuqi/employee/learning-tasks", (e) => {
         if (attempts.length > 0) latestAttempt = attempts[0]
       } catch (_) {}
 
-      return {
+      result.push({
         id: task.id,
         courseId: task.get("course"),
-        courseTitle: course ? course.get("title") : "合规培训课程",
-        category: course ? course.get("category") : "合规规范",
-        summary: course ? course.get("summary") : "",
-        coverUrl: course ? course.get("cover_url") : "",
-        videoUrl: course ? (course.get("video_url") || "") : "",
-        videoDuration: course ? Number(course.get("video_duration") || 0) : 0,
-        allowSeek: course ? Boolean(course.get("allow_seek")) : false,
+        courseTitle: course.get("title") || "合规培训课程",
+        category: course.get("category") || "合规规范",
+        summary: course.get("summary") || "",
+        coverUrl: course.get("cover_url") || "",
+        videoUrl: course.get("video_url") || "",
+        videoDuration: Number(course.get("video_duration") || 0),
+        allowSeek: Boolean(course.get("allow_seek")),
         targetScope: task.get("target_scope") || "EMPLOYEE",
         dueDate: task.get("due_date"),
         status: task.get("status") || "PENDING",
@@ -65,8 +70,8 @@ routerAdd("GET", "/api/yuqi/employee/learning-tasks", (e) => {
         lastExamScore: latestAttempt ? Number(latestAttempt.get("score") || 0) : null,
         lastExamPassed: latestAttempt ? Boolean(latestAttempt.get("passed")) : null,
         created: task.get("created"),
-      }
-    })
+      })
+    }
 
     return e.json(200, { items: result })
   } catch (err) {

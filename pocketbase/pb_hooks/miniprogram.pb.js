@@ -142,19 +142,30 @@ routerAdd("GET", "/api/yuqi/employee/dashboard", (e) => {
         ? "employee = {:emp} && (tenant = {:tenant} || tenant = '') && status != 'COMPLETED'"
         : "employee = {:emp} && status != 'COMPLETED'"
       const taskParams = ctx.tenantId ? { emp: empId, tenant: ctx.tenantId } : { emp: empId }
-      const pendingTasks = $app.findRecordsByFilter("learning_tasks", taskFilter, "-created", 10, 0, taskParams)
-      unreadCount = pendingTasks.length
-      if (pendingTasks.length > 0) {
-        const topTask = pendingTasks[0]
-        let course = null
-        try { course = $app.findRecordById("learning_courses", String(topTask.get("course") || "")) } catch (_) {}
+      const allPending = $app.findRecordsByFilter("learning_tasks", taskFilter, "-created", 20, 0, taskParams)
+
+      // 严格过滤出拥有有效课程的待办任务
+      const validPending = []
+      for (let i = 0; i < allPending.length; i++) {
+        const t = allPending[i]
+        const cId = String(t.get("course") || "")
+        if (!cId) continue
+        try {
+          const c = $app.findRecordById("learning_courses", cId)
+          if (c) validPending.push({ task: t, course: c })
+        } catch (_) {}
+      }
+
+      unreadCount = validPending.length
+      if (validPending.length > 0) {
+        const top = validPending[0]
         latestTask = {
-          id: topTask.id,
-          title: course ? course.get("title") : "视频学习培训",
-          category: course ? course.get("category") : "合规培训",
-          videoUrl: course ? (course.get("video_url") || "") : "",
-          dueAt: topTask.get("due_at") ? topTask.get("due_at").slice(0, 10) : "",
-          status: topTask.get("status") || "PENDING",
+          id: top.task.id,
+          title: top.course.get("title") || "视频学习培训",
+          category: top.course.get("category") || "合规培训",
+          videoUrl: top.course.get("video_url") || "",
+          dueAt: top.task.get("due_at") ? top.task.get("due_at").slice(0, 10) : "",
+          status: top.task.get("status") || "PENDING",
         }
       }
     } catch (_) {}
