@@ -2,7 +2,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Trash2, Upload, Video, Loader2, CheckCircle2, Clock } from "lucide-react"
+import { Plus, Trash2, Upload, Video, Loader2, CheckCircle2 } from "lucide-react"
 import { uploadCourseVideo } from "@/lib/admin"
 import { CustomSelect } from "@/components/ui/CustomSelect"
 import { toast } from "sonner"
@@ -223,28 +223,14 @@ export function CourseDialog({ open, course, saving, onCancel, onSave }: CourseD
                   <span className="text-[11px] text-[#65738a]">视频将保存在当前部署设备存储目录，也可直接粘贴链接</span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 mt-0.5">
-                  <div className="col-span-2 flex flex-col gap-1">
-                    <span className="text-[11px] text-[#65738a]">视频访问地址 (URL)</span>
-                    <Input
-                      value={values.video_url || ""}
-                      onChange={(e) => setValues({ ...values, video_url: e.target.value })}
-                      placeholder="视频相对路径或公网链接"
-                      className="h-9 border-[#cfd9e4] bg-white text-xs"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] text-[#65738a] flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> 视频时长 (秒)
-                    </span>
-                    <Input
-                      type="number"
-                      value={values.video_duration || 300}
-                      onChange={(e) => setValues({ ...values, video_duration: Number(e.target.value) || 0 })}
-                      placeholder="单位: 秒"
-                      className="h-9 border-[#cfd9e4] bg-white text-xs"
-                    />
-                  </div>
+                <div className="flex flex-col gap-1 mt-0.5">
+                  <span className="text-[11px] text-[#65738a]">视频访问地址 (URL)</span>
+                  <Input
+                    value={values.video_url || ""}
+                    onChange={(e) => setValues({ ...values, video_url: e.target.value })}
+                    placeholder="视频相对路径或公网链接"
+                    className="h-9 border-[#cfd9e4] bg-white text-xs"
+                  />
                 </div>
 
                 <div className="flex items-center gap-2 pt-1">
