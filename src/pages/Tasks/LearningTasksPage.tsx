@@ -1,12 +1,16 @@
 ﻿import { useState, useEffect, useMemo, useCallback } from "react"
-import { Video, Send, Plus, Download } from "lucide-react"
+import { Video, Send, Plus, Download, Play, Pencil, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import {
   fetchList,
   exportCsv,
   publishLearningTasks,
+  updateCourse,
+  deleteCourse,
+  createRecord,
   type Employee,
   type Store,
   type Region,
@@ -73,6 +77,9 @@ export function LearningTasksRoute() {
   // 弹窗
   const [publishDialogOpen, setPublishDialogOpen] = useState(false)
   const [courseDialogOpen, setCourseDialogOpen] = useState(false)
+  const [editingCourse, setEditingCourse] = useState<CourseRecord | null>(null)
+  const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null)
+  const [previewVideoTitle, setPreviewVideoTitle] = useState<string>("")
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -106,7 +113,6 @@ export function LearningTasksRoute() {
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s.name])), [stores])
   const courseMap = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
 
-  // 进度 Map (优先取 learning_progress, 兜底 task 本身)
   const progressByTaskId = useMemo(() => {
     const map = new Map<string, number>()
     progressList.forEach((p) => {
@@ -115,7 +121,6 @@ export function LearningTasksRoute() {
     return map
   }, [progressList])
 
-  // 组装呈现表格
   const taskRows = useMemo(() => {
     return tasks.map((t) => {
       const emp = empMap.get(t.employee)
@@ -146,7 +151,6 @@ export function LearningTasksRoute() {
     })
   }, [tasks, empMap, storeMap, courseMap, progressByTaskId])
 
-  // 筛选后的列表
   const filteredRows = useMemo(() => {
     return taskRows.filter((r) => {
       if (keyword) {
@@ -163,7 +167,6 @@ export function LearningTasksRoute() {
     })
   }, [taskRows, keyword, statusFilter, storeFilter])
 
-  // 统计指标
   const metrics = useMemo(() => {
     const total = tasks.length
     const completed = taskRows.filter((r) => r.status === "已完成").length
@@ -173,7 +176,6 @@ export function LearningTasksRoute() {
     return { total, completed, inProgress, pending, rate }
   }, [tasks, taskRows])
 
-  // 发布视频学习任务
   async function handlePublishTask(payload: PublishLearningTaskPayload) {
     setSaving(true)
     try {
@@ -188,7 +190,26 @@ export function LearningTasksRoute() {
     }
   }
 
-  // 导出 CSV
+  async function handleDeleteCourse(c: CourseRecord) {
+    if (!confirm(`确定要删除课程《${c.title}》吗？关联的任务记录将受到影响。`)) return
+    try {
+      await deleteCourse(c.id)
+      toast.success("课程已成功删除")
+      await loadData()
+    } catch (err: any) {
+      toast.error(err.message || "删除课程失败")
+    }
+  }
+
+  function handlePlayVideo(title: string, url?: string) {
+    if (!url) {
+      toast.error("该课程尚未关联视频资源")
+      return
+    }
+    setPreviewVideoTitle(title)
+    setPreviewVideoUrl(url)
+  }
+
   function handleExportTasks() {
     if (filteredRows.length === 0) {
       toast.error("当前列表没有可导出的任务数据")
@@ -261,7 +282,10 @@ export function LearningTasksRoute() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCourseDialogOpen(true)}
+              onClick={() => {
+                setEditingCourse(null)
+                setCourseDialogOpen(true)
+              }}
               className="h-9 gap-1.5 bg-white border-[#dbe3ec] text-[#172033]"
             >
               <Plus className="w-4 h-4" />
@@ -305,7 +329,6 @@ export function LearningTasksRoute() {
         {/* Tab 1: 任务追踪 */}
         {activeTab === "tasks" && (
           <div>
-            {/* 筛选条 */}
             <div className="p-4 border-b border-[#edf1f5] bg-[#fafcfe]">
               <div className="grid grid-cols-[repeat(3,minmax(140px,1fr))_auto] gap-3 items-end max-md:grid-cols-1">
                 <div className="flex flex-col gap-1">
@@ -357,7 +380,6 @@ export function LearningTasksRoute() {
               </div>
             </div>
 
-            {/* 数据表格 */}
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left text-xs">
                 <thead>
@@ -398,6 +420,15 @@ export function LearningTasksRoute() {
                           <div className="flex items-center gap-1.5">
                             <Video className="w-3.5 h-3.5 text-[#1672a8] shrink-0" />
                             <span className="truncate max-w-[220px]" title={r.courseTitle}>{r.courseTitle}</span>
+                            {r.videoUrl && (
+                              <button
+                                type="button"
+                                onClick={() => handlePlayVideo(r.courseTitle, r.videoUrl)}
+                                className="text-[11px] text-[#1672a8] hover:underline shrink-0 ml-1 flex items-center gap-0.5"
+                              >
+                                <Play className="w-3 h-3 fill-current" /> 预览
+                              </button>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-4 text-[#65738a]">
@@ -439,7 +470,7 @@ export function LearningTasksRoute() {
           </div>
         )}
 
-        {/* Tab 2: 课程库 */}
+        {/* Tab 2: 课程库 (支持增、删、改、查与在线看视频) */}
         {activeTab === "courses" && (
           <div className="p-4 grid grid-cols-3 gap-3.5 max-lg:grid-cols-2 max-sm:grid-cols-1">
             {courses.length === 0 ? (
@@ -462,7 +493,9 @@ export function LearningTasksRoute() {
                         <span className="text-[11px] text-[#65738a] mt-0.5 block">{c.category || "合规培训"}</span>
                       </div>
                     </div>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#e6f4ef] text-[#147054]">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                      c.video_url ? "bg-[#e6f4ef] text-[#147054]" : "bg-[#f1f5f9] text-[#475569]"
+                    }`}>
                       {c.video_url ? "含视频" : "图文"}
                     </span>
                   </div>
@@ -471,19 +504,54 @@ export function LearningTasksRoute() {
                     {c.summary || "包含规范话术指引、实操案例视频与学习考核闭环。"}
                   </p>
 
-                  <div className="pt-2 border-t border-[#edf1f5] flex items-center justify-between">
+                  <div className="pt-2 border-t border-[#edf1f5] flex items-center justify-between flex-wrap gap-2">
                     <span className="text-[10px] text-[#65738a]">
                       时长：{Math.round((c.video_duration || 300) / 60)} 分钟
                     </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setPublishDialogOpen(true)}
-                      className="h-7 text-xs border-[#dbe3ec] text-[#1672a8] hover:bg-[#e8f1fa] gap-1"
-                    >
-                      <Send className="w-3 h-3" />
-                      派发
-                    </Button>
+
+                    <div className="flex items-center gap-1.5">
+                      {c.video_url && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handlePlayVideo(c.title, c.video_url)}
+                          className="h-7 text-xs text-[#126b59] hover:bg-[#e6f4ef] px-2 gap-1"
+                        >
+                          <Play className="w-3 h-3 fill-current" />
+                          预览
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingCourse(c)
+                          setCourseDialogOpen(true)
+                        }}
+                        className="h-7 text-xs text-[#65738a] hover:bg-[#f1f5f9] px-2 gap-1"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        编辑
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDeleteCourse(c)}
+                        className="h-7 text-xs text-[#b43c3c] hover:bg-[#fae9e9] px-2 gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        删除
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPublishDialogOpen(true)}
+                        className="h-7 text-xs border-[#dbe3ec] text-[#1672a8] hover:bg-[#e8f1fa] px-2 gap-1"
+                      >
+                        <Send className="w-3 h-3" />
+                        派发
+                      </Button>
+                    </div>
                   </div>
                 </article>
               ))
@@ -504,37 +572,83 @@ export function LearningTasksRoute() {
         onPublish={handlePublishTask}
       />
 
-      {/* 创建课程弹窗 */}
+      {/* 创建 / 编辑课程弹窗 (含上传视频功能) */}
       <CourseDialog
         open={courseDialogOpen}
+        course={editingCourse}
         saving={saving}
-        onCancel={() => setCourseDialogOpen(false)}
+        onCancel={() => {
+          setCourseDialogOpen(false)
+          setEditingCourse(null)
+        }}
         onSave={async (values: CourseFormValues) => {
           setSaving(true)
           try {
-            await fetchList("learning_courses") // 触发预热
-            // 直接由 admin create
-            const { createRecord } = await import("@/lib/admin")
-            await createRecord("learning_courses", {
-              title: values.title,
-              category: values.category,
-              summary: values.summary,
-              video_url: values.video_url || "",
-              video_duration: values.video_duration || 300,
-              allow_seek: values.allow_seek ?? true,
-              target_issue_types: values.target_issue_types,
-              status: "PUBLISHED",
-            })
-            toast.success("课程已发布")
+            if (editingCourse) {
+              await updateCourse(editingCourse.id, {
+                title: values.title,
+                category: values.category,
+                summary: values.summary,
+                video_url: values.video_url || "",
+                video_duration: values.video_duration || 300,
+                allow_seek: values.allow_seek ?? true,
+                target_issue_types: values.target_issue_types,
+              })
+              toast.success("课程已成功更新")
+            } else {
+              await createRecord("learning_courses", {
+                title: values.title,
+                category: values.category,
+                summary: values.summary,
+                video_url: values.video_url || "",
+                video_duration: values.video_duration || 300,
+                allow_seek: values.allow_seek ?? true,
+                target_issue_types: values.target_issue_types,
+                status: "PUBLISHED",
+              })
+              toast.success("新课程已成功创建")
+            }
             setCourseDialogOpen(false)
+            setEditingCourse(null)
             await loadData()
-          } catch {
-            toast.error("发布课程失败")
+          } catch (err: any) {
+            toast.error(err.message || "操作课程失败")
           } finally {
             setSaving(false)
           }
         }}
       />
+
+      {/* Web 端视频在线播放预览弹窗 */}
+      <Dialog open={!!previewVideoUrl} onOpenChange={(v) => !v && setPreviewVideoUrl(null)}>
+        <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden bg-black text-white">
+          <DialogHeader className="p-4 bg-[#141d28] border-b border-[#2d3748] flex items-center justify-between flex-row">
+            <DialogTitle className="text-sm font-semibold text-white flex items-center gap-2">
+              <Video className="w-4 h-4 text-[#1672a8]" />
+              {previewVideoTitle || "培训视频在线预览"}
+            </DialogTitle>
+            <button
+              type="button"
+              onClick={() => setPreviewVideoUrl(null)}
+              className="text-gray-400 hover:text-white p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </DialogHeader>
+          <div className="w-full bg-black flex items-center justify-center p-2 min-h-[360px]">
+            {previewVideoUrl && (
+              <video
+                src={previewVideoUrl}
+                controls
+                autoPlay
+                className="w-full max-h-[500px] rounded bg-black"
+              >
+                您的浏览器不支持视频播放。
+              </video>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

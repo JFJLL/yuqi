@@ -123,6 +123,35 @@ export function publishLearningTasks(payload: PublishLearningTaskPayload): Promi
   return pb.send("/api/yuqi/admin/learning-tasks/publish", { method: "POST", body: payload })
 }
 
+
+// 视频文件上传接口
+export async function uploadCourseVideo(file: File): Promise<{ ok: boolean; videoUrl: string; fileName: string; fileSize: number }> {
+  const form = new FormData()
+  form.append("file", file)
+  const res = await fetch("/__pb/api/yuqi/admin/upload-video", {
+    method: "POST",
+    headers: {
+      Authorization: pb.authStore.token || "",
+    },
+    body: form,
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.message || "视频上传失败")
+  }
+  return res.json()
+}
+
+export function updateCourse(id: string, body: Record<string, unknown>): Promise<{ ok: boolean }> {
+  invalidateCache("learning_courses")
+  return pb.send(`/__pb/api/yuqi/admin/learning-courses/${id}`, { method: "PATCH", body })
+}
+
+export function deleteCourse(id: string): Promise<{ ok: boolean }> {
+  invalidateCache("learning_courses")
+  return pb.send(`/__pb/api/yuqi/admin/learning-courses/${id}`, { method: "DELETE" })
+}
+
 // ---- 通用业务表 CRUD ----
 
 export interface ListResponse<T> {

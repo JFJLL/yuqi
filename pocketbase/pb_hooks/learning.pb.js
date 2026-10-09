@@ -149,6 +149,104 @@ routerAdd("GET", "/api/yuqi/employee/learning-tasks/{id}", (e) => {
 })
 
 
+
+routerAdd("POST", "/api/yuqi/admin/upload-video", (e) => {
+  try {
+    const g = require(`${__hooks}/_lib/guards.js`)
+    const ctx = g.requireAuth(e)
+    g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "REGION_MANAGER", "STORE_MANAGER"])
+
+    const files = e.request.findUploadedFiles("file")
+    if (!files || files.length === 0) {
+      throw new BadRequestError("请选择需要上传的视频文件 (字段名为 file)")
+    }
+    const file = files[0]
+    const ext = (file.name.split(".").pop() || "mp4").toLowerCase()
+    const cleanName = `video-${Date.now()}-${$security.randomString(8)}.${ext}`
+
+    // 将视频保存到 PocketBase pb_data/storage/videos 目录
+    const storageDir = `${$app.dataDir()}/storage/videos`
+    try { $os.mkdirAll(storageDir, 0755) } catch (_) {}
+    const destPath = `${storageDir}/${cleanName}`
+    $filesystem.copy(file, destPath)
+
+    // 生成外部可直接访问的相对/绝对路径
+    const videoUrl = `/__pb/api/yuqi/media/video/${cleanName}`
+
+    return e.json(200, {
+      ok: true,
+      videoUrl,
+      fileName: file.name,
+      fileSize: file.size,
+      message: "视频上传成功"
+    })
+  } catch (err) {
+    const status = Number(err && err.status) || 500
+    return e.json(status >= 400 && status <= 599 ? status : 500, { error: "upload_failed", message: String((err && err.message) || err) })
+  }
+})
+
+routerAdd("GET", "/api/yuqi/media/video/{filename}", (e) => {
+  try {
+    const filename = e.request.pathValue("filename")
+    if (!/^[a-zA-Z0-9_.-]+$/.test(filename)) {
+      return e.json(400, { error: "invalid_filename" })
+    }
+    const filePath = `${$app.dataDir()}/storage/videos/${filename}`
+    return e.file(filePath)
+  } catch (err) {
+    return e.json(404, { error: "not_found", message: "视频文件不存在" })
+  }
+})
+
+routerAdd("PATCH", "/api/yuqi/admin/learning-courses/{id}", (e) => {
+  try {
+    const g = require(`${__hooks}/_lib/guards.js`)
+    const ctx = g.requireAuth(e)
+    g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "REGION_MANAGER", "STORE_MANAGER"])
+
+    const id = e.request.pathValue("id")
+    const course = $app.findRecordById("learning_courses", id)
+    if (!course) throw new NotFoundError("课程不存在")
+
+    const body = e.requestInfo().body || {}
+    if (body.title !== undefined) course.set("title", String(body.title).trim())
+    if (body.category !== undefined) course.set("category", String(body.category).trim())
+    if (body.summary !== undefined) course.set("summary", String(body.summary).trim())
+    if (body.video_url !== undefined) course.set("video_url", String(body.video_url).trim())
+    if (body.video_duration !== undefined) course.set("video_duration", Number(body.video_duration) || 0)
+    if (body.allow_seek !== undefined) course.set("allow_seek", Boolean(body.allow_seek))
+    if (body.target_issue_types !== undefined) course.set("target_issue_types", body.target_issue_types)
+    if (body.status !== undefined) course.set("status", String(body.status))
+
+    $app.save(course)
+    g.writeAudit(e, ctx, "learning_course_update", "learning_courses", course.id, body)
+    return e.json(200, { ok: true, item: course.publicExport() })
+  } catch (err) {
+    const status = Number(err && err.status) || 500
+    return e.json(status >= 400 && status <= 599 ? status : 500, { error: "update_failed", message: String((err && err.message) || err) })
+  }
+})
+
+routerAdd("DELETE", "/api/yuqi/admin/learning-courses/{id}", (e) => {
+  try {
+    const g = require(`${__hooks}/_lib/guards.js`)
+    const ctx = g.requireAuth(e)
+    g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN"])
+
+    const id = e.request.pathValue("id")
+    const course = $app.findRecordById("learning_courses", id)
+    if (!course) throw new NotFoundError("课程不存在")
+
+    $app.delete(course)
+    g.writeAudit(e, ctx, "learning_course_delete", "learning_courses", id, {})
+    return e.json(200, { ok: true, message: "课程已删除" })
+  } catch (err) {
+    const status = Number(err && err.status) || 500
+    return e.json(status >= 400 && status <= 599 ? status : 500, { error: "delete_failed", message: String((err && err.message) || err) })
+  }
+})
+
 routerAdd("POST", "/api/yuqi/admin/learning-tasks/publish", (e) => {
   try {
     const g = require(`${__hooks}/_lib/guards.js`)
