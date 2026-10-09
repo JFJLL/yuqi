@@ -17,6 +17,7 @@ import {
   type PublishLearningTaskPayload,
 } from "@/lib/admin"
 import { CourseDialog, type CourseFormValues } from "@/components/activity/CourseDialog"
+import { CustomSelect } from "@/components/ui/CustomSelect"
 import { PublishVideoTaskDialog } from "@/components/activity/PublishVideoTaskDialog"
 
 export interface CourseRecord {
@@ -342,29 +343,26 @@ export function LearningTasksRoute() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-medium text-[#65738a]">门店</label>
-                  <select
+                  <CustomSelect
                     value={storeFilter}
-                    onChange={(e) => setStoreFilter(e.target.value)}
-                    className="h-9 border border-[#cfd9e4] rounded px-2.5 bg-white text-xs"
-                  >
-                    <option value="">全部门店</option>
-                    {stores.map((s) => (
-                      <option key={s.id} value={s.name}>{s.name}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setStoreFilter(val)}
+                    options={[{ value: "", label: "全部门店" }, ...stores.map(s => ({ value: s.name, label: s.name }))]}
+                    placeholder="全部门店"
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-medium text-[#65738a]">状态</label>
-                  <select
+                  <CustomSelect
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="h-9 border border-[#cfd9e4] rounded px-2.5 bg-white text-xs"
-                  >
-                    <option value="">全部状态</option>
-                    <option value="待学习">待学习</option>
-                    <option value="学习中">学习中</option>
-                    <option value="已完成">已完成</option>
-                  </select>
+                    onChange={(val) => setStatusFilter(val)}
+                    options={[
+                      { value: "", label: "全部状态" },
+                      { value: "待学习", label: "待学习" },
+                      { value: "学习中", label: "学习中" },
+                      { value: "已完成", label: "已完成" },
+                    ]}
+                    placeholder="全部状态"
+                  />
                 </div>
                 <div>
                   <Button

@@ -2,8 +2,9 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Trash2, Upload, Video, Loader2, CheckCircle2 } from "lucide-react"
+import { Plus, Trash2, Upload, Video, Loader2, CheckCircle2, Clock } from "lucide-react"
 import { uploadCourseVideo } from "@/lib/admin"
+import { CustomSelect } from "@/components/ui/CustomSelect"
 import { toast } from "sonner"
 
 export interface CourseUnitForm {
@@ -41,6 +42,13 @@ interface CourseDialogProps {
   onCancel: () => void
   onSave: (values: CourseFormValues) => void
 }
+
+const CATEGORY_OPTIONS = [
+  { value: "合规规范", label: "合规规范" },
+  { value: "药学知识", label: "药学知识" },
+  { value: "荐药话术", label: "荐药话术" },
+  { value: "服务标准", label: "服务标准" },
+]
 
 export function CourseDialog({ open, course, saving, onCancel, onSave }: CourseDialogProps) {
   const [values, setValues] = useState<CourseFormValues>({
@@ -97,7 +105,7 @@ export function CourseDialog({ open, course, saving, onCancel, onSave }: CourseD
         video_url: res.videoUrl,
         title: prev.title || file.name.replace(/\.[^/.]+$/, ""),
       }))
-      toast.success("视频上传成功！已自动填入视频地址")
+      toast.success("视频上传成功！已存储在当前服务设备并生成在线访问地址")
     } catch (err: any) {
       toast.error(err.message || "视频上传失败")
     } finally {
@@ -128,7 +136,7 @@ export function CourseDialog({ open, course, saving, onCancel, onSave }: CourseD
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
-      <DialogContent className="sm:max-w-[620px] p-0 overflow-hidden bg-white max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-[640px] p-0 overflow-hidden bg-white max-h-[90vh] flex flex-col">
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <DialogHeader className="p-4 border-b border-[#dbe3ec]">
             <DialogTitle className="text-base font-bold text-[#172033]">
@@ -149,18 +157,14 @@ export function CourseDialog({ open, course, saving, onCancel, onSave }: CourseD
                 />
               </div>
 
+              {/* 美化下拉框：课程分类 */}
               <div className="flex flex-col gap-1.5">
                 <label className="font-medium text-[#65738a]">课程分类</label>
-                <select
+                <CustomSelect
                   value={values.category}
-                  onChange={(e) => setValues({ ...values, category: e.target.value })}
-                  className="h-9 border border-[#cfd9e4] rounded px-2.5 bg-white text-xs"
-                >
-                  <option value="合规规范">合规规范</option>
-                  <option value="药学知识">药学知识</option>
-                  <option value="荐药话术">荐药话术</option>
-                  <option value="服务标准">服务标准</option>
-                </select>
+                  onChange={(val) => setValues({ ...values, category: val })}
+                  options={CATEGORY_OPTIONS}
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">
@@ -183,8 +187,8 @@ export function CourseDialog({ open, course, saving, onCancel, onSave }: CourseD
                 />
               </div>
 
-              {/* 核心：视频上传与在线管理 */}
-              <div className="flex flex-col gap-2 col-span-2 p-3.5 bg-[#f8fafc] border border-[#dbe3ec] rounded-[6px]">
+              {/* 核心：视频上传与在线管理卡片 */}
+              <div className="flex flex-col gap-2.5 col-span-2 p-3.5 bg-[#f8fafc] border border-[#dbe3ec] rounded-[6px]">
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-[#172033] flex items-center gap-1.5">
                     <Video className="w-4 h-4 text-[#1672a8]" />
@@ -192,7 +196,7 @@ export function CourseDialog({ open, course, saving, onCancel, onSave }: CourseD
                   </label>
                   {values.video_url && (
                     <span className="text-[11px] text-[#126b59] font-medium flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> 已绑定视频
+                      <CheckCircle2 className="w-3.5 h-3.5" /> 已绑定视频文件
                     </span>
                   )}
                 </div>
@@ -214,27 +218,31 @@ export function CourseDialog({ open, course, saving, onCancel, onSave }: CourseD
                     className="h-8 gap-1.5 bg-white border-[#1672a8] text-[#1672a8] hover:bg-[#e8f1fa]"
                   >
                     {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                    {uploading ? "正在上传视频…" : "选择本地视频上传"}
+                    {uploading ? "正在上传视频至服务器…" : "选择本地视频上传"}
                   </Button>
-                  <span className="text-[11px] text-[#65738a]">或直接在下方输入视频链接</span>
+                  <span className="text-[11px] text-[#65738a]">视频将保存在当前部署设备存储目录，也可直接粘贴链接</span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 mt-1">
-                  <div className="col-span-2">
+                <div className="grid grid-cols-3 gap-2 mt-0.5">
+                  <div className="col-span-2 flex flex-col gap-1">
+                    <span className="text-[11px] text-[#65738a]">视频访问地址 (URL)</span>
                     <Input
                       value={values.video_url || ""}
                       onChange={(e) => setValues({ ...values, video_url: e.target.value })}
-                      placeholder="视频链接，如 /__pb/... 或 https://.../video.mp4"
-                      className="h-8 border-[#cfd9e4] bg-white text-xs"
+                      placeholder="视频相对路径或公网链接"
+                      className="h-9 border-[#cfd9e4] bg-white text-xs"
                     />
                   </div>
-                  <div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[11px] text-[#65738a] flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> 视频时长 (秒)
+                    </span>
                     <Input
                       type="number"
                       value={values.video_duration || 300}
                       onChange={(e) => setValues({ ...values, video_duration: Number(e.target.value) || 0 })}
-                      placeholder="时长 (秒)"
-                      className="h-8 border-[#cfd9e4] bg-white text-xs"
+                      placeholder="单位: 秒"
+                      className="h-9 border-[#cfd9e4] bg-white text-xs"
                     />
                   </div>
                 </div>

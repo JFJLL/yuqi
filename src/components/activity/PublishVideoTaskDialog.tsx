@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Video, Users, Building2, MapPin, CheckCircle2 } from "lucide-react"
+import { CustomSelect } from "@/components/ui/CustomSelect"
 import type { Employee, Store, Region, PublishLearningTaskPayload } from "@/lib/admin"
 
 export interface PublishVideoTaskDialogProps {
@@ -46,7 +47,6 @@ export function PublishVideoTaskDialog({
     setNote("")
   }, [open, courses, regions])
 
-  // 依据选择范围，计算受众员工人数
   const targetAudienceEmployees = useMemo(() => {
     const activeEmps = employees.filter((e) => e.status !== "离职")
     if (targetScope === "EMPLOYEE") {
@@ -63,6 +63,22 @@ export function PublishVideoTaskDialog({
   }, [targetScope, regionId, selectedStoreIds, selectedEmployeeIds, employees, stores])
 
   const selectedCourse = useMemo(() => courses.find((c) => c.id === courseId), [courses, courseId])
+
+  const courseSelectOptions = useMemo(() => {
+    return courses.map((c) => ({
+      value: c.id,
+      label: c.title,
+      sublabel: `${c.category || "合规"} · ${c.video_url ? "含视频" : "图文"}`,
+    }))
+  }, [courses])
+
+  const regionSelectOptions = useMemo(() => {
+    return regions.map((r) => ({
+      value: r.id,
+      label: r.name,
+      sublabel: `负责人: ${r.manager_name || "未指定"}`,
+    }))
+  }, [regions])
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -107,7 +123,7 @@ export function PublishVideoTaskDialog({
           </DialogHeader>
 
           <div className="p-5 flex flex-col gap-4 text-xs overflow-y-auto">
-            {/* 选择课程 */}
+            {/* 选择课程：替换为美化下拉框 */}
             <div className="flex flex-col gap-1.5">
               <label className="font-semibold text-[#172033] flex items-center justify-between">
                 <span>选择培训视频课程 <span className="text-red-500">*</span></span>
@@ -117,18 +133,12 @@ export function PublishVideoTaskDialog({
                   </span>
                 )}
               </label>
-              <select
+              <CustomSelect
                 value={courseId}
-                onChange={(e) => setCourseId(e.target.value)}
-                className="h-9 border border-[#cfd9e4] rounded px-2.5 bg-white text-xs font-medium"
-                required
-              >
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title} ({c.category || "合规"} · {c.video_url ? "含视频" : "图文"})
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setCourseId(val)}
+                options={courseSelectOptions}
+                placeholder="请选择课程"
+              />
             </div>
 
             {/* 发布范围模式选择 */}
@@ -150,7 +160,7 @@ export function PublishVideoTaskDialog({
                       onClick={() => setTargetScope(item.key as any)}
                       className={`h-9 flex items-center justify-center gap-1.5 rounded border text-xs font-medium transition-all ${
                         active
-                          ? "border-[#1672a8] bg-[#e8f1fa] text-[#1672a8] font-bold"
+                          ? "border-[#1672a8] bg-[#e8f1fa] text-[#1672a8] font-bold shadow-2xs"
                           : "border-[#dbe3ec] bg-white text-[#65738a] hover:bg-[#f8fafc]"
                       }`}
                     >
@@ -162,19 +172,16 @@ export function PublishVideoTaskDialog({
               </div>
             </div>
 
-            {/* 范围选项：指定区域 */}
+            {/* 范围选项：指定区域 (替换为美化下拉框) */}
             {targetScope === "REGION" && (
               <div className="flex flex-col gap-1.5 p-3 bg-[#f8fafc] border border-[#dbe3ec] rounded-[6px]">
                 <label className="font-medium text-[#65738a]">选择目标区域</label>
-                <select
+                <CustomSelect
                   value={regionId}
-                  onChange={(e) => setRegionId(e.target.value)}
-                  className="h-9 border border-[#cfd9e4] rounded px-2.5 bg-white text-xs"
-                >
-                  {regions.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name} ({r.manager_name || "未指定负责人"})</option>
-                  ))}
-                </select>
+                  onChange={(val) => setRegionId(val)}
+                  options={regionSelectOptions}
+                  placeholder="请选择区域"
+                />
               </div>
             )}
 
