@@ -1,4 +1,5 @@
 import { pb } from "./pb"
+import { getSessionToken } from "./auth"
 
 // 药店连锁 AI 运营管理后台 — 后端接口封装
 // 自定义路由挂在 PocketBase 的 /api/admin、/api/<collection> 下, 统一走 pb.send
@@ -128,28 +129,29 @@ export function publishLearningTasks(payload: PublishLearningTaskPayload): Promi
 export async function uploadCourseVideo(file: File): Promise<{ ok: boolean; videoUrl: string; fileName: string; fileSize: number }> {
   const form = new FormData()
   form.append("file", file)
+  const token = getSessionToken() || pb.authStore.token || ""
   const res = await fetch("/__pb/api/yuqi/admin/upload-video", {
     method: "POST",
     headers: {
-      Authorization: pb.authStore.token || "",
+      Authorization: token ? (token.startsWith("Bearer ") ? token : `Bearer ${token}`) : "",
     },
     body: form,
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new Error(data.message || "视频上传失败")
+    throw new Error(data.message || (res.status === 401 ? "请先登录管理端账号" : "视频上传失败"))
   }
   return res.json()
 }
 
 export function updateCourse(id: string, body: Record<string, unknown>): Promise<{ ok: boolean }> {
   invalidateCache("learning_courses")
-  return pb.send(`/__pb/api/yuqi/admin/learning-courses/${id}`, { method: "PATCH", body })
+  return pb.send(`/api/yuqi/admin/learning-courses/${id}`, { method: "PATCH", body })
 }
 
 export function deleteCourse(id: string): Promise<{ ok: boolean }> {
   invalidateCache("learning_courses")
-  return pb.send(`/__pb/api/yuqi/admin/learning-courses/${id}`, { method: "DELETE" })
+  return pb.send(`/api/yuqi/admin/learning-courses/${id}`, { method: "DELETE" })
 }
 
 // ---- 通用业务表 CRUD ----
