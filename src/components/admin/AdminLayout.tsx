@@ -16,6 +16,7 @@ import {
   Settings2,
   ShieldCheck,
   Users,
+  Video,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
@@ -52,6 +53,7 @@ export const NAV_ITEMS: NavItem[] = [
   { path: "/inspection", label: "AI巡检结果", title: "AI巡检结果", subtitle: "查看风险问题、命中文本与整改状态。", icon: ScanSearch, group: "巡检业务", permission: "inspection.manage" },
   { path: "/appeals", label: "申诉复核", title: "申诉复核", subtitle: "复核员工对 AI 问题判断的异议与整改情况。", icon: MessageSquareWarning, group: "巡检业务", permission: "appeal.review" },
   { path: "/activity", label: "员工业务记录", title: "员工业务记录", subtitle: "查看员工维度的荐药和学习记录。", icon: History, group: "巡检业务", permission: "activity.view" },
+  { path: "/tasks", label: "学习任务", title: "学习任务", subtitle: "面向区域、门店或员工定向发布视频培训任务及考核追踪。", icon: Video, group: "巡检业务", permission: "activity.view" },
 
   // 管理配置
   { path: "/reports", label: "基础报表", title: "基础报表", subtitle: "导出组织、人员和巡检基础报表与合规经营指标。", icon: FileBarChart, group: "管理配置", permission: "report.export" },
@@ -84,7 +86,6 @@ export function useCurrentNav(): NavItem {
   const aliasMap: Record<string, string> = {
     "/org": "/organization",
     "/records": "/recordings",
-    "/tasks": "/activity",
     "/logs": "/audit",
     "/device-ops": "/devices",
     "/knowledge": "/settings",

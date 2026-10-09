@@ -107,6 +107,22 @@ export function closeIssue(id: string, reason?: string): Promise<{ ok: boolean }
   })
 }
 
+// ---- 视频学习任务发布 ----
+export interface PublishLearningTaskPayload {
+  courseId: string
+  targetScope: "ALL" | "REGION" | "STORE" | "EMPLOYEE"
+  regionId?: string
+  storeIds?: string[]
+  employeeIds?: string[]
+  dueAt?: string
+  note?: string
+}
+
+export function publishLearningTasks(payload: PublishLearningTaskPayload): Promise<{ ok: boolean; count: number; message: string }> {
+  invalidateCache("learning_tasks")
+  return pb.send("/api/yuqi/admin/learning-tasks/publish", { method: "POST", body: payload })
+}
+
 // ---- 通用业务表 CRUD ----
 
 export interface ListResponse<T> {

@@ -14,6 +14,9 @@ export interface CourseFormValues {
   title: string
   category: string
   summary: string
+  video_url?: string
+  video_duration?: number
+  allow_seek?: boolean
   target_issue_types: string[]
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED"
   units: CourseUnitForm[]
@@ -31,6 +34,9 @@ export function CourseDialog({ open, saving, onCancel, onSave }: CourseDialogPro
     title: "",
     category: "合规规范",
     summary: "",
+    video_url: "https://yuqi.red-magic.cn/demo/videos/compliance-training.mp4",
+    video_duration: 300,
+    allow_seek: true,
     target_issue_types: ["夸大疗效"],
     status: "PUBLISHED",
     units: [{ title: "第一章：合规原则与风险防范", content: "药品销售中应当遵守真实、客观原则，不得夸大功效。", duration_seconds: 300 }],

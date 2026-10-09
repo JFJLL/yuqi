@@ -54,6 +54,10 @@ routerAdd("GET", "/api/yuqi/employee/learning-tasks", (e) => {
         category: course ? course.get("category") : "合规规范",
         summary: course ? course.get("summary") : "",
         coverUrl: course ? course.get("cover_url") : "",
+        videoUrl: course ? (course.get("video_url") || "") : "",
+        videoDuration: course ? Number(course.get("video_duration") || 0) : 0,
+        allowSeek: course ? Boolean(course.get("allow_seek")) : false,
+        targetScope: task.get("target_scope") || "EMPLOYEE",
         dueDate: task.get("due_date"),
         status: task.get("status") || "PENDING",
         passRequired: Boolean(task.get("pass_required")),
@@ -118,6 +122,10 @@ routerAdd("GET", "/api/yuqi/employee/learning-tasks/{id}", (e) => {
         title: course.get("title"),
         category: course.get("category"),
         summary: course.get("summary"),
+        coverUrl: course.get("cover_url") || "",
+        videoUrl: course.get("video_url") || "",
+        videoDuration: Number(course.get("video_duration") || 0),
+        allowSeek: Boolean(course.get("allow_seek")),
         coverUrl: course.get("cover_url"),
       },
       units: units.map((u) => ({
@@ -140,6 +148,107 @@ routerAdd("GET", "/api/yuqi/employee/learning-tasks/{id}", (e) => {
   }
 })
 
+
+routerAdd("POST", "/api/yuqi/admin/learning-tasks/publish", (e) => {
+  try {
+    const g = require(`${__hooks}/_lib/guards.js`)
+    const AH = require(`${__hooks}/_lib/auth-helpers.js`)
+    const H = require(`${__hooks}/_lib/phase1-helpers.js`)
+    const ctx = g.requireAuth(e)
+    g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "REGION_MANAGER", "STORE_MANAGER"])
+
+    const body = e.requestInfo().body || {}
+    const courseId = String(body.courseId || "").trim()
+    const targetScope = String(body.targetScope || "ALL").toUpperCase()
+    const regionId = String(body.regionId || "").trim()
+    const storeIds = Array.isArray(body.storeIds) ? body.storeIds.map(String) : (body.storeId ? [String(body.storeId)] : [])
+    const employeeIds = Array.isArray(body.employeeIds) ? body.employeeIds.map(String) : (body.employeeId ? [String(body.employeeId)] : [])
+    const dueDate = body.dueDate || body.dueAt || ""
+    const note = String(body.note || body.sourceIssue || "").slice(0, 500)
+
+    if (!courseId) throw new BadRequestError("请选择需要派发的课程")
+    const course = $app.findRecordById("learning_courses", courseId)
+    if (!course) throw new NotFoundError("指定课程不存在")
+
+    let targetEmployees = []
+    if (targetScope === "EMPLOYEE") {
+      if (employeeIds.length === 0) throw new BadRequestError("请至少选择一名员工")
+      for (let i = 0; i < employeeIds.length; i++) {
+        try {
+          const emp = $app.findRecordById("employees", employeeIds[i])
+          if (emp && emp.get("status") !== "离职") targetEmployees.push(emp)
+        } catch (_) {}
+      }
+    } else if (targetScope === "STORE") {
+      if (storeIds.length === 0) throw new BadRequestError("请至少选择一个门店")
+      for (let i = 0; i < storeIds.length; i++) {
+        const emps = $app.findRecordsByFilter("employees", "store = {:s} && status != '离职'", "", 500, 0, { s: storeIds[i] })
+        targetEmployees.push(...emps)
+      }
+    } else if (targetScope === "REGION") {
+      if (!regionId) throw new BadRequestError("请选择指定区域")
+      const storesInReg = $app.findRecordsByFilter("stores", "region = {:r} && status != 'DISABLED'", "", 500, 0, { r: regionId })
+      for (let i = 0; i < storesInReg.length; i++) {
+        const emps = $app.findRecordsByFilter("employees", "store = {:s} && status != '离职'", "", 500, 0, { s: storesInReg[i].id })
+        targetEmployees.push(...emps)
+      }
+    } else {
+      const filter = ctx.tenantId ? "tenant = {:t} && status != '离职'" : "status != '离职'"
+      const params = ctx.tenantId ? { t: ctx.tenantId } : {}
+      targetEmployees = $app.findRecordsByFilter("employees", filter, "", 2000, 0, params)
+    }
+
+    const uniqueEmpMap = new Map()
+    targetEmployees.forEach((emp) => uniqueEmpMap.set(emp.id, emp))
+    const finalEmps = Array.from(uniqueEmpMap.values())
+
+    if (finalEmps.length === 0) {
+      throw new BadRequestError("目标范围内未找到在职员工")
+    }
+
+    const taskColl = $app.findCollectionByNameOrId("learning_tasks")
+    let createdCount = 0
+
+    for (let i = 0; i < finalEmps.length; i++) {
+      const emp = finalEmps[i]
+      const task = new Record(taskColl)
+      if (ctx.tenantId) task.set("tenant", ctx.tenantId)
+      task.set("course", courseId)
+      task.set("employee", emp.id)
+      task.set("store", emp.get("store") || "")
+      if (regionId) task.set("region", regionId)
+      task.set("target_scope", targetScope)
+      task.set("source_issue", note)
+      task.set("note", note)
+      if (dueDate) task.set("due_at", dueDate)
+      task.set("status", "PENDING")
+      task.set("created", AH.pbDate())
+      task.set("updated", AH.pbDate())
+      $app.save(task)
+      createdCount++
+
+      const empUser = H.findEmployeeUser(emp.id)
+      if (empUser) {
+        H.createNotification(
+          ctx.tenantId || String(emp.get("tenant") || ""),
+          empUser.id,
+          emp.id,
+          `【新学习任务】${course.get("title")}`,
+          `您有新的视频学习培训任务：《${course.get("title")}》，请在截止日期前进入小程序完成观看与复盘。`,
+          "learning_task",
+          `/pages/learning/index?taskId=${task.id}`
+        )
+      }
+    }
+
+    g.writeAudit(e, ctx, "learning_task_publish", "learning_tasks", courseId, { targetScope, createdCount })
+    return e.json(200, { ok: true, count: createdCount, message: `成功派发给 ${createdCount} 名员工` })
+  } catch (err) {
+    const status = Number(err && err.status) || 500
+    return e.json(status >= 400 && status <= 599 ? status : 500, { error: "publish_task_failed", message: String((err && err.message) || err) })
+  }
+})
+
 routerAdd("POST", "/api/yuqi/employee/learning-tasks/{id}/progress", (e) => {
   try {
     const g = require(`${__hooks}/_lib/guards.js`)
@@ -156,21 +265,24 @@ routerAdd("POST", "/api/yuqi/employee/learning-tasks/{id}/progress", (e) => {
     }
 
     const body = e.requestInfo().body || {}
+    const videoProgress = Number(body.videoProgressSeconds || body.videoProgress || 0)
     const completedUnitId = String(body.completedUnitId || body.unitId || "").trim()
     const courseId = String(task.get("course") || "")
 
-    if (!completedUnitId) throw new BadRequestError("缺少 completedUnitId")
-
-    // 严格校验章节真实性与课程归属
-    let validUnit = null
-    try {
-      validUnit = $app.findRecordById("learning_course_units", completedUnitId)
-    } catch (_) {}
-    if (!validUnit || String(validUnit.get("course") || "") !== courseId) {
-      throw new BadRequestError("章节不存在或不属于该课程")
-    }
-
+    const percentInput = typeof body.progress === "number" ? body.progress : (typeof body.progressPercent === "number" ? body.progressPercent : null)
     const totalUnits = $app.findRecordsByFilter("learning_course_units", "course = {:c}", "", 200, 0, { c: courseId }).length
+
+    let validUnit = null
+    if (completedUnitId) {
+      try {
+        validUnit = $app.findRecordById("learning_course_units", completedUnitId)
+      } catch (_) {}
+      if (!validUnit || String(validUnit.get("course") || "") !== courseId) {
+        throw new BadRequestError("章节不存在或不属于该课程")
+      }
+    } else if (percentInput === null && !videoProgress) {
+      throw new BadRequestError("缺少 completedUnitId 或 progress 参数")
+    }
 
     let progress = null
     try {
@@ -199,19 +311,37 @@ routerAdd("POST", "/api/yuqi/employee/learning-tasks/{id}/progress", (e) => {
       completedUnits.push(completedUnitId)
     }
 
-    const total = Math.max(1, totalUnits)
-    const percent = Math.min(100, Math.round((completedUnits.length / total) * 100))
+    let percent = 0
+    if (percentInput !== null) {
+      percent = Math.max(0, Math.min(100, Math.round(percentInput)))
+    } else if (totalUnits > 0) {
+      const total = Math.max(1, totalUnits)
+      percent = Math.min(100, Math.round((completedUnits.length / total) * 100))
+    } else {
+      percent = videoProgress > 0 ? 100 : 0
+    }
+
     progress.set("completed_units", JSON.stringify(completedUnits))
     progress.set("progress_percent", percent)
     if (completedUnitId) progress.set("last_unit", completedUnitId)
 
+    if (videoProgress > 0) {
+      task.set("video_progress_seconds", videoProgress)
+    }
+
     if (percent >= 100) {
       progress.set("status", "COMPLETED")
       progress.set("completed_at", AH.pbDate())
+      task.set("status", "COMPLETED")
+      task.set("completed_at", AH.pbDate())
     } else {
       progress.set("status", "IN_PROGRESS")
+      if (task.get("status") !== "COMPLETED") {
+        task.set("status", "IN_PROGRESS")
+      }
     }
     $app.save(progress)
+    $app.save(task)
 
     return e.json(200, {
       ok: true,

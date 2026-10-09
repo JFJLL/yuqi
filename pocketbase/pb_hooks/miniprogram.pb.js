@@ -134,6 +134,31 @@ routerAdd("GET", "/api/yuqi/employee/dashboard", (e) => {
     const pending = issues.filter((i) => i.get("state") === "待整改")
     const highRisk = issues.filter((i) => (i.get("risk") === "高" || i.get("risk") === "HIGH") && i.get("state") !== "已完成")
 
+    // 最新视频学习任务 (待完成)
+    let latestTask = null
+    let unreadCount = 0
+    try {
+      const taskFilter = ctx.tenantId
+        ? "employee = {:emp} && (tenant = {:tenant} || tenant = '') && status != 'COMPLETED'"
+        : "employee = {:emp} && status != 'COMPLETED'"
+      const taskParams = ctx.tenantId ? { emp: empId, tenant: ctx.tenantId } : { emp: empId }
+      const pendingTasks = $app.findRecordsByFilter("learning_tasks", taskFilter, "-created", 10, 0, taskParams)
+      unreadCount = pendingTasks.length
+      if (pendingTasks.length > 0) {
+        const topTask = pendingTasks[0]
+        let course = null
+        try { course = $app.findRecordById("learning_courses", String(topTask.get("course") || "")) } catch (_) {}
+        latestTask = {
+          id: topTask.id,
+          title: course ? course.get("title") : "视频学习培训",
+          category: course ? course.get("category") : "合规培训",
+          videoUrl: course ? (course.get("video_url") || "") : "",
+          dueAt: topTask.get("due_at") ? topTask.get("due_at").slice(0, 10) : "",
+          status: topTask.get("status") || "PENDING",
+        }
+      }
+    } catch (_) {}
+
     // 设备
     let device = null
     try {
@@ -169,7 +194,9 @@ routerAdd("GET", "/api/yuqi/employee/dashboard", (e) => {
         inspected: issues.length,
         pending: pending.length,
         highRisk: highRisk.length,
+        learningPending: unreadCount,
       },
+      latestLearningTask: latestTask,
       feedbacks: issues.slice(0, 10).map((i) => ({
         id: i.id,
         issueType: i.get("issue_type"),
