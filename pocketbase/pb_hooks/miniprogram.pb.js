@@ -129,7 +129,7 @@ routerAdd("GET", "/api/yuqi/employee/dashboard", (e) => {
       ? "store = {:s} && tenant = {:t} && review_status = 'APPROVED' && employee_visibility = 'VISIBLE'"
       : "employee = {:e} && tenant = {:t} && review_status = 'APPROVED' && employee_visibility = 'VISIBLE'"
     const issuesParams = isMgr ? { s: storeId, t: ctx.tenantId } : { e: empId, t: ctx.tenantId }
-    const issues = $app.findRecordsByFilter("inspection_issues", issuesFilter, "-occurred_at", 100, 0, issuesParams)
+    const issues = $app.findRecordsByFilter("issues", issuesFilter, "-occurred_at", 100, 0, issuesParams)
 
     const pending = issues.filter((i) => i.get("state") === "待整改")
     const highRisk = issues.filter((i) => (i.get("risk") === "高" || i.get("risk") === "HIGH") && i.get("state") !== "已完成")
@@ -225,7 +225,7 @@ routerAdd("GET", "/api/yuqi/employee/feedbacks", (e) => {
       ? "store = {:s} && tenant = {:t} && review_status = 'APPROVED' && employee_visibility = 'VISIBLE'"
       : "employee = {:e} && tenant = {:t} && review_status = 'APPROVED' && employee_visibility = 'VISIBLE'"
     const params = isMgr ? { s: storeId, t: ctx.tenantId } : { e: empId, t: ctx.tenantId }
-    const issues = $app.findRecordsByFilter("inspection_issues", filter, "-occurred_at", 200, 0, params)
+    const issues = $app.findRecordsByFilter("issues", filter, "-occurred_at", 200, 0, params)
 
     return e.json(200, issues.map((i) => ({
       id: i.id,
@@ -247,9 +247,9 @@ routerAdd("POST", "/api/yuqi/employee/feedbacks/{id}/learned", (e) => {
     const g = require(`${__hooks}/_lib/guards.js`)
     const ctx = g.requireAuth(e)
     const issueId = e.request.pathValue("id")
-    const issue = $app.findRecordById("inspection_issues", issueId)
+    const issue = $app.findRecordById("issues", issueId)
     if (!issue) throw new NotFoundError("问题不存在")
-    g.writeAudit(e, ctx, "issue_learned", "inspection_issues", issue.id, {})
+    g.writeAudit(e, ctx, "issue_learned", "issues", issue.id, {})
     return e.json(200, { ok: true, message: "已确认学习" })
   } catch (err) {
     const status = Number(err && err.status) || 500

@@ -156,28 +156,37 @@ routerAdd("POST", "/api/yuqi/admin/upload-video", (e) => {
     const ctx = g.requireAuth(e)
     g.requireRole(e, ctx, ["SUPER_ADMIN", "ADMIN", "REGION_MANAGER", "STORE_MANAGER"])
 
-    const files = e.request.findUploadedFiles("file")
-    if (!files || files.length === 0) {
-      throw new BadRequestError("请选择需要上传的视频文件 (字段名为 file)")
+    try { e.request.parseMultipartForm(100 << 20) } catch (_) {}
+    const mf = e.request.multipartForm
+    let fileObj = null
+    if (mf && mf.file && mf.file["file"] && mf.file["file"].length) {
+      fileObj = mf.file["file"][0]
     }
-    const file = files[0]
-    const ext = (file.name.split(".").pop() || "mp4").toLowerCase()
+    if (!fileObj) {
+      throw new BadRequestError("请选择需要上传的视频文件 (表单字段名 file)")
+    }
+
+    const originalName = fileObj.filename || "video.mp4"
+    const ext = (originalName.split(".").pop() || "mp4").toLowerCase()
     const cleanName = `video-${Date.now()}-${$security.randomString(8)}.${ext}`
 
-    // 将视频保存到 PocketBase pb_data/storage/videos 目录
     const storageDir = `${$app.dataDir()}/storage/videos`
-    try { $os.mkdirAll(storageDir, 0755) } catch (_) {}
+    try { $os.mkdirAll(storageDir, 0o755) } catch (_) {}
     const destPath = `${storageDir}/${cleanName}`
-    $filesystem.copy(file, destPath)
 
-    // 生成外部可直接访问的相对/绝对路径
+    const rhFile = $filesystem.fileFromMultipart(fileObj)
+    const fsSystem = $app.newFilesystem()
+    try {
+      fsSystem.uploadFile(rhFile, cleanName)
+    } finally {
+      fsSystem.close()
+    }
+
     const videoUrl = `/__pb/api/yuqi/media/video/${cleanName}`
-
     return e.json(200, {
       ok: true,
       videoUrl,
-      fileName: file.name,
-      fileSize: file.size,
+      fileName: originalName,
       message: "视频上传成功"
     })
   } catch (err) {
@@ -192,8 +201,12 @@ routerAdd("GET", "/api/yuqi/media/video/{filename}", (e) => {
     if (!/^[a-zA-Z0-9_.-]+$/.test(filename)) {
       return e.json(400, { error: "invalid_filename" })
     }
-    const filePath = `${$app.dataDir()}/storage/videos/${filename}`
-    return e.file(filePath)
+    const fsSystem = $app.newFilesystem()
+    try {
+      return fsSystem.serve(e.response, e.request, filename, filename)
+    } finally {
+      fsSystem.close()
+    }
   } catch (err) {
     return e.json(404, { error: "not_found", message: "视频文件不存在" })
   }
