@@ -220,3 +220,14 @@ function isOpenIssue(state) {
     return e.json(code, { code: code, message: msg })
   }
 })
+
+routerAdd("POST", "/api/admin/sync", function (e) {
+  try {
+    const g = require(`${__hooks}/_lib/guards.js`)
+    const ctx = g.requireAuth(e)
+    g.writeAudit(e, ctx, "data_sync", "sync_logs", "manual", { action: "refresh_cache" })
+    return e.json(200, { ok: true, synced_at: new Date().toISOString() })
+  } catch (err) {
+    return e.json(500, { error: "sync_failed", message: String((err && err.message) || err) })
+  }
+})

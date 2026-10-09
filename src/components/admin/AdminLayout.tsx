@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import {
   AudioLines,
   Badge,
@@ -126,12 +126,17 @@ export function AdminLayout() {
     return () => clearTimeout(timer)
   }, [])
 
+  const [syncing, setSyncing] = useState(false)
+
   async function handleSync() {
+    setSyncing(true)
     try {
       await triggerSync()
       toast.success("数据已刷新")
     } catch {
       toast.error("同步失败，请稍后重试")
+    } finally {
+      setTimeout(() => setSyncing(false), 500)
     }
   }
 
@@ -202,11 +207,12 @@ export function AdminLayout() {
             <Button
               variant="outline"
               size="sm"
+              disabled={syncing}
               className="h-9 gap-1.5 bg-white border-[#dbe3ec] text-[#172033] hover:bg-[#f8fafc] hover:border-[#9fb2c4]"
               onClick={handleSync}
             >
-              <RefreshCw className="w-4 h-4" />
-              刷新数据
+              <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin text-[#1672a8]" : ""}`} />
+              {syncing ? "正在刷新…" : "刷新数据"}
             </Button>
             <div className="h-9 px-3 border border-[#dbe3ec] bg-white rounded-[6px] flex items-center gap-2 text-xs">
               <div className="flex flex-col leading-tight">
