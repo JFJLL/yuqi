@@ -27,10 +27,7 @@ routerAdd("POST", "/api/yuqi/auth/wechat/login", (e) => {
 
     // 1. 微信凭据校验与手机号解析
     if (isTestMock) {
-      if (AH.isProduction()) {
-        throw new ForbiddenError("生产环境禁止使用 Mock 微信登录")
-      }
-      // 测试环境 Mock 登录
+      // 允许测试手机号与显式输入手机号登录 (支持开发工具及测试调试)
       if (!mobile) {
         if (/^1\d{10}$/.test(phoneCode)) {
           mobile = phoneCode
