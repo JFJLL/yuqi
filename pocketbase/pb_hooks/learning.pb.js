@@ -454,6 +454,7 @@ routerAdd("POST", "/api/yuqi/employee/learning-tasks/{id}/progress", (e) => {
     $app.save(progress)
     $app.save(task)
 
+    const total = Math.max(1, totalUnits || 1)
     return e.json(200, {
       ok: true,
       progressPercent: percent,
